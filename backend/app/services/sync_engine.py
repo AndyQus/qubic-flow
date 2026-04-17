@@ -1,0 +1,162 @@
+import json
+import logging
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from sqlalchemy import select
+from ..database import SessionLocal
+from ..models.wallet import Wallet
+from ..models.event import Event
+from ..models.sync_state import SyncState
+from ..models.sync_gap import SyncGap
+from ..utils.time import now_utc_iso, unix_ms_to_iso, iso_to_date
+from .qubic_client import RPCClient
+from .coingecko import get_price_for_date
+
+logger = logging.getLogger(__name__)
+
+MAX_WINDOW_RECORDS = 10000
+PAGE_SIZE = 1000
+
+_client = RPCClient()
+
+
+async def sync_all_wallets():
+    """Entry point — called by scheduler every 60s."""
+    db = SessionLocal()
+    try:
+        current_tick = await _client.get_current_tick()
+        wallets = db.query(Wallet).filter(Wallet.active == 1, Wallet.deleted_at.is_(None)).all()
+        for wallet in wallets:
+            try:
+                await sync_wallet(db, wallet.id, current_tick)
+            except Exception as e:
+                logger.error(f"Sync failed for wallet {wallet.id}: {e}", exc_info=True)
+                _set_sync_failed(db, wallet.id, str(e))
+    finally:
+        db.close()
+
+
+async def sync_wallet(db: Session, wallet_id: str, current_tick: int):
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    if state is None:
+        state = SyncState(wallet_id=wallet_id, last_tick=0, status="IDLE", total_events=0)
+        db.add(state)
+        db.commit()
+
+    from_tick = (state.last_tick or 0) + 1
+    to_tick = current_tick
+
+    if from_tick > to_tick:
+        return
+
+    state.status = "SYNCING"
+    state.last_sync = now_utc_iso()
+    db.commit()
+
+    try:
+        owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
+        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses)
+
+        state.last_tick = max_valid_tick or to_tick
+        state.status = "SUCCESS"
+        state.error_message = None
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        gap = SyncGap(
+            wallet_id=wallet_id,
+            from_tick=from_tick,
+            to_tick=to_tick,
+            detected_at=now_utc_iso(),
+        )
+        db.add(gap)
+        state.status = "FAILED"
+        state.error_message = str(e)[:500]
+        db.commit()
+        raise
+
+
+async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set) -> int:
+    probe = await _client.get_event_logs(wallet_id, from_tick, to_tick, offset=0, size=1)
+    total = probe.get("hits", {}).get("total", 0)
+    valid_for_tick = probe.get("validForTick", to_tick)
+
+    if total > MAX_WINDOW_RECORDS and from_tick < to_tick:
+        mid = (from_tick + to_tick) // 2
+        v1 = await _sync_window(db, wallet_id, from_tick, mid, owned_addresses)
+        v2 = await _sync_window(db, wallet_id, mid + 1, to_tick, owned_addresses)
+        return max(v1, v2)
+
+    if total > MAX_WINDOW_RECORDS:
+        logger.warning(f"Wallet {wallet_id} tick {from_tick}: {total} events, truncating at {MAX_WINDOW_RECORDS}")
+
+    offset = 0
+    while offset < min(total, MAX_WINDOW_RECORDS):
+        resp = await _client.get_event_logs(wallet_id, from_tick, to_tick, offset=offset, size=PAGE_SIZE)
+        logs = resp.get("eventLogs", [])
+        if not logs:
+            break
+        await _persist_logs(db, wallet_id, logs, owned_addresses)
+        offset += len(logs)
+        valid_for_tick = resp.get("validForTick", valid_for_tick)
+
+    return valid_for_tick
+
+
+async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set):
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    inserted = 0
+
+    for log in logs:
+        log_id = log.get("logId")
+        if not log_id:
+            continue
+        if db.query(Event.id).filter(Event.id == log_id).first():
+            continue
+
+        qu = log.get("quTransfer", {})
+        source = qu.get("source")
+        dest = qu.get("destination")
+        amount = int(qu.get("amount", "0")) if qu.get("amount") else 0
+
+        ts_iso = unix_ms_to_iso(log.get("timestamp", "0"))
+        date_str = iso_to_date(ts_iso)
+        price = await get_price_for_date(db, date_str)
+
+        is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
+
+        event = Event(
+            id=log_id,
+            epoch=log.get("epoch"),
+            tick_number=log.get("tickNumber"),
+            timestamp_raw=log.get("timestamp"),
+            timestamp=ts_iso,
+            log_type=log.get("logType"),
+            log_digest=log.get("logDigest"),
+            categories=json.dumps(log.get("categories", [])),
+            source_address=source,
+            destination_addr=dest,
+            wallet_id=wallet_id,
+            is_internal=is_internal,
+            amount_qubic=amount,
+            qubic_eur_rate=price.get("eur"),
+            qubic_usd_rate=price.get("usd"),
+            source_type="EVENT",
+            verified=0,
+            created_at=now_utc_iso(),
+        )
+        db.merge(event)
+        inserted += 1
+
+    if inserted > 0:
+        state.total_events = (state.total_events or 0) + inserted
+        db.commit()
+        logger.info(f"Wallet {wallet_id}: persisted {inserted} new events")
+
+
+def _set_sync_failed(db: Session, wallet_id: str, message: str):
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    if state:
+        state.status = "FAILED"
+        state.error_message = message[:500]
+        db.commit()
