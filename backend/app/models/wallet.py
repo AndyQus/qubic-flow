@@ -15,5 +15,14 @@ class Wallet(Base):
     updated_at = Column(Text)
     deleted_at = Column(Text, nullable=True)
 
-    sync_state = relationship("SyncState", back_populates="wallet", uselist=False)
-    events = relationship("Event", back_populates="wallet")
+    sync_state = relationship(
+        "SyncState",
+        back_populates="wallet",
+        uselist=False,
+        primaryjoin="Wallet.id == foreign(SyncState.wallet_id)",
+    )
+    events = relationship(
+        "Event",
+        back_populates="wallet",
+        primaryjoin="Wallet.id == foreign(Event.wallet_id)",
+    )

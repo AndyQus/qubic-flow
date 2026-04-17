@@ -14,4 +14,8 @@ class SyncState(Base):
     total_events = Column(Integer, default=0)
     last_window_size = Column(Integer, default=10000)
 
-    wallet = relationship("Wallet", back_populates="sync_state")
+    wallet = relationship(
+        "Wallet",
+        back_populates="sync_state",
+        primaryjoin="foreign(SyncState.wallet_id) == Wallet.id",
+    )

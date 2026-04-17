@@ -35,4 +35,8 @@ class Event(Base):
     verified = Column(Integer, default=0)
     created_at = Column(Text)
 
-    wallet = relationship("Wallet", back_populates="events", foreign_keys=[wallet_id])
+    wallet = relationship(
+        "Wallet",
+        back_populates="events",
+        primaryjoin="foreign(Event.wallet_id) == Wallet.id",
+    )
