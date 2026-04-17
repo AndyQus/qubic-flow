@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+  html.light { color-scheme: light; }
+  html.light body {
+    background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+    color: #1a202c;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-qubic-card border border-qubic-border rounded-xl p-4;
+  }
+  html.light .card {
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  .btn {
+    @apply px-4 py-2 rounded-lg bg-qubic-teal text-gray-900 font-medium
+           hover:bg-qubic-cyan transition-colors disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg border border-qubic-border
+           hover:bg-qubic-card transition-colors;
+  }
+  .pill {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-qubic-teal/20 text-qubic-teal border border-qubic-teal/30;
+  }
+  .input {
+    @apply px-3 py-2 rounded-lg bg-qubic-bg border border-qubic-border
+           text-gray-100 focus:border-qubic-teal focus:outline-none;
+  }
+  html.light .input {
+    @apply bg-white/60 text-gray-900 border-gray-300;
+  }
+}
+
+@keyframes beam-drop {
+  0% { opacity: 0; transform: translateY(-20px); filter: blur(4px); }
+  50% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes slide-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes push-down {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+@keyframes flash-green {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(45, 212, 191, 0.3); }
+}
+@keyframes flash-red {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(239, 68, 68, 0.3); }
+}
+
+.anim-push-down    { animation: push-down 0.4s ease-out; }
+.anim-slide-in     { animation: slide-in 0.5s ease-out; }
+.anim-beam-drop    { animation: beam-drop 0.8s ease-out; }
+.flash-in          { animation: flash-green 1.5s ease-out; }
+.flash-out         { animation: flash-red 1.5s ease-out; }

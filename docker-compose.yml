@@ -25,7 +25,9 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: nginx:alpine
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: qubicflow-frontend
     ports:
       - "8080:80"
