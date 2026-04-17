@@ -1,9 +1,27 @@
 from typing import Protocol, runtime_checkable
+import asyncio
 import logging
+from datetime import datetime, timezone
 import httpx
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+_RPC_RATE_LIMIT = 100
+_rpc_lock = asyncio.Lock()
+_rpc_request_times: list[float] = []
+
+
+async def _rpc_rate_limit():
+    async with _rpc_lock:
+        now = datetime.now(timezone.utc).timestamp()
+        global _rpc_request_times
+        _rpc_request_times = [t for t in _rpc_request_times if now - t < 60]
+        if len(_rpc_request_times) >= _RPC_RATE_LIMIT:
+            wait = 60 - (now - _rpc_request_times[0])
+            logger.info(f"RPC rate limit reached, waiting {wait:.1f}s")
+            await asyncio.sleep(wait)
+        _rpc_request_times.append(datetime.now(timezone.utc).timestamp())
 
 
 @runtime_checkable
@@ -17,6 +35,7 @@ class RPCClient:
         self.base_url = settings.qubic_rpc_url
 
     async def _request(self, method: str, path: str, **kwargs) -> dict:
+        await _rpc_rate_limit()
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
@@ -28,7 +47,6 @@ class RPCClient:
                 last_exc = e
                 wait = 2 ** attempt
                 logger.warning(f"RPC {path} attempt {attempt+1} failed: {e}, retry in {wait}s")
-                import asyncio
                 await asyncio.sleep(wait)
         raise last_exc if last_exc else RuntimeError("RPC request failed")
 
