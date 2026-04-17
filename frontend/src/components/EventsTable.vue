@@ -72,7 +72,7 @@ function valueEur(ev) {
               <span v-else class="text-gray-500">—</span>
             </td>
             <td class="p-3 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-            <td class="p-3 font-mono text-xs">{{ ev.qubic_eur_rate?.toFixed(6) || '—' }}</td>
+            <td class="p-3 font-mono text-xs">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(10).replace(/\.?0+$/, '') : '—' }}</td>
             <td class="p-3 font-mono">{{ valueEur(ev) }}</td>
             <td class="p-3 font-mono text-xs text-gray-400">{{ shortAddr(ev.source_address) }}</td>
             <td class="p-3 font-mono text-xs text-gray-400">{{ shortAddr(ev.destination_addr) }}</td>
