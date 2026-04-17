@@ -22,7 +22,9 @@ export function useWebSocket() {
           const idx = store.nodes.findIndex(n => n.id === msg.payload.node_id)
           if (idx >= 0) Object.assign(store.nodes[idx], msg.payload)
         }
-      } catch {}
+      } catch (err) {
+        console.warn('WS message parse error', err)
+      }
     }
   }
 

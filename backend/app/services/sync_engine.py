@@ -58,7 +58,17 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int):
         owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
         max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses)
 
-        state.last_tick = max_valid_tick or to_tick
+        effective_tick = max_valid_tick if max_valid_tick is not None else to_tick
+        if effective_tick < to_tick:
+            gap = SyncGap(
+                wallet_id=wallet_id,
+                from_tick=effective_tick + 1,
+                to_tick=to_tick,
+                detected_at=now_utc_iso(),
+            )
+            db.add(gap)
+            logger.warning(f"Wallet {wallet_id}: validForTick={effective_tick} < to_tick={to_tick}, gap recorded")
+        state.last_tick = effective_tick
         state.status = "SUCCESS"
         state.error_message = None
         db.commit()
