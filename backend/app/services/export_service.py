@@ -48,6 +48,15 @@ def _classify(event: Event, owned: set) -> str:
     return "UNKNOWN"
 
 
+def _fmt_rate(rate) -> str:
+    """Format rate with up to 10 decimal places, no scientific notation.
+    e.g. 6.482e-7 -> '0.0000006482'
+    """
+    if not rate:
+        return ""
+    return f"{float(rate):.10f}".rstrip("0").rstrip(".")
+
+
 def _eur_value(amount: int, rate) -> str:
     if not rate:
         return ""
@@ -107,8 +116,8 @@ def export_steuerberater(db: Session, year: int | None = None) -> str:
     for e in events:
         kind = _classify(e, owned)
         amount = e.amount_qubic or 0
-        rate = e.qubic_eur_rate or 0
-        value = _eur_value(amount, rate)
+        rate = _fmt_rate(e.qubic_eur_rate)
+        value = _eur_value(amount, e.qubic_eur_rate)
         label = labels.get(e.wallet_id, "")
 
         writer.writerow([
