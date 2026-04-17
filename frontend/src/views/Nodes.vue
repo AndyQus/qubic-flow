@@ -7,13 +7,14 @@ import { useTranslation } from 'i18next-vue'
 const store = useAppStore()
 const { t } = useTranslation()
 const showForm = ref(false)
-const form = ref({ url: '', node_type: 'RPC', label: '', priority: 1 })
+const DEFAULT_RPC = 'https://rpc.qubic.org'
+const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 })
 
 async function reload() { store.nodes = await api.nodes.list() }
 
 async function submit() {
   await api.nodes.create(form.value)
-  form.value = { url: '', node_type: 'RPC', label: '', priority: 1 }
+  form.value = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
   showForm.value = false
   await reload()
 }
@@ -40,7 +41,10 @@ onMounted(reload)
   </div>
 
   <div v-if="showForm" class="card mb-4 space-y-3">
-    <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
+    <div>
+      <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
+      <p class="text-xs text-gray-400 mt-1">Standard: <span class="font-mono">https://rpc.qubic.org</span></p>
+    </div>
     <select v-model="form.node_type" class="input w-full">
       <option value="RPC">RPC</option>
       <option value="BOB_NODE">BOB_NODE</option>
