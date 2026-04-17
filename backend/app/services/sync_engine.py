@@ -11,6 +11,7 @@ from ..models.sync_gap import SyncGap
 from ..utils.time import now_utc_iso, unix_ms_to_iso, iso_to_date
 from .qubic_client import RPCClient
 from .coingecko import get_price_for_date
+from ..websocket.manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int
 async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set):
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
     inserted = 0
+    new_events = []
 
     for log in logs:
         log_id = log.get("logId")
@@ -147,11 +149,26 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         )
         db.merge(event)
         inserted += 1
+        new_events.append({
+            "id": log_id,
+            "epoch": event.epoch,
+            "tick_number": event.tick_number,
+            "timestamp": event.timestamp,
+            "source_address": event.source_address,
+            "destination_addr": event.destination_addr,
+            "wallet_id": event.wallet_id,
+            "amount_qubic": event.amount_qubic,
+            "qubic_eur_rate": event.qubic_eur_rate,
+            "qubic_usd_rate": event.qubic_usd_rate,
+            "is_internal": event.is_internal,
+        })
 
     if inserted > 0:
         state.total_events = (state.total_events or 0) + inserted
         db.commit()
         logger.info(f"Wallet {wallet_id}: persisted {inserted} new events")
+        for ev in new_events:
+            await manager.broadcast("event.new", ev)
 
 
 def _set_sync_failed(db: Session, wallet_id: str, message: str):

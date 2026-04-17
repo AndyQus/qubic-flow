@@ -1,28 +1,71 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import List
+from ...database import get_db
+from ...models.node import Node
+from ...schemas.node import NodeCreate, NodeOut
+from ...utils.time import now_utc_iso
 
 router = APIRouter()
 
 
-@router.get("/nodes")
-def list_nodes():
-    return []
+class NodeReorder(BaseModel):
+    order: List[int]
 
 
-@router.post("/nodes")
-def create_node():
-    return {}
+@router.get("/nodes", response_model=list[NodeOut])
+def list_nodes(db: Session = Depends(get_db)):
+    return db.query(Node).order_by(Node.priority).all()
 
 
-@router.put("/nodes/{node_id}")
-def update_node(node_id: int):
-    return {}
-
-
-@router.delete("/nodes/{node_id}")
-def delete_node(node_id: int):
-    return {}
+@router.post("/nodes", response_model=NodeOut, status_code=201)
+def create_node(payload: NodeCreate, db: Session = Depends(get_db)):
+    if db.query(Node).filter(Node.url == payload.url).first():
+        raise HTTPException(status_code=409, detail="Node URL already exists")
+    node = Node(
+        url=payload.url,
+        node_type=payload.node_type,
+        label=payload.label,
+        priority=payload.priority,
+        health_status="ONLINE",
+        is_active=1,
+        last_checked=now_utc_iso(),
+    )
+    db.add(node)
+    db.commit()
+    db.refresh(node)
+    return node
 
 
 @router.put("/nodes/reorder")
-def reorder_nodes():
-    return {}
+def reorder_nodes(payload: NodeReorder, db: Session = Depends(get_db)):
+    for priority, node_id in enumerate(payload.order, start=1):
+        node = db.query(Node).filter(Node.id == node_id).first()
+        if node:
+            node.priority = priority
+    db.commit()
+    return {"ok": True}
+
+
+@router.put("/nodes/{node_id}", response_model=NodeOut)
+def update_node(node_id: int, payload: NodeCreate, db: Session = Depends(get_db)):
+    node = db.query(Node).filter(Node.id == node_id).first()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    node.url = payload.url
+    node.node_type = payload.node_type
+    node.label = payload.label
+    node.priority = payload.priority
+    db.commit()
+    db.refresh(node)
+    return node
+
+
+@router.delete("/nodes/{node_id}", status_code=204)
+def delete_node(node_id: int, db: Session = Depends(get_db)):
+    node = db.query(Node).filter(Node.id == node_id).first()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    db.delete(node)
+    db.commit()
