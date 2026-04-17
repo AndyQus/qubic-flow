@@ -8,14 +8,26 @@ so wallet IDs can be reused across tests without conflict.
 import pytest
 
 
+def _addr(seed: str) -> str:
+    """Produce a valid 60-char uppercase Qubic-style address for tests."""
+    import hashlib
+    h = hashlib.sha256(seed.encode()).hexdigest().upper()
+    alpha = "".join(c for c in h if c.isalpha())
+    while len(alpha) < 60:
+        alpha += alpha
+    return alpha[:60]
+
+
 WALLET_PAYLOAD = {
-    "id": "ADDR_TEST_WALLET_AAABBBCCC",
+    "id": _addr("primary"),
     "label": "Test Wallet",
     "note": "Created in tests",
     "wallet_type": "PRIVATE",
 }
 
 WALLET_ID = WALLET_PAYLOAD["id"]
+WALLET_ID_A = _addr("list-a")
+WALLET_ID_B = _addr("list-b")
 
 
 # ------------------------------------------------------------------ POST /wallets --
@@ -80,14 +92,14 @@ class TestListWallets:
         assert WALLET_ID in ids
 
     def test_list_returns_all_active_wallets(self, client):
-        payload_a = {**WALLET_PAYLOAD, "id": "WALLET_LIST_A"}
-        payload_b = {**WALLET_PAYLOAD, "id": "WALLET_LIST_B"}
+        payload_a = {**WALLET_PAYLOAD, "id": WALLET_ID_A}
+        payload_b = {**WALLET_PAYLOAD, "id": WALLET_ID_B}
         client.post("/api/v1/wallets", json=payload_a)
         client.post("/api/v1/wallets", json=payload_b)
         resp = client.get("/api/v1/wallets")
         ids = [w["id"] for w in resp.json()]
-        assert "WALLET_LIST_A" in ids
-        assert "WALLET_LIST_B" in ids
+        assert WALLET_ID_A in ids
+        assert WALLET_ID_B in ids
 
     def test_list_returns_200(self, client):
         resp = client.get("/api/v1/wallets")

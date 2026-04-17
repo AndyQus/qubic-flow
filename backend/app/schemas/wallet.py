@@ -1,19 +1,19 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Literal
 from datetime import datetime
 
 
 class WalletCreate(BaseModel):
-    id: str
-    label: str
-    note: Optional[str] = None
-    wallet_type: str
+    id: str = Field(..., pattern=r"^[A-Z]{60}$", description="Qubic address: 60 uppercase letters")
+    label: str = Field(..., min_length=1, max_length=200)
+    note: Optional[str] = Field(None, max_length=1000)
+    wallet_type: Literal["PRIVATE", "BUSINESS"]
 
 
 class WalletUpdate(BaseModel):
-    label: Optional[str] = None
-    note: Optional[str] = None
-    wallet_type: Optional[str] = None
+    label: Optional[str] = Field(None, min_length=1, max_length=200)
+    note: Optional[str] = Field(None, max_length=1000)
+    wallet_type: Optional[Literal["PRIVATE", "BUSINESS"]] = None
     active: Optional[int] = None
 
 

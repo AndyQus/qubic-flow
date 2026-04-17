@@ -35,10 +35,14 @@ async def get_price_for_date(db: Session, date_str: str) -> dict:
     try:
         await _rate_limit_wait()
         yyyy, mm, dd = date_str.split("-")
+        headers = {}
+        if settings.coingecko_api_key:
+            headers["x-cg-demo-api-key"] = settings.coingecko_api_key
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 f"{settings.coingecko_api_url}/coins/qubic-network/history",
                 params={"date": f"{dd}-{mm}-{yyyy}", "localization": "false"},
+                headers=headers,
                 timeout=15,
             )
             r.raise_for_status()

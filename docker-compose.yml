@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: qubicflow-backend
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - qubicflow-data:/app/data
     user: "1000:1000"
@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile
     container_name: qubicflow-frontend
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
     restart: unless-stopped
