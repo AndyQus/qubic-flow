@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="150" viewBox="0 0 480 150">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07111F"/>
+      <stop offset="100%" stop-color="#0D1A2E"/>
+    </linearGradient>
+    <radialGradient id="glow-bg" cx="14%" cy="50%" r="22%">
+      <stop offset="0%" stop-color="#23FFFF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#23FFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow-filter" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="text-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="55%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#23FFFF"/>
+    </linearGradient>
+    <linearGradient id="sep-fade" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#23FFFF" stop-opacity="0.05"/>
+      <stop offset="50%" stop-color="#23FFFF" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#23FFFF" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="150" rx="14" fill="url(#bg2)"/>
+  <rect width="480" height="150" rx="14" fill="url(#glow-bg)"/>
+  <rect x="36" y="0" width="54" height="2" rx="1" fill="#23FFFF" fill-opacity="0.7"/>
+
+  <g transform="translate(36, 29) scale(1.75)" filter="url(#glow-filter)">
+    <path fill="#23FFFF" d="M11.308 0H1.615C.723 0 0 .724 0 1.616v35.538c0 .892.723 1.616 1.615 1.616h9.693c.892 0 1.615-.724 1.615-1.616V1.616C12.923.724 12.2 0 11.308 0Zm17.23 0h-9.692c-.892 0-1.616.723-1.616 1.615v48.462c0 .892.724 1.615 1.616 1.615h9.692c.892 0 1.616-.723 1.616-1.615V1.615C30.154.723 29.43 0 28.538 0Z"/>
+  </g>
+
+  <rect x="131" y="20" width="1" height="110" fill="url(#sep-fade)"/>
+
+  <text x="153" y="84" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="44" font-weight="900" letter-spacing="-1" fill="url(#text-grad)">QubicFlow</text>
+
+  <circle cx="157" cy="107" r="2" fill="#23FFFF" fill-opacity="0.5"/>
+  <text x="167" y="111" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="400" fill="#23FFFF" fill-opacity="0.5" letter-spacing="5">WALLET TRACKER</text>
+
+  <line x1="420" y1="150" x2="480" y2="150" stroke="#23FFFF" stroke-width="0.5" stroke-opacity="0.15"/>
+  <line x1="460" y1="110" x2="460" y2="150" stroke="#23FFFF" stroke-width="0.5" stroke-opacity="0.15"/>
+</svg>

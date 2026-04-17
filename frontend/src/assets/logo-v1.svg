@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="150" viewBox="0 0 480 150">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0C1628"/>
+      <stop offset="100%" stop-color="#0A0F1E"/>
+    </linearGradient>
+    <linearGradient id="accent1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#23FFFF"/>
+      <stop offset="100%" stop-color="#00CCCC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="480" height="150" rx="14" fill="url(#bg1)"/>
+
+  <!-- Border -->
+  <rect width="480" height="150" rx="14" fill="none" stroke="#23FFFF" stroke-width="0.8" stroke-opacity="0.25"/>
+
+  <!-- Qubic Symbol — scale 1.75, centered vertically -->
+  <!-- 31×52 × 1.75 = 54.25×91 → y=(150−91)/2=29.5 -->
+  <g transform="translate(36, 29) scale(1.75)">
+    <path fill="url(#accent1)" d="M11.308 0H1.615C.723 0 0 .724 0 1.616v35.538c0 .892.723 1.616 1.615 1.616h9.693c.892 0 1.615-.724 1.615-1.616V1.616C12.923.724 12.2 0 11.308 0Zm17.23 0h-9.692c-.892 0-1.616.723-1.616 1.615v48.462c0 .892.724 1.615 1.616 1.615h9.692c.892 0 1.616-.723 1.616-1.615V1.615C30.154.723 29.43 0 28.538 0Z"/>
+  </g>
+
+  <!-- Separator -->
+  <line x1="132" y1="28" x2="132" y2="122" stroke="#23FFFF" stroke-width="0.75" stroke-opacity="0.2"/>
+
+  <!-- Main title -->
+  <text x="154" y="86" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="46" font-weight="900" letter-spacing="-1.5">
+    <tspan fill="#FFFFFF">Qubic</tspan><tspan fill="#23FFFF">Flow</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="156" y="112" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#23FFFF" fill-opacity="0.55" letter-spacing="4">WALLET TRACKER</text>
+</svg>
