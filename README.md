@@ -66,6 +66,8 @@ cd qubic-flow
 docker-compose up --build
 ```
 
+**→ Hauptseite: http://localhost:8080**
+
 | Dienst    | URL                                    |
 |-----------|----------------------------------------|
 | Frontend  | http://localhost:8080                  |
