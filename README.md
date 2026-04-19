@@ -74,6 +74,8 @@ docker-compose up --build
 
 > Die Ports sind auf `127.0.0.1` gebunden — von außen nicht erreichbar.
 
+Das Backend führt beim Start automatisch `alembic upgrade head` aus — Datenbank-Migrationen laufen also ohne manuellen Eingriff.
+
 Daten werden im Docker-Volume `qubicflow-data` gespeichert und bleiben beim Neustart erhalten.
 
 **Stoppen:**
