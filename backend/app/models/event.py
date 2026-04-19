@@ -7,6 +7,7 @@ class Event(Base):
     __tablename__ = "events"
 
     id = Column(Text, primary_key=True)
+    wallet_id = Column(Text, primary_key=True, index=True)
     epoch = Column(Integer)
     tick_number = Column(Integer, index=True)
     timestamp_raw = Column(Text)
@@ -16,7 +17,6 @@ class Event(Base):
     categories = Column(Text)
     source_address = Column(Text, index=True)
     destination_addr = Column(Text, index=True)
-    wallet_id = Column(Text, index=True)
     is_internal = Column(Integer, default=0)
     amount_qubic = Column(Integer)
     qubic_eur_rate = Column(Float)

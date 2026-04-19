@@ -64,3 +64,12 @@ class RPCClient:
             "pagination": {"offset": offset, "size": size},
         }
         return await self._request("POST", "/query/v1/getEventLogs", json=payload)
+
+    async def get_transfer_transactions(self, wallet_id: str, from_tick: int, to_tick: int, page: int = 1, page_size: int = 100) -> dict:
+        params = {
+            "start_tick": from_tick,
+            "end_tick": to_tick,
+            "page": page,
+            "page_size": page_size,
+        }
+        return await self._request("GET", f"/v2/identities/{wallet_id}/transfer-transactions", params=params)

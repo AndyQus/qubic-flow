@@ -8,6 +8,7 @@ class SyncState(Base):
 
     wallet_id = Column(Text, primary_key=True)
     last_tick = Column(Integer, default=0)
+    last_tx_tick = Column(Integer, default=0)
     last_sync = Column(Text)
     status = Column(Text, default="IDLE")
     error_message = Column(Text, nullable=True)

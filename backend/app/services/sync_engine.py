@@ -31,8 +31,12 @@ async def sync_all_wallets():
             try:
                 await sync_wallet(db, wallet.id, current_tick)
             except Exception as e:
-                logger.error(f"Sync failed for wallet {wallet.id}: {e}", exc_info=True)
+                logger.error(f"Event sync failed for wallet {wallet.id}: {e}", exc_info=True)
                 _set_sync_failed(db, wallet.id, str(e))
+            try:
+                await sync_wallet_tx(db, wallet.id, current_tick)
+            except Exception as e:
+                logger.error(f"TX sync failed for wallet {wallet.id}: {e}", exc_info=True)
     finally:
         db.close()
 
@@ -123,7 +127,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         log_id = log.get("logId")
         if not log_id:
             continue
-        if db.query(Event.id).filter(Event.id == log_id).first():
+        if db.query(Event.id).filter(Event.id == log_id, Event.wallet_id == wallet_id).first():
             continue
 
         qu = log.get("quTransfer", {})
@@ -179,6 +183,97 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         logger.info(f"Wallet {wallet_id}: persisted {inserted} new events")
         for ev in new_events:
             await manager.broadcast("event.new", ev)
+
+
+async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int):
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    if state is None:
+        return
+
+    from_tick = (state.last_tx_tick or 0) + 1
+    to_tick = current_tick
+
+    if from_tick > to_tick:
+        return
+
+    owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
+    total_inserted = await _sync_transactions(db, wallet_id, from_tick, to_tick, owned_addresses)
+
+    state.last_tx_tick = to_tick
+    if total_inserted > 0:
+        state.total_events = (state.total_events or 0) + total_inserted
+    db.commit()
+    logger.info(f"TX sync done for wallet {wallet_id}: {total_inserted} new records (ticks {from_tick}–{to_tick})")
+
+
+async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set) -> int:
+    page = 1
+    total_inserted = 0
+
+    while True:
+        resp = await _client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
+        tick_groups = resp.get("transactions", [])
+        inserted = 0
+
+        for tick_group in tick_groups:
+            tick_number = tick_group.get("tickNumber")
+            for tx_data in tick_group.get("transactions", []):
+                if not tx_data.get("moneyFlew", False):
+                    continue
+
+                tx = tx_data.get("transaction", {})
+                tx_id = tx.get("txId")
+                if not tx_id:
+                    continue
+
+                # Skip if already stored as TX
+                if db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first():
+                    continue
+                # Skip if already covered by an Event (logDigest == txId)
+                if db.query(Event.id).filter(Event.log_digest == tx_id, Event.wallet_id == wallet_id).first():
+                    continue
+
+                source = tx.get("sourceId")
+                dest = tx.get("destId")
+                amount = int(tx.get("amount") or "0")
+                ts_unix_s = tx_data.get("timestamp", 0)
+                ts_iso = unix_ms_to_iso(int(ts_unix_s) * 1000)
+                date_str = iso_to_date(ts_iso)
+                price = await get_price_for_date(db, date_str)
+                is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
+
+                event = Event(
+                    id=tx_id,
+                    wallet_id=wallet_id,
+                    tick_number=tick_number,
+                    timestamp_raw=str(ts_unix_s),
+                    timestamp=ts_iso,
+                    log_type=tx.get("inputType"),
+                    log_digest=tx_id,
+                    source_address=source,
+                    destination_addr=dest,
+                    is_internal=is_internal,
+                    amount_qubic=amount,
+                    qubic_eur_rate=price.get("eur"),
+                    qubic_usd_rate=price.get("usd"),
+                    source_type="TX",
+                    verified=0,
+                    created_at=now_utc_iso(),
+                )
+                db.merge(event)
+                inserted += 1
+
+        if inserted > 0:
+            db.commit()
+            total_inserted += inserted
+            logger.info(f"Wallet {wallet_id}: TX page {page} — {inserted} new records")
+
+        pagination = resp.get("pagination", {})
+        if page >= pagination.get("totalPages", 1) or not tick_groups:
+            break
+        page += 1
+
+    return total_inserted
 
 
 def _set_sync_failed(db: Session, wallet_id: str, message: str):
