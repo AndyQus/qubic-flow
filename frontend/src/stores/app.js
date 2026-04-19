@@ -6,6 +6,8 @@ export const useAppStore = defineStore('app', () => {
   const theme = ref(localStorage.getItem('theme') || 'dark')
   const lang = ref(localStorage.getItem('lang') || 'de')
   const fontSize = ref(localStorage.getItem('fontSize') || '100')
+  const hideAddresses = ref(localStorage.getItem('hideAddresses') === 'true')
+  const currency = ref(localStorage.getItem('currency') || 'EUR')
   const walletFilter = ref('all')
   const wallets = ref([])
   const events = ref([])
@@ -21,6 +23,11 @@ export const useAppStore = defineStore('app', () => {
   const activeNode = computed(() => nodes.value.find(n => n.health_status === 'ONLINE'))
 
   function setAnimation(a) { animation.value = a; localStorage.setItem('animation', a) }
+  function toggleHideAddresses() {
+    hideAddresses.value = !hideAddresses.value
+    localStorage.setItem('hideAddresses', hideAddresses.value)
+  }
+  function setCurrency(c) { currency.value = c; localStorage.setItem('currency', c) }
   function setFontSize(s) {
     fontSize.value = s
     localStorage.setItem('fontSize', s)
@@ -64,9 +71,9 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    animation, theme, lang, fontSize, walletFilter,
+    animation, theme, lang, fontSize, hideAddresses, currency, walletFilter,
     wallets, events, nodes, wsConnected, newEventIds,
     filteredWallets, activeNode,
-    setAnimation, setTheme, setLang, setFontSize, prependEvent, simulateEvent,
+    setAnimation, setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
   }
 })

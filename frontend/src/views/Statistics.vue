@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
+import { useAppStore } from '../stores/app'
 import { Line, Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS, Title, Tooltip, Legend, LineElement, BarElement,
@@ -11,6 +12,10 @@ import {
 ChartJS.register(Title, Tooltip, Legend, LineElement, BarElement, CategoryScale, LinearScale, PointElement, Filler)
 
 const { t } = useTranslation()
+const store = useAppStore()
+
+const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
+const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
 const stats   = ref(null)
 const snaps   = ref([])
 const history = ref([])
@@ -26,9 +31,9 @@ onMounted(async () => {
 
 // ── Formatierung ────────────────────────────────────────────────
 function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString('de-DE') }
-function fmtEur(n) {
-  return n == null ? '—'
-    : Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+function fmtCurrency(n) {
+  if (n == null) return '—'
+  return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currencySymbol.value
 }
 
 // ── Trend-Pfeil ─────────────────────────────────────────────────
@@ -82,7 +87,7 @@ const totals = computed(() => {
     tx:     acc.tx     + (s.tx_count     || 0),
     events: acc.events + (s.event_count  || 0),
     qubic:  acc.qubic  + (s.volume_qubic || 0),
-    eur:    acc.eur    + (s.volume_eur   || 0),
+    eur:    acc.eur    + (s[volumeKey.value] || 0),
   }), { tx: 0, events: 0, qubic: 0, eur: 0 })
 })
 
@@ -112,11 +117,11 @@ const lineData = computed(() => {
       ],
     }
   }
-  if (mode.value === 'volume_eur') {
+  if (mode.value === 'volume_fiat') {
     return {
       labels,
       datasets: [
-        { label: 'Volumen EUR', data: items.map(s => +(s.volume_eur || 0).toFixed(2)),
+        { label: `Volumen ${store.currency}`, data: items.map(s => +((s[volumeKey.value]) || 0).toFixed(2)),
           borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)', fill: true, tension: 0.4 },
       ],
     }
@@ -176,8 +181,8 @@ const chartOptions = {
         <div class="text-2xl font-bold text-white">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-xs uppercase text-gray-400 mb-1">Volumen EUR</div>
-        <div class="text-2xl font-bold text-green-400">{{ fmtEur(totals.eur) }}</div>
+        <div class="text-xs uppercase text-gray-400 mb-1">Volumen {{ store.currency }}</div>
+        <div class="text-2xl font-bold text-green-400">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
 
@@ -190,11 +195,12 @@ const chartOptions = {
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
-        <div class="text-xl font-bold text-qubic-teal">{{ fmt(p.cur.count) }}</div>
-        <div class="text-[10px] text-gray-500">{{ fmt(p.cur.volume_qubic) }} QU · {{ fmtEur(p.cur.volume_eur) }}</div>
+        <div class="text-xl font-bold text-qubic-teal">{{ fmt(p.cur.volume_qubic) }} QU</div>
+        <div class="text-xs text-gray-400">{{ fmt(p.cur.count) }} {{ t('stats.count') }}</div>
+        <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
-          <div class="text-sm font-semibold text-gray-400">{{ fmt(p.prev.count) }}</div>
-          <div class="text-[10px] text-gray-500">{{ fmt(p.prev.volume_qubic) }} QU · {{ fmtEur(p.prev.volume_eur) }}</div>
+          <div class="text-sm font-semibold text-gray-400">{{ fmt(p.prev.volume_qubic) }} QU</div>
+          <div class="text-[10px] text-gray-500">{{ fmt(p.prev.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.prev[volumeKey]) }}</div>
         </div>
       </div>
     </div>
@@ -212,7 +218,7 @@ const chartOptions = {
 
         <!-- Toggle -->
         <div class="flex gap-2 ml-auto">
-          <button v-for="[val, lbl] in [['count','Anzahl'],['volume_qubic','Vol. QU'],['volume_eur','Vol. EUR']]"
+          <button v-for="[val, lbl] in [['count','Anzahl'],['volume_qubic','Vol. QU'],['volume_fiat',`Vol. ${store.currency}`]]"
                   :key="val"
                   :class="['btn-ghost text-xs py-1', mode === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="mode = val">

@@ -9,20 +9,6 @@ from ...models.snapshot import WeeklySnapshot
 router = APIRouter()
 
 
-def _aggregate(db: Session, since_iso: str) -> dict:
-    q = db.query(
-        func.count(Event.id),
-        func.coalesce(func.sum(Event.amount_qubic), 0),
-        func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
-    ).filter(Event.timestamp >= since_iso)
-    count, vol_q, vol_eur = q.one()
-    return {
-        "count": int(count or 0),
-        "volume_qubic": int(vol_q or 0),
-        "volume_eur": float(vol_eur or 0.0),
-    }
-
-
 @router.get("/stats/current")
 def current_stats(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
@@ -44,18 +30,22 @@ def current_stats(db: Session = Depends(get_db)):
             func.count(Event.id),
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
+            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0),
         ).filter(Event.timestamp >= s, Event.timestamp < e)
-        c, vq, ve = q.one()
-        return {"count": int(c or 0), "volume_qubic": int(vq or 0), "volume_eur": float(ve or 0.0)}
+        c, vq, ve, vu = q.one()
+        return {"count": int(c or 0), "volume_qubic": int(vq or 0),
+                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0)}
 
     def by_epoch(ep):
         q = db.query(
             func.count(Event.id),
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
+            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0),
         ).filter(Event.epoch == ep)
-        c, vq, ve = q.one()
-        return {"count": int(c or 0), "volume_qubic": int(vq or 0), "volume_eur": float(ve or 0.0)}
+        c, vq, ve, vu = q.one()
+        return {"count": int(c or 0), "volume_qubic": int(vq or 0),
+                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0)}
 
     return {
         "hour":  {"current": between(hour_start.isoformat(), now.isoformat()),
@@ -77,7 +67,7 @@ def snapshots(limit: int = 100, db: Session = Depends(get_db)):
 
 @router.get("/stats/history")
 def history(group_by: str = "week", db: Session = Depends(get_db)):
-    """Aggregate events from DB grouped by week or month — used when no snapshots exist yet."""
+    """Aggregate events from DB grouped by week or month."""
     if group_by == "month":
         period_expr = func.strftime("%Y-%m", Event.timestamp)
     else:
@@ -91,6 +81,7 @@ def history(group_by: str = "week", db: Session = Depends(get_db)):
             func.sum(func.iif(Event.source_type == "EVENT", 1, 0)).label("event_count"),
             func.coalesce(func.sum(Event.amount_qubic), 0).label("volume_qubic"),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0).label("volume_eur"),
+            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0).label("volume_usd"),
         )
         .filter(Event.timestamp.isnot(None))
         .group_by("period")
@@ -101,19 +92,17 @@ def history(group_by: str = "week", db: Session = Depends(get_db)):
     result = []
     for r in rows:
         period = r.period or ""
+        base = {
+            "count": r.count, "tx_count": r.tx_count or 0,
+            "event_count": r.event_count or 0,
+            "volume_qubic": int(r.volume_qubic or 0),
+            "volume_eur": float(r.volume_eur or 0.0),
+            "volume_usd": float(r.volume_usd or 0.0),
+            "source": "live",
+        }
         if group_by == "month" and len(period) == 7:
-            year, month = int(period[:4]), int(period[5:])
-            result.append({"period": period, "year": year, "month": month, "week": None,
-                           "count": r.count, "tx_count": r.tx_count or 0,
-                           "event_count": r.event_count or 0,
-                           "volume_qubic": int(r.volume_qubic or 0),
-                           "volume_eur": float(r.volume_eur or 0.0), "source": "live"})
+            result.append({**base, "period": period, "year": int(period[:4]), "month": int(period[5:]), "week": None})
         elif group_by == "week" and len(period) >= 7:
-            year, week = int(period[:4]), int(period[5:])
-            result.append({"period": period, "year": year, "week": week, "month": None,
-                           "count": r.count, "tx_count": r.tx_count or 0,
-                           "event_count": r.event_count or 0,
-                           "volume_qubic": int(r.volume_qubic or 0),
-                           "volume_eur": float(r.volume_eur or 0.0), "source": "live"})
+            result.append({**base, "period": period, "year": int(period[:4]), "week": int(period[5:]), "month": None})
 
     return result

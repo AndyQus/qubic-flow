@@ -77,6 +77,19 @@ function simulate() {
       </div>
     </div>
 
+    <!-- Währung -->
+    <div class="card">
+      <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">Währung</h3>
+      <div class="flex gap-2">
+        <button v-for="[val, lbl, flag] in [['EUR','Euro','€'],['USD','US-Dollar','$']]"
+                :key="val"
+                :class="['btn-ghost text-xs py-1', store.currency === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                @click="store.setCurrency(val)">
+          <span class="mr-1">{{ flag }}</span>{{ lbl }}
+        </button>
+      </div>
+    </div>
+
     <!-- Schriftgröße -->
     <div class="card">
       <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">Schriftgröße</h3>

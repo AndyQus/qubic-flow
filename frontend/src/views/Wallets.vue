@@ -68,7 +68,7 @@ onMounted(reload)
                      class="flex items-center gap-2 min-w-0 flex-1 group">
           <div class="min-w-0">
             <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ w.label }}</div>
-            <div class="text-[10px] font-mono text-gray-500 truncate">{{ w.id }}</div>
+            <div class="text-[10px] font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
           </div>
           <!-- Chevron -->
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-qubic-teal flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -121,8 +121,8 @@ onMounted(reload)
           <!-- Address + explorer link -->
           <td class="p-3">
             <div class="flex items-center gap-1.5">
-              <span class="font-mono text-gray-400 text-[10px]" :title="w.id">
-                {{ w.id.slice(0, 8) }}…{{ w.id.slice(-8) }}
+              <span class="font-mono text-gray-400 text-[10px]" :title="store.hideAddresses ? '' : w.id">
+                {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 8) + '…' + w.id.slice(-8) }}
               </span>
               <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
                  class="text-gray-600 hover:text-qubic-teal flex-shrink-0" title="Im Explorer öffnen">

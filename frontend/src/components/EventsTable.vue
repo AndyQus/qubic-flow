@@ -41,12 +41,27 @@ function flashClass(ev) {
 
 function shortAddr(a) {
   if (!a) return '—'
+  if (store.hideAddresses) return '••••••••••••'
   return a.length > 16 ? `${a.slice(0, 6)}…${a.slice(-6)}` : a
 }
 
-function valueEur(ev) {
-  if (!ev.amount_qubic || !ev.qubic_eur_rate) return '—'
-  return (ev.amount_qubic * ev.qubic_eur_rate).toFixed(2) + ' €'
+function maskName(name, addr) {
+  if (store.hideAddresses) return '••••••••••••'
+  return name || shortAddr(addr)
+}
+
+function fmtValue(ev) {
+  const isUsd = store.currency === 'USD'
+  const rate = isUsd ? ev.qubic_usd_rate : ev.qubic_eur_rate
+  if (!ev.amount_qubic || !rate) return '—'
+  return (ev.amount_qubic * rate).toFixed(2) + (isUsd ? ' $' : ' €')
+}
+
+function fmtRate(ev) {
+  const isUsd = store.currency === 'USD'
+  const rate = isUsd ? ev.qubic_usd_rate : ev.qubic_eur_rate
+  if (!rate) return '—'
+  return rate.toFixed(8).replace(/\.?0+$/, '') + (isUsd ? ' $' : ' €')
 }
 
 function explorerUrl(addr) {
@@ -87,13 +102,13 @@ function counterpart(ev) {
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
               <span class="font-mono text-xs font-medium">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
-              <span class="text-xs text-gray-400">{{ valueEur(ev) }}</span>
+              <span class="text-xs text-gray-400">{{ fmtValue(ev) }}</span>
             </div>
             <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }}</div>
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
               <span class="text-[10px] text-gray-400 font-mono truncate">
-                {{ counterpart(ev).name || shortAddr(counterpart(ev).addr) }}
+                {{ maskName(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
               <a :href="explorerUrl(counterpart(ev).addr)" target="_blank" rel="noopener"
                  class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
@@ -114,8 +129,8 @@ function counterpart(ev) {
               <th class="text-left p-3">{{ t('event.date') }}</th>
               <th class="text-left p-3">{{ t('event.direction') }}</th>
               <th class="text-left p-3">{{ t('event.amount') }}</th>
-              <th class="text-left p-3 hidden lg:table-cell">{{ t('event.rate_eur') }}</th>
-              <th class="text-left p-3">{{ t('event.value_eur') }}</th>
+              <th class="text-left p-3 hidden lg:table-cell">Kurs {{ store.currency }}</th>
+              <th class="text-left p-3">Wert {{ store.currency }}</th>
               <th class="text-left p-3">Source</th>
               <th class="text-left p-3">Destination</th>
             </tr>
@@ -138,13 +153,13 @@ function counterpart(ev) {
                 <span v-else class="text-gray-500">—</span>
               </td>
               <td class="p-3 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-              <td class="p-3 font-mono text-gray-400 hidden lg:table-cell">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(8).replace(/\.?0+$/, '') : '—' }}</td>
-              <td class="p-3 font-mono">{{ valueEur(ev) }}</td>
+              <td class="p-3 font-mono text-gray-400 hidden lg:table-cell">{{ fmtRate(ev) }}</td>
+              <td class="p-3 font-mono">{{ fmtValue(ev) }}</td>
               <!-- Source -->
               <td class="p-3">
                 <div v-if="ev.source_address" class="flex items-center gap-1">
-                  <span class="font-mono text-gray-300" :title="ev.source_address">
-                    {{ ev.source_name || shortAddr(ev.source_address) }}
+                  <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.source_address">
+                    {{ maskName(ev.source_name, ev.source_address) }}
                   </span>
                   <a :href="explorerUrl(ev.source_address)" target="_blank" rel="noopener"
                      class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
@@ -158,8 +173,8 @@ function counterpart(ev) {
               <!-- Destination -->
               <td class="p-3">
                 <div v-if="ev.destination_addr" class="flex items-center gap-1">
-                  <span class="font-mono text-gray-300" :title="ev.destination_addr">
-                    {{ ev.destination_name || shortAddr(ev.destination_addr) }}
+                  <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.destination_addr">
+                    {{ maskName(ev.destination_name, ev.destination_addr) }}
                   </span>
                   <a :href="explorerUrl(ev.destination_addr)" target="_blank" rel="noopener"
                      class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
