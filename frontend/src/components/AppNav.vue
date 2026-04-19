@@ -5,6 +5,7 @@ const { t } = useTranslation()
 const items = [
   { to: '/', key: 'dashboard' },
   { to: '/wallets', key: 'wallets' },
+  { to: '/assets', key: 'assets' },
   { to: '/nodes', key: 'nodes' },
   { to: '/stats', key: 'stats' },
   { to: '/settings', key: 'settings' },

@@ -6,3 +6,4 @@ from .price_cache import PriceCache
 from .sync_gap import SyncGap
 from .snapshot import WeeklySnapshot
 from .settings import AppSetting
+from .address_label import AddressLabel

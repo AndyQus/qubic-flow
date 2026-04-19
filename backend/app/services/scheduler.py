@@ -5,6 +5,8 @@ from apscheduler.triggers.cron import CronTrigger
 from .health_monitor import check_nodes
 from .sync_engine import sync_all_wallets
 from .snapshot_service import create_snapshot
+from .label_service import sync_labels
+from ..database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -23,4 +25,22 @@ scheduler.add_job(
     CronTrigger(day_of_week="wed", hour=12, minute=0, timezone="UTC"),
     id="weekly_snapshot",
     max_instances=1,
+)
+
+
+async def daily_sync_labels():
+    db = SessionLocal()
+    try:
+        await sync_labels(db)
+    finally:
+        db.close()
+
+
+scheduler.add_job(
+    daily_sync_labels,
+    "interval",
+    hours=24,
+    id="sync_labels",
+    max_instances=1,
+    coalesce=True,
 )

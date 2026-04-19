@@ -34,6 +34,12 @@ export const api = {
     current: () => req('/stats/current'),
     snapshots: () => req('/stats/snapshots'),
   },
+  labels: {
+    list: (params = {}) => {
+      const q = new URLSearchParams(params).toString()
+      return req(`/labels${q ? '?' + q : ''}`)
+    },
+  },
   metrics: () => req('/metrics'),
   health: () => req('/health'),
 }

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from ..models.event import Event
 from ..models.wallet import Wallet
+from .label_service import get_label
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +86,21 @@ def export_cointracking(db: Session, year: int | None = None) -> str:
         value_eur = _eur_value(amount, e.qubic_eur_rate)
         exchange = labels.get(e.wallet_id, e.wallet_id or "")
 
+        src_name = get_label(db, e.source_address)
+        dst_name = get_label(db, e.destination_addr)
+        if src_name and dst_name:
+            comment = f"{src_name} \u2192 {dst_name}"
+        elif src_name:
+            comment = f"{src_name} \u2192"
+        elif dst_name:
+            comment = f"\u2192 {dst_name}"
+        else:
+            comment = ""
+
         if kind == "QUBIC_IN":
-            row = ["Deposit", amount, "QUBIC", "", "", "", "", exchange, "", "", _fmt_date(e.timestamp), e.id, value_eur, ""]
+            row = ["Deposit", amount, "QUBIC", "", "", "", "", exchange, "", comment, _fmt_date(e.timestamp), e.id, value_eur, ""]
         elif kind == "QUBIC_OUT":
-            row = ["Withdrawal", "", "", amount, "QUBIC", "", "", exchange, "", "", _fmt_date(e.timestamp), e.id, "", value_eur]
+            row = ["Withdrawal", "", "", amount, "QUBIC", "", "", exchange, "", comment, _fmt_date(e.timestamp), e.id, "", value_eur]
         else:
             continue
 
@@ -120,10 +132,22 @@ def export_steuerberater(db: Session, year: int | None = None) -> str:
         value = _eur_value(amount, e.qubic_eur_rate)
         label = labels.get(e.wallet_id, "")
 
+        src_name = get_label(db, e.source_address)
+        dst_name = get_label(db, e.destination_addr)
+        if src_name and dst_name:
+            addr_note = f"{src_name} \u2192 {dst_name}"
+        elif src_name:
+            addr_note = f"{src_name} \u2192"
+        elif dst_name:
+            addr_note = f"\u2192 {dst_name}"
+        else:
+            addr_note = ""
+        bemerkung = " | ".join(filter(None, [e.comment or "", addr_note])) if addr_note else e.comment or ""
+
         writer.writerow([
             _fmt_date(e.timestamp), kind, amount, rate, value,
             label, e.source_address or "", e.destination_addr or "",
-            e.id, e.comment or "",
+            e.id, bemerkung,
         ])
 
     return buf.getvalue()

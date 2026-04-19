@@ -5,6 +5,7 @@ from ...database import get_db
 from ...models.event import Event
 from ...models.wallet import Wallet
 from ...schemas.event import EventOut
+from ...services.label_service import get_label
 
 router = APIRouter()
 
@@ -19,4 +20,11 @@ def list_events(
     q = db.query(Event).join(Wallet, Wallet.id == Event.wallet_id).filter(Wallet.deleted_at.is_(None))
     if wallet_id:
         q = q.filter(Event.wallet_id == wallet_id)
-    return q.order_by(desc(Event.tick_number)).offset(offset).limit(limit).all()
+    events = q.order_by(desc(Event.tick_number)).offset(offset).limit(limit).all()
+    result = []
+    for e in events:
+        out = EventOut.model_validate(e)
+        out.source_name = get_label(db, e.source_address)
+        out.destination_name = get_label(db, e.destination_addr)
+        result.append(out)
+    return result

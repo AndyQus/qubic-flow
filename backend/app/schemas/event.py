@@ -14,6 +14,8 @@ class EventOut(BaseModel):
     qubic_eur_rate: Optional[float]
     source_type: Optional[str]
     is_internal: int = 0
+    source_name: Optional[str] = None
+    destination_name: Optional[str] = None
 
     class Config:
         from_attributes = True

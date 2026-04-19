@@ -1,6 +1,7 @@
 export const en = {
   app: { title: 'QubicFlow', subtitle: 'Qubic Wallet Tracker' },
-  nav: { dashboard: 'Dashboard', wallets: 'Wallets', nodes: 'Nodes', stats: 'Statistics', settings: 'Settings' },
+  nav: { dashboard: 'Dashboard', wallets: 'Wallets', assets: 'Assets', nodes: 'Nodes', stats: 'Statistics', settings: 'Settings' },
+  assets: { name: 'Name', ticker: 'Ticker', address: 'Address', category: 'Category', decimals: 'Decimals', website: 'Website', search: 'Search name, ticker or address…', none: 'No assets found', total: 'Total', copy: 'Copy address', explorer: 'Open in Explorer', category_standard: 'Standard', category_liquid_staking: 'Liquid Staking' },
   status: { connected: 'Connected', no_node: 'No node available', syncing: 'Syncing', online: 'Online', offline: 'Offline', degraded: 'Degraded' },
   filter: { all: 'All', private: 'Private', business: 'Business' },
   wallet: { add: 'Add Wallet', address: 'Address', label: 'Label', note: 'Note', type: 'Type', actions: 'Actions', edit: 'Edit', delete: 'Delete', none: 'No wallets configured' },
