@@ -48,7 +48,7 @@ export const useAppStore = defineStore('app', () => {
     setTimeout(() => {
       const idx = newEventIds.value.indexOf(ev.id)
       if (idx >= 0) newEventIds.value.splice(idx, 1)
-    }, 2000)
+    }, 60_000)
     if (events.value.length > 500) events.value.pop()
   }
 

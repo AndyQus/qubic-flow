@@ -36,7 +36,7 @@ function simulate() {
   setTimeout(() => {
     const row = previewRows.value.find(r => r.id === newRow.id)
     if (row) row.isNew = false
-  }, 2000)
+  }, 60_000)
 }
 </script>
 
