@@ -11,6 +11,7 @@ useWebSocket()
 
 onMounted(async () => {
   store.setTheme(store.theme)
+  document.documentElement.style.fontSize = store.fontSize + '%'
   try {
     const [wallets, nodes] = await Promise.all([api.wallets.list(), api.nodes.list()])
     store.wallets = wallets
@@ -25,7 +26,7 @@ onMounted(async () => {
   <div class="min-h-screen flex flex-col">
     <AppHeader />
     <AppNav />
-    <main class="flex-1 container mx-auto px-4 py-6 max-w-7xl">
+    <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
       <router-view />
     </main>
   </div>

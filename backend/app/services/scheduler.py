@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from .health_monitor import check_nodes
@@ -43,4 +44,5 @@ scheduler.add_job(
     id="sync_labels",
     max_instances=1,
     coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
 )

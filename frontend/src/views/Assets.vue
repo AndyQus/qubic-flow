@@ -71,9 +71,9 @@ function explorerUrl(addr) {
 }
 
 function categoryLabel(cat) {
-  if (cat === 'liquid_staking') return t('assets.category_liquid_staking')
-  if (cat === 'standard') return t('assets.category_standard')
-  return cat || '—'
+  const key = `assets.category_${cat}`
+  const translated = t(key)
+  return translated !== key ? translated : (cat || '—')
 }
 </script>
 
@@ -94,7 +94,14 @@ function categoryLabel(cat) {
       <button
         v-for="cat in categories"
         :key="cat"
-        :class="['btn-ghost text-sm', categoryFilter === cat && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+        :class="[
+          'btn-ghost text-sm',
+          cat === 'all'            && categoryFilter === cat ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal' : '',
+          cat === 'smart_contract' && categoryFilter === cat ? 'bg-purple-500/20 border-purple-500 text-purple-400'  : '',
+          cat === 'exchange'       && categoryFilter === cat ? 'bg-orange-500/20 border-orange-500 text-orange-400'  : '',
+          cat === 'liquid_staking' && categoryFilter === cat ? 'bg-blue-500/20 border-blue-500 text-blue-400'        : '',
+          cat === 'standard'       && categoryFilter === cat ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal' : '',
+        ]"
         @click="categoryFilter = cat"
       >
         {{ cat === 'all' ? t('filter.all') : categoryLabel(cat) }}
@@ -109,7 +116,7 @@ function categoryLabel(cat) {
     <!-- Table -->
     <div class="card overflow-hidden p-0">
       <div v-if="loading" class="p-8 text-center text-gray-500">{{ t('common.loading') }}</div>
-      <table v-else class="w-full text-sm">
+      <table v-else class="w-full text-xs">
         <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
           <tr>
             <th class="text-left p-3">{{ t('assets.name') }}</th>
@@ -130,7 +137,7 @@ function categoryLabel(cat) {
             class="border-b border-qubic-border/50 hover:bg-qubic-teal/5 transition-colors"
           >
             <!-- Name / Label -->
-            <td class="p-3 font-medium">
+            <td class="p-3">
               {{ displayName(l) }}
             </td>
 
@@ -176,9 +183,10 @@ function categoryLabel(cat) {
                 v-if="l.category"
                 :class="[
                   'pill text-xs',
-                  l.category === 'liquid_staking'
-                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                    : 'bg-qubic-teal/20 text-qubic-teal border-qubic-teal/30'
+                  l.category === 'smart_contract' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' :
+                  l.category === 'exchange'        ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                  l.category === 'liquid_staking'  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                                                     'bg-qubic-teal/20 text-qubic-teal border-qubic-teal/30'
                 ]"
               >
                 {{ categoryLabel(l.category) }}

@@ -73,3 +73,47 @@ def current_stats(db: Session = Depends(get_db)):
 @router.get("/stats/snapshots")
 def snapshots(limit: int = 100, db: Session = Depends(get_db)):
     return db.query(WeeklySnapshot).order_by(desc(WeeklySnapshot.snapshot_at)).limit(limit).all()
+
+
+@router.get("/stats/history")
+def history(group_by: str = "week", db: Session = Depends(get_db)):
+    """Aggregate events from DB grouped by week or month — used when no snapshots exist yet."""
+    if group_by == "month":
+        period_expr = func.strftime("%Y-%m", Event.timestamp)
+    else:
+        period_expr = func.strftime("%Y-%W", Event.timestamp)
+
+    rows = (
+        db.query(
+            period_expr.label("period"),
+            func.count(Event.id).label("count"),
+            func.sum(func.iif(Event.source_type == "TX",    1, 0)).label("tx_count"),
+            func.sum(func.iif(Event.source_type == "EVENT", 1, 0)).label("event_count"),
+            func.coalesce(func.sum(Event.amount_qubic), 0).label("volume_qubic"),
+            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0).label("volume_eur"),
+        )
+        .filter(Event.timestamp.isnot(None))
+        .group_by("period")
+        .order_by("period")
+        .all()
+    )
+
+    result = []
+    for r in rows:
+        period = r.period or ""
+        if group_by == "month" and len(period) == 7:
+            year, month = int(period[:4]), int(period[5:])
+            result.append({"period": period, "year": year, "month": month, "week": None,
+                           "count": r.count, "tx_count": r.tx_count or 0,
+                           "event_count": r.event_count or 0,
+                           "volume_qubic": int(r.volume_qubic or 0),
+                           "volume_eur": float(r.volume_eur or 0.0), "source": "live"})
+        elif group_by == "week" and len(period) >= 7:
+            year, week = int(period[:4]), int(period[5:])
+            result.append({"period": period, "year": year, "week": week, "month": None,
+                           "count": r.count, "tx_count": r.tx_count or 0,
+                           "event_count": r.event_count or 0,
+                           "volume_qubic": int(r.volume_qubic or 0),
+                           "volume_eur": float(r.volume_eur or 0.0), "source": "live"})
+
+    return result

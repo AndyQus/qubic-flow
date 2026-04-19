@@ -22,6 +22,10 @@ export const api = {
       const q = new URLSearchParams(params).toString()
       return req(`/events${q ? '?' + q : ''}`)
     },
+    count: (params = {}) => {
+      const q = new URLSearchParams(params).toString()
+      return req(`/events/count${q ? '?' + q : ''}`)
+    },
   },
   nodes: {
     list: () => req('/nodes'),
@@ -31,8 +35,9 @@ export const api = {
     reorder: (order) => req('/nodes/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
   },
   stats: {
-    current: () => req('/stats/current'),
+    current:  () => req('/stats/current'),
     snapshots: () => req('/stats/snapshots'),
+    history:  (groupBy = 'week') => req(`/stats/history?group_by=${groupBy}`),
   },
   labels: {
     list: (params = {}) => {

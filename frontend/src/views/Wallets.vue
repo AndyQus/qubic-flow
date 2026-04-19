@@ -19,46 +19,86 @@ async function submit() {
 }
 
 async function remove(id) {
-  if (!confirm('Delete wallet?')) return
+  if (!confirm('Wallet löschen?')) return
   await api.wallets.remove(id)
   await reload()
+}
+
+function explorerUrl(addr) {
+  return `https://explorer.qubic.org/network/address/${addr}`
 }
 
 onMounted(reload)
 </script>
 
 <template>
-  <div class="flex items-center justify-between mb-4">
+  <!-- Toolbar -->
+  <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
     <div class="flex gap-2">
-      <button :class="['btn-ghost', store.walletFilter === 'all' && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-xs', store.walletFilter === 'all'      && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
-      <button :class="['btn-ghost', store.walletFilter === 'private' && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-xs', store.walletFilter === 'private'  && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
-      <button :class="['btn-ghost', store.walletFilter === 'business' && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-xs', store.walletFilter === 'business' && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
     </div>
-    <button class="btn" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
+    <button class="btn text-xs" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
   </div>
 
+  <!-- Add-Form -->
   <div v-if="showForm" class="card mb-4 space-y-3">
-    <input v-model="form.id" :placeholder="t('wallet.address')" class="input w-full font-mono" />
-    <input v-model="form.label" :placeholder="t('wallet.label')" class="input w-full" />
-    <input v-model="form.note" :placeholder="t('wallet.note')" class="input w-full" />
-    <select v-model="form.wallet_type" class="input w-full">
+    <input v-model="form.id"    :placeholder="t('wallet.address')" class="input w-full font-mono text-xs" />
+    <input v-model="form.label" :placeholder="t('wallet.label')"   class="input w-full text-xs" />
+    <input v-model="form.note"  :placeholder="t('wallet.note')"    class="input w-full text-xs" />
+    <select v-model="form.wallet_type" class="input w-full text-xs">
       <option value="PRIVATE">PRIVATE</option>
       <option value="BUSINESS">BUSINESS</option>
     </select>
-    <button class="btn" @click="submit">{{ t('common.save') }}</button>
+    <button class="btn text-xs" @click="submit">{{ t('common.save') }}</button>
   </div>
 
-  <div class="card overflow-hidden">
-    <table class="w-full text-sm">
-      <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
+  <!-- Mobile: card list -->
+  <div class="sm:hidden space-y-2">
+    <div v-if="!store.filteredWallets.length" class="card p-6 text-center text-gray-500 text-xs">
+      {{ t('wallet.none') }}
+    </div>
+    <div v-for="w in store.filteredWallets" :key="w.id" class="card">
+      <div class="flex items-center justify-between gap-2">
+        <router-link :to="`/wallets/${w.id}`"
+                     class="flex items-center gap-2 min-w-0 flex-1 group">
+          <div class="min-w-0">
+            <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ w.label }}</div>
+            <div class="text-[10px] font-mono text-gray-500 truncate">{{ w.id }}</div>
+          </div>
+          <!-- Chevron -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-qubic-teal flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </router-link>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span :class="['pill text-[10px]', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+            {{ w.wallet_type }}
+          </span>
+          <a :href="explorerUrl(w.id)" target="_blank" rel="noopener" class="text-gray-500 hover:text-qubic-teal">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+          </a>
+          <button @click="remove(w.id)" class="text-red-400 hover:text-red-300 text-xs">{{ t('wallet.delete') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop: table -->
+  <div class="card overflow-hidden hidden sm:block">
+    <table class="w-full text-xs">
+      <thead class="border-b border-qubic-border text-gray-400 uppercase">
         <tr>
           <th class="text-left p-3">{{ t('wallet.label') }}</th>
           <th class="text-left p-3">{{ t('wallet.address') }}</th>
           <th class="text-left p-3">{{ t('wallet.type') }}</th>
-          <th class="text-left p-3">{{ t('wallet.note') }}</th>
+          <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.note') }}</th>
           <th class="text-right p-3">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
@@ -66,19 +106,42 @@ onMounted(reload)
         <tr v-if="!store.filteredWallets.length">
           <td colspan="5" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
         </tr>
-        <tr v-for="w in store.filteredWallets" :key="w.id" class="border-b border-qubic-border/50 hover:bg-qubic-bg/50">
-          <td class="p-3 font-medium">
-            <router-link :to="`/wallets/${w.id}`" class="hover:text-qubic-teal">{{ w.label }}</router-link>
-          </td>
-          <td class="p-3 font-mono text-xs text-gray-400">{{ w.id }}</td>
+        <tr v-for="w in store.filteredWallets" :key="w.id"
+            class="border-b border-qubic-border/50 hover:bg-qubic-bg/50">
+          <!-- Label + chevron -->
           <td class="p-3">
-            <span :class="['pill', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+            <router-link :to="`/wallets/${w.id}`"
+                         class="flex items-center gap-1.5 group font-medium hover:text-qubic-teal transition-colors">
+              {{ w.label }}
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </router-link>
+          </td>
+          <!-- Address + explorer link -->
+          <td class="p-3">
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-gray-400 text-[10px]" :title="w.id">
+                {{ w.id.slice(0, 8) }}…{{ w.id.slice(-8) }}
+              </span>
+              <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
+                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0" title="Im Explorer öffnen">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </td>
+          <td class="p-3">
+            <span :class="['pill text-[10px]', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
               {{ w.wallet_type }}
             </span>
           </td>
-          <td class="p-3 text-gray-400">{{ w.note || '—' }}</td>
+          <td class="p-3 text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
           <td class="p-3 text-right">
-            <button @click="remove(w.id)" class="text-red-400 hover:text-red-300 text-sm">{{ t('wallet.delete') }}</button>
+            <button @click="remove(w.id)" class="text-red-400 hover:text-red-300 text-xs">{{ t('wallet.delete') }}</button>
           </td>
         </tr>
       </tbody>

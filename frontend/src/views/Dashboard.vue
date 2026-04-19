@@ -9,7 +9,7 @@ const store = useAppStore()
 
 onMounted(async () => {
   try {
-    const events = await api.events.list({ limit: 100 })
+    const events = await api.events.list({ limit: 30 })
     store.events = events
   } catch (e) { console.error(e) }
 })

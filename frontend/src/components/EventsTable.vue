@@ -3,7 +3,10 @@ import { computed } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 
-const props = defineProps({ events: { type: Array, required: true } })
+const props = defineProps({
+  events:  { type: Array, required: true },
+  loading: { type: Boolean, default: false },
+})
 const store = useAppStore()
 const { t } = useTranslation()
 
@@ -15,6 +18,10 @@ const animClass = computed(() => {
 
 function fmtDate(iso) {
   try { return new Date(iso).toLocaleString('de-DE') } catch { return iso }
+}
+
+function fmtDateShort(iso) {
+  try { return new Date(iso).toLocaleDateString('de-DE') } catch { return iso }
 }
 
 function direction(ev) {
@@ -34,51 +41,139 @@ function flashClass(ev) {
 
 function shortAddr(a) {
   if (!a) return '—'
-  return a.length > 16 ? `${a.slice(0, 8)}…${a.slice(-6)}` : a
+  return a.length > 16 ? `${a.slice(0, 6)}…${a.slice(-6)}` : a
 }
 
 function valueEur(ev) {
   if (!ev.amount_qubic || !ev.qubic_eur_rate) return '—'
-  return (ev.amount_qubic * ev.qubic_eur_rate).toFixed(4) + ' €'
+  return (ev.amount_qubic * ev.qubic_eur_rate).toFixed(2) + ' €'
+}
+
+function explorerUrl(addr) {
+  return `https://explorer.qubic.org/network/address/${addr}`
+}
+
+function counterpart(ev) {
+  const owned = new Set(store.wallets.map(w => w.id))
+  const dir = direction(ev)
+  if (dir === 'IN')  return { addr: ev.source_address,  name: ev.source_name }
+  if (dir === 'OUT') return { addr: ev.destination_addr, name: ev.destination_name }
+  return { addr: ev.source_address, name: ev.source_name }
 }
 </script>
 
 <template>
   <div class="card overflow-hidden">
-    <div class="overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
-          <tr>
-            <th class="text-left p-3">{{ t('event.date') }}</th>
-            <th class="text-left p-3">{{ t('event.direction') }}</th>
-            <th class="text-left p-3">{{ t('event.amount') }}</th>
-            <th class="text-left p-3">{{ t('event.rate_eur') }}</th>
-            <th class="text-left p-3">{{ t('event.value_eur') }}</th>
-            <th class="text-left p-3">Source</th>
-            <th class="text-left p-3">Destination</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!events.length">
-            <td colspan="7" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
-          </tr>
-          <tr v-for="ev in events" :key="ev.id"
-              :class="[animClass, flashClass(ev), 'border-b border-qubic-border/50 hover:bg-qubic-bg/50']">
-            <td class="p-3 text-xs">{{ fmtDate(ev.timestamp) }}</td>
-            <td class="p-3">
-              <span v-if="direction(ev) === 'IN'" class="text-green-400">▲ IN</span>
-              <span v-else-if="direction(ev) === 'OUT'" class="text-red-400">▼ OUT</span>
-              <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
-              <span v-else class="text-gray-500">—</span>
-            </td>
-            <td class="p-3 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-            <td class="p-3 font-mono text-xs">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(10).replace(/\.?0+$/, '') : '—' }}</td>
-            <td class="p-3 font-mono">{{ valueEur(ev) }}</td>
-            <td class="p-3 font-mono text-xs text-gray-400">{{ shortAddr(ev.source_address) }}</td>
-            <td class="p-3 font-mono text-xs text-gray-400">{{ shortAddr(ev.destination_addr) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <div v-if="loading" class="p-8 text-center text-gray-500 text-xs">{{ t('common.loading') }}</div>
+
+    <template v-else>
+      <!-- Mobile: card list -->
+      <div class="sm:hidden divide-y divide-qubic-border/40">
+        <div v-if="!events.length" class="p-6 text-center text-gray-500 text-xs">{{ t('event.none') }}</div>
+        <div v-for="ev in events" :key="ev.id"
+             :class="[
+               store.newEventIds.includes(ev.id) ? animClass : '',
+               store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
+               'p-3 flex items-start gap-3'
+             ]">
+          <!-- Direction badge -->
+          <div class="flex-shrink-0 mt-0.5">
+            <span v-if="direction(ev) === 'IN'"       class="text-green-400 text-xs font-bold">▲ IN</span>
+            <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 text-xs font-bold">▼ OUT</span>
+            <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400 text-xs font-bold">⇄ INT</span>
+            <span v-else class="text-gray-500 text-xs">—</span>
+          </div>
+          <!-- Main info -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-medium">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
+              <span class="text-xs text-gray-400">{{ valueEur(ev) }}</span>
+            </div>
+            <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }}</div>
+            <!-- Counterpart address -->
+            <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
+              <span class="text-[10px] text-gray-400 font-mono truncate">
+                {{ counterpart(ev).name || shortAddr(counterpart(ev).addr) }}
+              </span>
+              <a :href="explorerUrl(counterpart(ev).addr)" target="_blank" rel="noopener"
+                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop: table -->
+      <div class="hidden sm:block overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead class="border-b border-qubic-border text-gray-400 uppercase">
+            <tr>
+              <th class="text-left p-3">{{ t('event.date') }}</th>
+              <th class="text-left p-3">{{ t('event.direction') }}</th>
+              <th class="text-left p-3">{{ t('event.amount') }}</th>
+              <th class="text-left p-3 hidden lg:table-cell">{{ t('event.rate_eur') }}</th>
+              <th class="text-left p-3">{{ t('event.value_eur') }}</th>
+              <th class="text-left p-3">Source</th>
+              <th class="text-left p-3">Destination</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!events.length">
+              <td colspan="7" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
+            </tr>
+            <tr v-for="ev in events" :key="ev.id"
+                :class="[
+                  store.newEventIds.includes(ev.id) ? animClass : '',
+                  store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
+                  'border-b border-qubic-border/50 hover:bg-qubic-bg/50'
+                ]">
+              <td class="p-3 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
+              <td class="p-3">
+                <span v-if="direction(ev) === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
+                <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
+                <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
+                <span v-else class="text-gray-500">—</span>
+              </td>
+              <td class="p-3 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
+              <td class="p-3 font-mono text-gray-400 hidden lg:table-cell">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(8).replace(/\.?0+$/, '') : '—' }}</td>
+              <td class="p-3 font-mono">{{ valueEur(ev) }}</td>
+              <!-- Source -->
+              <td class="p-3">
+                <div v-if="ev.source_address" class="flex items-center gap-1">
+                  <span class="font-mono text-gray-300" :title="ev.source_address">
+                    {{ ev.source_name || shortAddr(ev.source_address) }}
+                  </span>
+                  <a :href="explorerUrl(ev.source_address)" target="_blank" rel="noopener"
+                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                </div>
+                <span v-else class="text-gray-500">—</span>
+              </td>
+              <!-- Destination -->
+              <td class="p-3">
+                <div v-if="ev.destination_addr" class="flex items-center gap-1">
+                  <span class="font-mono text-gray-300" :title="ev.destination_addr">
+                    {{ ev.destination_name || shortAddr(ev.destination_addr) }}
+                  </span>
+                  <a :href="explorerUrl(ev.destination_addr)" target="_blank" rel="noopener"
+                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                </div>
+                <span v-else class="text-gray-500">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
   </div>
 </template>

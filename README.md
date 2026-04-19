@@ -63,7 +63,10 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 
 ```bash
 cd qubic-flow
-docker-compose up --build
+docker-compose up --build   # erster Start oder nach Code-Änderungen
+docker-compose up           # danach reicht das (ohne --build)
+docker-compose down         # stoppen (Daten bleiben erhalten)
+docker-compose down -v      # stoppen + Daten vollständig löschen
 ```
 
 **→ Hauptseite: http://localhost:8080**
@@ -79,18 +82,6 @@ docker-compose up --build
 Das Backend führt beim Start automatisch `alembic upgrade head` aus — Datenbank-Migrationen laufen also ohne manuellen Eingriff.
 
 Daten werden im Docker-Volume `qubicflow-data` gespeichert und bleiben beim Neustart erhalten.
-
-**Stoppen:**
-
-```bash
-docker-compose down
-```
-
-**Daten vollständig löschen:**
-
-```bash
-docker-compose down -v
-```
 
 ---
 
@@ -126,7 +117,7 @@ alembic upgrade head
 4. **F5** drücken
 
 VSCode startet Backend (Port 8000) und Frontend (Port 5173) gleichzeitig.  
-Chrome öffnet sich automatisch auf `http://localhost:5173`.
+**→ Hauptseite: http://localhost:5173**
 
 Der Vite-Dev-Server leitet `/api/...`-Anfragen automatisch an das Backend weiter (Proxy in `vite.config.js`).  
 Python-Breakpoints funktionieren direkt in den `.py`-Dateien.
