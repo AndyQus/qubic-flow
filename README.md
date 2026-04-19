@@ -24,8 +24,11 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 ## Features
 
 - **Unbegrenzte Wallets** — PRIVATE und BUSINESS, verwaltbar über die Oberfläche
-- **Automatische Synchronisation** alle 60 Sekunden via Qubic RPC (`rpc.qubic.org`)
+- **Event-Sync** — automatisch alle 60 Sekunden via Qubic RPC (`rpc.qubic.org`, getEventLogs)
+- **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events
 - **Tick-Range-Windowing** — überwindet das 10.000-Records-Limit der RPC-API durch rekursives Halbieren
+- **Adress-Namen-Auflösung** — automatische Auflösung von Qubic-Adressen zu Tokens/Labels (Assets-Seite + CSV)
+- **Assets-Seite** — Übersicht aller Smart Contracts und Tokens mit Ticker, Kategorie, Dezimalstellen, Website
 - **EUR/USD-Kurse** — täglich von CoinGecko abgerufen, in DB gecacht
 - **Statistik-Panels** — Stunden / Tag / Epoch / Monat / Jahr, je mit aktueller und vorheriger Periode
 - **Wöchentliche Snapshots** — jeden Mittwoch 12:00 UTC
@@ -34,6 +37,7 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 - **Export CSV**:
   - CoinTracking-Format (PRIVATE Wallets, kommagetrennt, UTF-8 BOM)
   - Steuerberater-Format (BUSINESS Wallets, semikolongetrennt, UTF-8 BOM)
+  - Mit aufgelösten Adress-Namen im Kommentar-Feld
 - **Interne Transfers** (`is_internal`) — Wallet-zu-Wallet-Transfers werden beim Export steuerlich neutral behandelt
 - **DE / EN** Benutzeroberfläche, Dark / Light Mode
 - **Vollständig containerisiert** — ein `docker-compose up --build` genügt
@@ -167,6 +171,7 @@ qubic-flow/
 │   │   │   ├── nodes.py     # Node CRUD + Reihenfolge
 │   │   │   ├── stats.py     # Statistik-Panels
 │   │   │   ├── export.py    # CSV-Download
+│   │   │   ├── labels.py    # Adress-Namen-Auflösung
 │   │   │   ├── health.py    # Gesundheitsstatus
 │   │   │   └── ws.py        # WebSocket-Endpunkt
 │   │   ├── models/          # SQLAlchemy ORM-Modelle
@@ -176,12 +181,14 @@ qubic-flow/
 │   │   │   ├── sync_state.py
 │   │   │   ├── sync_gap.py
 │   │   │   ├── price_cache.py
+│   │   │   ├── address_label.py
 │   │   │   ├── snapshot.py
 │   │   │   └── settings.py
 │   │   ├── services/        # Business-Logik
-│   │   │   ├── sync_engine.py      # Tick-Sync mit Windowing
+│   │   │   ├── sync_engine.py      # Tick-Sync mit Windowing (Event + TX)
 │   │   │   ├── qubic_client.py     # RPC-Client (3x Retry)
 │   │   │   ├── coingecko.py        # Kurs-Abruf mit Rate-Limit
+│   │   │   ├── label_service.py    # Adress-Namen-Sync
 │   │   │   ├── export_service.py   # CSV-Generierung
 │   │   │   ├── health_monitor.py   # Node-Statusprüfung
 │   │   │   ├── snapshot_service.py # Wöchentliche Snapshots
@@ -194,13 +201,17 @@ qubic-flow/
 │   │   ├── database.py      # SQLAlchemy Engine + Session
 │   │   └── main.py          # FastAPI App + Lifespan
 │   ├── tests/               # pytest-Suite (72 Tests)
-│   ├── alembic/             # DB-Migrationen
+│   ├── alembic/
+│   │   └── versions/        # DB-Migrationen
+│   │       ├── 001_composite_pk_events.py
+│   │       ├── 002_add_last_tx_tick.py
+│   │       └── 003_address_labels.py
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
 │   ├── src/
-│   │   ├── views/           # Seiten (Dashboard, Wallets, etc.)
+│   │   ├── views/           # Seiten (Dashboard, Wallets, Assets, etc.)
 │   │   ├── components/      # AppHeader, AppNav, StatsPanel, EventsTable
 │   │   ├── composables/     # useWebSocket (Auto-Reconnect)
 │   │   ├── stores/          # Pinia-Store (App-State)
@@ -231,6 +242,7 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Doku: `http://localhost:8000/docs`
 | PUT     | `/wallets/{id}`               | Wallet bearbeiten                     |
 | DELETE  | `/wallets/{id}`               | Wallet soft-löschen                   |
 | GET     | `/events`                     | Events (filter: wallet_id, pagination)|
+| GET     | `/labels`                     | Adress-Labels (optional `?address=`)  |
 | GET     | `/nodes`                      | Nodes                                 |
 | POST    | `/nodes`                      | Node anlegen                          |
 | PUT     | `/nodes/{id}`                 | Node bearbeiten                       |
@@ -255,12 +267,14 @@ Beispiel: `AAAAABBBBBCCCCCDDDDDEEEEEFFFFFGGGGGHHHHHIIIIIIJJJJJKKKKKLLLLL`
 - Enthält: Deposits und Withdrawals
 - Interne Transfers (Wallet → Wallet) werden **automatisch ausgeschlossen**
 - `is_internal` wird beim Export dynamisch berechnet — auch rückwirkend korrekt, wenn neue Wallets hinzugefügt werden
+- Kommentar-Feld enthält aufgelöste Adress-Namen: `"source_name → dest_name"`
 - Download: `GET /api/v1/export/cointracking?year=2024`
 
 ### Steuerberater (BUSINESS Wallets)
 
 - Format: Semikolon-getrennt, UTF-8 BOM
 - Enthält: alle Transfers inkl. interne (mit Typ-Kennzeichnung)
+- Kommentar-Feld enthält aufgelöste Adress-Namen: `"source_name → dest_name"`
 - Download: `GET /api/v1/export/steuerberater?year=2024`
 
 Beide Exporte enthalten EUR-Werte, gerundet auf 2 Dezimalstellen.
@@ -271,8 +285,9 @@ Beide Exporte enthalten EUR-Werte, gerundet auf 2 Dezimalstellen.
 
 | Job                | Intervall              | Beschreibung                                      |
 |--------------------|------------------------|---------------------------------------------------|
-| `sync_all_wallets` | alle 60 Sekunden       | Neue Events von Qubic RPC holen, Kurse anreichern |
+| `sync_all_wallets` | alle 60 Sekunden       | Event-Sync (getEventLogs) + TX-Sync (transfer-transactions) |
 | `health_monitor`   | alle 30 Sekunden       | Node-Status prüfen, WS-Broadcast                  |
+| `sync_labels`      | alle 24 Stunden        | Adress-Namen-Auflösung (address_labels, tokens, issuances) |
 | `weekly_snapshot`  | Mi 12:00 UTC (Cron)   | Wöchentlichen Aggregations-Snapshot speichern     |
 
 Jobs laufen mit `max_instances=1` und `coalesce=True` — kein paralleler Doppellauf.
