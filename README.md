@@ -104,7 +104,17 @@ cd qubic-flow/frontend
 npm install
 ```
 
-### 2. Starten
+### 2. Datenbank initialisieren (einmalig / nach Migrationen)
+
+```bash
+cd qubic-flow/backend
+alembic upgrade head
+```
+
+> Muss nach dem ersten Checkout und nach jeder neuen Migration ausgeführt werden.  
+> Erstellt alle Tabellen inkl. `events` (composite PK), `sync_state`, `address_labels` u.a.
+
+### 3. Starten
 
 1. Ordner `qubic-flow` in VSCode öffnen
 2. **Run & Debug** öffnen (`Ctrl+Shift+D`)
