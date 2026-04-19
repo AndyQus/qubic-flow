@@ -27,10 +27,6 @@ function fmt(n) {
       <div class="text-xs uppercase tracking-wide text-gray-400 mb-2">{{ t(`stats.${k}`) }}</div>
       <div class="text-xl font-bold text-qubic-teal">{{ fmt(stats[k].current.volume_qubic) }} QU</div>
       <div class="text-xs text-gray-400">{{ fmt(stats[k].current.count) }} {{ t('stats.count') }}</div>
-      <div class="mt-2 pt-2 border-t border-qubic-border">
-        <div class="text-sm font-semibold text-gray-300">{{ fmt(stats[k].previous.volume_qubic) }} QU</div>
-        <div class="text-[10px] text-gray-500">{{ fmt(stats[k].previous.count) }} {{ t('stats.count') }}</div>
-      </div>
     </div>
   </div>
 </template>
