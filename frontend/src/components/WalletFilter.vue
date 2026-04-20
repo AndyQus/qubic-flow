@@ -19,9 +19,9 @@ function walletLabel(w) {
 </script>
 
 <template>
-  <div v-if="store.wallets.length > 1" class="card px-3 py-2 space-y-2">
+  <div v-if="store.wallets.length > 1" class="border border-qubic-border rounded-xl px-3 py-2 space-y-2 bg-[#1a2d4a]">
     <div class="flex items-center justify-between">
-      <span class="text-[10px] text-gray-500 uppercase tracking-wide">Wallet</span>
+      <span class="text-[10px] text-gray-400 uppercase tracking-wide">Wallet Filter</span>
       <button
         v-if="modelValue.length"
         class="text-xs text-gray-500 hover:text-gray-300"
