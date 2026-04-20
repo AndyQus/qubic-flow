@@ -22,7 +22,7 @@ onMounted(loadEvents)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-3">
     <WalletFilter v-model="selectedWallets" />
     <StatsPanel />
     <EventsTable :events="store.events" />

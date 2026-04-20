@@ -93,7 +93,7 @@ function explorerUrl(addr) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
 
     <!-- Wallet-Header -->
     <div v-if="wallet" class="card">

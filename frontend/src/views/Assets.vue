@@ -78,7 +78,7 @@ function categoryLabel(cat) {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-2">
     <!-- Header & Stats -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex gap-4 text-sm text-gray-400">
