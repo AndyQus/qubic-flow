@@ -62,14 +62,14 @@ onMounted(reload)
   <!-- Toolbar -->
   <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
     <div class="flex gap-2">
-      <button :class="['btn-ghost text-xs', store.walletFilter === 'all'      && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-sm', store.walletFilter === 'all'      && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
-      <button :class="['btn-ghost text-xs', store.walletFilter === 'private'  && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-sm', store.walletFilter === 'private'  && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
-      <button :class="['btn-ghost text-xs', store.walletFilter === 'business' && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['btn-ghost text-sm', store.walletFilter === 'business' && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
     </div>
-    <button class="btn text-xs" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
+    <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
   </div>
 
   <!-- Add-Form -->
@@ -82,7 +82,7 @@ onMounted(reload)
       <option value="BUSINESS">BUSINESS</option>
     </select>
     <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
-    <button class="btn text-xs" @click="submit">{{ t('common.save') }}</button>
+    <button class="btn text-sm" @click="submit">{{ t('common.save') }}</button>
   </div>
 
   <!-- Mobile: card list -->
@@ -100,8 +100,8 @@ onMounted(reload)
           <option value="BUSINESS">BUSINESS</option>
         </select>
         <div class="flex gap-2">
-          <button class="btn text-xs" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
-          <button class="btn-ghost text-xs" @click="cancelEdit">{{ t('common.cancel') }}</button>
+          <button class="btn text-sm" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
+          <button class="btn-ghost text-sm" @click="cancelEdit">{{ t('common.cancel') }}</button>
         </div>
       </div>
       <div v-else class="flex items-center justify-between gap-2">
@@ -166,8 +166,8 @@ onMounted(reload)
             </td>
             <td class="p-2 text-right">
               <div class="flex justify-end gap-2">
-                <button class="btn text-xs py-1" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
-                <button class="btn-ghost text-xs py-1" @click="cancelEdit">{{ t('common.cancel') }}</button>
+                <button class="btn text-sm py-1" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
+                <button class="btn-ghost text-sm py-1" @click="cancelEdit">{{ t('common.cancel') }}</button>
               </div>
             </td>
           </tr>

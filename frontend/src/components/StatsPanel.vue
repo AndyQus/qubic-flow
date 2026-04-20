@@ -23,6 +23,14 @@ const icons = {
   year:  'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
 }
 
+const colors = {
+  hour:  'text-sky-400',
+  day:   'text-amber-400',
+  epoch: 'text-violet-400',
+  month: 'text-emerald-400',
+  year:  'text-rose-400',
+}
+
 function fmt(n) {
   if (n == null) return '—'
   return Number(n).toLocaleString('de-DE')
@@ -33,10 +41,10 @@ function fmt(n) {
   <div v-if="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3">
     <div v-for="k in keys" :key="k" class="card !p-3">
       <div class="flex items-center gap-1 mb-1">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <svg xmlns="http://www.w3.org/2000/svg" :class="['w-3 h-3 flex-shrink-0', colors[k]]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" :d="icons[k]"/>
         </svg>
-        <span class="text-[10px] uppercase tracking-wide text-gray-500">{{ t(`stats.${k}`) }}</span>
+        <span :class="['text-sm uppercase tracking-wide', colors[k]]">{{ t(`stats.${k}`) }}</span>
       </div>
       <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(stats[k].current.volume_qubic) }} QU</div>
       <div class="text-xs text-gray-400">{{ fmt(stats[k].current.count) }} {{ t('stats.count') }}</div>

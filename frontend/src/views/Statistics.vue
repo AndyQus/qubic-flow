@@ -23,6 +23,14 @@ const periodIcons = {
   year:  'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
 }
 
+const periodColors = {
+  hour:  'text-sky-400',
+  day:   'text-amber-400',
+  epoch: 'text-violet-400',
+  month: 'text-emerald-400',
+  year:  'text-rose-400',
+}
+
 const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
 const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
 const stats          = ref(null)
@@ -191,19 +199,19 @@ const chartOptions = computed(() => {
     <!-- Gesamt-KPIs -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="card text-center">
-        <div class="text-xs uppercase text-gray-400 mb-1">Events gesamt</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">Events gesamt</div>
         <div class="text-2xl font-bold text-qubic-teal">{{ fmt(totals.events) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-xs uppercase text-gray-400 mb-1">TX gesamt</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">TX gesamt</div>
         <div class="text-2xl font-bold text-amber-400">{{ fmt(totals.tx) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-xs uppercase text-gray-400 mb-1">Volumen QUBIC</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">Volumen QUBIC</div>
         <div class="text-2xl font-bold">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-xs uppercase text-gray-400 mb-1">Volumen {{ store.currency }}</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">Volumen {{ store.currency }}</div>
         <div class="text-2xl font-bold text-green-400">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
@@ -213,10 +221,10 @@ const chartOptions = computed(() => {
       <div v-for="p in periods" :key="p.key" class="card !p-3">
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg xmlns="http://www.w3.org/2000/svg" :class="['w-3 h-3 flex-shrink-0', periodColors[p.key]]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" :d="periodIcons[p.key]"/>
             </svg>
-            <span class="text-[10px] uppercase tracking-wide text-gray-500">{{ p.label }}</span>
+            <span :class="['text-sm uppercase tracking-wide', periodColors[p.key]]">{{ p.label }}</span>
           </div>
           <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-[10px] font-medium">
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
@@ -235,7 +243,7 @@ const chartOptions = computed(() => {
     <!-- Charts -->
     <div v-if="hasData">
       <!-- Legende Live vs Snapshot -->
-      <div class="flex items-center gap-4 text-xs text-gray-400 mb-3">
+      <div class="flex items-center gap-4 text-sm text-gray-400 mb-3">
         <span class="flex items-center gap-1.5">
           <span class="inline-block w-3 h-3 rounded-sm bg-qubic-teal/60"></span> Snapshot (Mi 12:00 UTC)
         </span>
@@ -247,7 +255,7 @@ const chartOptions = computed(() => {
         <div class="flex gap-2 ml-auto">
           <button v-for="[val, lbl] in [['count','Anzahl'],['volume_qubic','Vol. QU'],['volume_fiat',`Vol. ${store.currency}`]]"
                   :key="val"
-                  :class="['btn-ghost text-xs py-1', mode === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                  :class="['btn-ghost text-sm py-1', mode === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="mode = val">
             {{ lbl }}
           </button>
@@ -261,7 +269,7 @@ const chartOptions = computed(() => {
 
       <!-- Balkendiagramm: letzte 12 Wochen TX vs Events -->
       <div class="card" style="height:260px">
-        <div class="text-xs uppercase text-gray-400 mb-2">TX vs. Events — letzte 12 Wochen</div>
+        <div class="text-sm uppercase text-gray-400 mb-2">TX vs. Events — letzte 12 Wochen</div>
         <div style="height:210px">
           <Bar :data="barData" :options="chartOptions" />
         </div>

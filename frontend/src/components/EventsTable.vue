@@ -89,7 +89,7 @@ function counterpart(ev) {
 
 <template>
   <div class="card overflow-hidden">
-    <div class="px-3 pt-3 pb-1 text-[10px] text-gray-500 uppercase tracking-wide">{{ t('event.last10') }}</div>
+    <div class="px-3 pt-3 pb-1 text-sm text-gray-500 uppercase tracking-wide">{{ t('event.last10') }}</div>
     <div v-if="loading" class="p-8 text-center text-gray-500 text-xs">{{ t('common.loading') }}</div>
 
     <template v-else>
@@ -115,7 +115,7 @@ function counterpart(ev) {
               <span class="font-mono text-xs font-medium">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
               <span class="text-xs text-gray-400">{{ fmtValue(ev) }}</span>
             </div>
-            <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }}</div>
+            <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
               <span class="text-[10px] text-gray-400 font-mono truncate">
@@ -148,6 +148,7 @@ function counterpart(ev) {
           <thead class="border-b border-qubic-border text-gray-400 uppercase">
             <tr>
               <th class="text-left px-3 py-2.5">{{ t('event.date') }}</th>
+              <th class="text-left px-3 py-2.5">Epoch</th>
               <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.amount') }}</th>
               <th class="text-left px-3 py-2.5 hidden lg:table-cell">Kurs {{ store.currency }}</th>
@@ -159,7 +160,7 @@ function counterpart(ev) {
           </thead>
           <tbody>
             <tr v-if="!events.length">
-              <td colspan="7" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
+              <td colspan="8" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
             </tr>
             <tr v-for="ev in events" :key="ev.id"
                 :class="[
@@ -168,6 +169,7 @@ function counterpart(ev) {
                   'border-b border-qubic-border/50 hover:bg-qubic-bg/50'
                 ]">
               <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
+              <td class="px-3 py-2.5 text-gray-400 font-mono">{{ ev.epoch ?? '—' }}</td>
               <td class="px-3 py-2.5">
                 <span v-if="direction(ev) === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
                 <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>

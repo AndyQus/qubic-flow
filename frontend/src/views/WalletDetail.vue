@@ -124,27 +124,27 @@ function explorerUrl(addr) {
     <div class="flex flex-wrap gap-2 items-center">
       <button v-for="[mode, lbl] in [['all','Alle'],['epoch','Epoch'],['month','Monat'],['year','Jahr']]"
               :key="mode"
-              :class="['btn-ghost text-xs py-1', filterMode === mode && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+              :class="['btn-ghost text-sm py-1', filterMode === mode && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
               @click="setFilter(mode)">
         {{ lbl }}
       </button>
 
-      <select v-if="filterMode === 'epoch'" v-model="filterEpoch" class="input text-xs py-1">
+      <select v-if="filterMode === 'epoch'" v-model="filterEpoch" class="input text-sm py-1">
         <option value="">Epoch wählen…</option>
         <option v-for="ep in availableEpochs" :key="ep" :value="ep">{{ ep }}</option>
       </select>
 
-      <select v-if="filterMode === 'month'" v-model="filterMonth" class="input text-xs py-1">
+      <select v-if="filterMode === 'month'" v-model="filterMonth" class="input text-sm py-1">
         <option value="">Monat wählen…</option>
         <option v-for="m in monthOptions" :key="m.val" :value="m.val">{{ m.lbl }}</option>
       </select>
 
-      <select v-if="filterMode === 'year'" v-model="filterYear" class="input text-xs py-1">
+      <select v-if="filterMode === 'year'" v-model="filterYear" class="input text-sm py-1">
         <option value="">Jahr wählen…</option>
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
       </select>
 
-      <span class="ml-auto text-xs text-gray-500">{{ total.toLocaleString('de-DE') }} Einträge</span>
+      <span class="ml-auto text-sm text-gray-500">{{ total.toLocaleString('de-DE') }} Einträge</span>
     </div>
 
     <!-- Events-Tabelle -->
@@ -153,12 +153,12 @@ function explorerUrl(addr) {
     <!-- Paging -->
     <div v-if="totalPages > 1" class="flex items-center justify-center gap-4 py-2">
       <button @click="page--" :disabled="page <= 1"
-              class="btn-ghost text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+              class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
         ← Zurück
       </button>
       <span class="text-xs text-gray-400">Seite {{ page }} / {{ totalPages }}</span>
       <button @click="page++" :disabled="page >= totalPages"
-              class="btn-ghost text-xs py-1 disabled:opacity-40 disabled:cursor-not-allowed">
+              class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
         Weiter →
       </button>
     </div>

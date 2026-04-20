@@ -26,6 +26,12 @@
     border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
+  .card.border-teal {
+    border-color: rgba(35, 255, 255, 0.30) !important;
+  }
+  html.light .card.border-teal {
+    border-color: rgba(0, 180, 180, 0.40) !important;
+  }
   .btn {
     @apply px-4 py-2 rounded-lg bg-qubic-teal text-gray-900 font-medium
            hover:bg-qubic-cyan transition-colors disabled:opacity-50;
