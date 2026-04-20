@@ -2,7 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useAppStore = defineStore('app', () => {
-  const animation = ref(localStorage.getItem('animation') || 'beam-drop')
+  const animation  = ref(localStorage.getItem('animation')  || 'beam-drop')
+  const moneyAnim   = ref(localStorage.getItem('moneyAnim')   || 'floating-coins')
+  const moneySound  = ref(localStorage.getItem('moneySound')  !== 'false')
+  const soundStyle  = ref(localStorage.getItem('soundStyle')  || 'kaching')
   const theme = ref(localStorage.getItem('theme') || 'dark')
   const lang = ref(localStorage.getItem('lang') || 'de')
   const fontSize = ref(localStorage.getItem('fontSize') || '100')
@@ -22,7 +25,10 @@ export const useAppStore = defineStore('app', () => {
 
   const activeNode = computed(() => nodes.value.find(n => n.health_status === 'ONLINE'))
 
-  function setAnimation(a) { animation.value = a; localStorage.setItem('animation', a) }
+  function setAnimation(a)  { animation.value  = a; localStorage.setItem('animation',  a) }
+  function setMoneyAnim(a)   { moneyAnim.value   = a; localStorage.setItem('moneyAnim',   a) }
+  function setMoneySound(v)  { moneySound.value  = v; localStorage.setItem('moneySound',  String(v)) }
+  function setSoundStyle(s)  { soundStyle.value  = s; localStorage.setItem('soundStyle',  s) }
   function toggleHideAddresses() {
     hideAddresses.value = !hideAddresses.value
     localStorage.setItem('hideAddresses', hideAddresses.value)
@@ -42,14 +48,16 @@ export const useAppStore = defineStore('app', () => {
 
   function setLang(l) { lang.value = l; localStorage.setItem('lang', l) }
 
+  const DASHBOARD_LIMIT = 10
+
   function prependEvent(ev) {
     events.value.unshift(ev)
+    if (events.value.length > DASHBOARD_LIMIT) events.value.splice(DASHBOARD_LIMIT)
     newEventIds.value.push(ev.id)
     setTimeout(() => {
       const idx = newEventIds.value.indexOf(ev.id)
       if (idx >= 0) newEventIds.value.splice(idx, 1)
-    }, 60_000)
-    if (events.value.length > 500) events.value.pop()
+    }, 20_000)
   }
 
   function simulateEvent() {
@@ -71,9 +79,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    animation, theme, lang, fontSize, hideAddresses, currency, walletFilter,
+    animation, moneyAnim, moneySound, soundStyle,
+    theme, lang, fontSize, hideAddresses, currency, walletFilter,
     wallets, events, nodes, wsConnected, newEventIds,
     filteredWallets, activeNode,
-    setAnimation, setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
+    setAnimation, setMoneyAnim, setMoneySound, setSoundStyle,
+    setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
   }
 })

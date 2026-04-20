@@ -31,5 +31,5 @@
   </text>
 
   <!-- Tagline -->
-  <text x="156" y="112" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="400" fill="#23FFFF" fill-opacity="0.55" letter-spacing="4">WALLET TRACKER</text>
+  <text x="156" y="120" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#23FFFF" fill-opacity="0.75" letter-spacing="3">WALLET TRACKER</text>
 </svg>

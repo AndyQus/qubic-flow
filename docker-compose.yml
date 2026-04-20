@@ -5,6 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: qubicflow-backend:latest
     container_name: qubicflow-backend
     ports:
       - "127.0.0.1:8000:8000"
@@ -28,6 +29,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: qubicflow-frontend:latest
     container_name: qubicflow-frontend
     ports:
       - "127.0.0.1:8080:80"

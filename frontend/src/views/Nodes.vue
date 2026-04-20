@@ -7,16 +7,22 @@ import { useTranslation } from 'i18next-vue'
 const store = useAppStore()
 const { t } = useTranslation()
 const showForm = ref(false)
+const error = ref('')
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 })
 
 async function reload() { store.nodes = await api.nodes.list() }
 
 async function submit() {
-  await api.nodes.create(form.value)
-  form.value = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
-  showForm.value = false
-  await reload()
+  error.value = ''
+  try {
+    await api.nodes.create(form.value)
+    form.value = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
+    showForm.value = false
+    await reload()
+  } catch (e) {
+    error.value = e.message.includes('409') ? 'Diese URL existiert bereits.' : `Fehler: ${e.message}`
+  }
 }
 
 async function remove(id) {
@@ -52,6 +58,7 @@ onMounted(reload)
     </select>
     <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
     <input v-model.number="form.priority" type="number" min="1" max="5" class="input w-full" />
+    <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
     <button class="btn" @click="submit">{{ t('common.save') }}</button>
   </div>
 

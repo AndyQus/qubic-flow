@@ -5,10 +5,11 @@ export const de = {
   status: { connected: 'Verbunden', no_node: 'Kein Node verfügbar', syncing: 'Synchronisiert', online: 'Online', offline: 'Offline', degraded: 'Beeinträchtigt' },
   filter: { all: 'Alle', private: 'Privat', business: 'Business' },
   wallet: { add: 'Wallet hinzufügen', address: 'Adresse', label: 'Bezeichnung', note: 'Notiz', type: 'Typ', actions: 'Aktionen', edit: 'Bearbeiten', delete: 'Löschen', none: 'Keine Wallets konfiguriert' },
-  event: { date: 'Datum', wallet: 'Wallet', type: 'Typ', amount: 'Betrag', rate_eur: 'Kurs EUR', value_eur: 'Wert EUR', direction: 'Richtung', none: 'Keine Events' },
+  event: { date: 'Datum', wallet: 'Wallet', type: 'Typ', amount: 'Betrag', rate_eur: 'Kurs EUR', value_eur: 'Wert EUR', direction: 'Richtung', none: 'Keine Events', last10: 'Letzte 10 Transaktionen' },
   node: { add: 'Node hinzufügen', url: 'URL', type: 'Typ', label: 'Bezeichnung', priority: 'Priorität', tick: 'Tick', response: 'Antwortzeit', health: 'Status', save: 'Speichern' },
   stats: { hour: 'Stunde', day: 'Tag', epoch: 'Epoche', month: 'Monat', year: 'Jahr', current: 'Aktuell', previous: 'Vorherige', count: 'Anzahl', volume: 'Volumen' },
-  settings: { animation: 'Animation', theme: 'Theme', dark: 'Dunkel', light: 'Hell', language: 'Sprache', push_down: 'Push Down', slide_in: 'Slide In', beam_drop: 'Beam Drop', preview: 'Vorschau' },
+  moneyAnim: { title: 'Eingangsanimation', none: 'Keine', coin_rain: 'Münzregen', money_burst: 'Geldburst', floating_coins: 'Schwebende Münzen', sound: 'Mit Ton', mute: 'Stumm' },
+  settings: { animation: 'Animation', display: 'Darstellung', theme: 'Theme', dark: 'Dunkel', light: 'Hell', language: 'Sprache', push_down: 'Push Down', slide_in: 'Slide In', beam_drop: 'Beam Drop', preview: 'Vorschau' },
   export: { cointracking: 'CoinTracking CSV (Privat)', steuerberater: 'Steuerberater CSV (Business)', year: 'Jahr', download: 'Herunterladen' },
   common: { save: 'Speichern', cancel: 'Abbrechen', confirm: 'Bestätigen', loading: 'Lädt...' },
 }
