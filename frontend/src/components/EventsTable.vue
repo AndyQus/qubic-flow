@@ -129,7 +129,7 @@ function counterpart(ev) {
             </div>
             <!-- TxId -->
             <div class="flex items-center gap-1 mt-1">
-              <span class="text-[10px] text-gray-500 font-mono" :title="ev.id">{{ shortTx(ev.id) }}</span>
+              <span class="text-xs text-gray-500 font-mono" :title="ev.id">{{ shortTx(ev.id) }}</span>
               <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
                  class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -209,7 +209,7 @@ function counterpart(ev) {
               <!-- TxId -->
               <td class="px-3 py-2.5">
                 <div class="flex items-center gap-1">
-                  <span class="font-mono text-gray-400 text-[10px]" :title="ev.id">{{ shortTx(ev.id) }}</span>
+                  <span class="font-mono text-gray-400" :title="ev.id">{{ shortTx(ev.id) }}</span>
                   <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
                      class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
