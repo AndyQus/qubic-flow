@@ -26,6 +26,7 @@ export const api = {
       const q = new URLSearchParams(params).toString()
       return req(`/events/count${q ? '?' + q : ''}`)
     },
+    filterOptions: (walletId) => req(`/events/filter-options?wallet_id=${walletId}`),
   },
   nodes: {
     list: () => req('/nodes'),

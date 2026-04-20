@@ -18,24 +18,30 @@ const filterEpoch = ref('')
 const filterMonth = ref('')
 const filterYear  = ref('')
 
+const availableYears  = ref([])
+const availableMonths = ref([])
+const availableEpochs = ref([])
+
 const wallet = computed(() => store.wallets.find(w => w.id === props.id))
 
-const monthOptions = computed(() => {
-  const opts = []
-  const now = new Date()
-  for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const lbl = d.toLocaleString('de-DE', { month: 'long', year: 'numeric' })
-    opts.push({ val, lbl })
-  }
-  return opts
-})
+const monthOptions = computed(() =>
+  availableMonths.value.map(val => {
+    const [y, m] = val.split('-')
+    const lbl = new Date(+y, +m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' })
+    return { val, lbl }
+  })
+)
 
-const yearOptions = computed(() => {
-  const y = new Date().getFullYear()
-  return Array.from({ length: 6 }, (_, i) => y - i)
-})
+const yearOptions = computed(() => availableYears.value)
+
+async function loadFilterOptions() {
+  try {
+    const opts = await api.events.filterOptions(props.id)
+    availableYears.value  = opts.years
+    availableMonths.value = opts.months
+    availableEpochs.value = opts.epochs
+  } catch (e) { console.error(e) }
+}
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -73,7 +79,7 @@ function setFilter(mode) {
 
 watch([filterEpoch, filterMonth, filterYear], () => { page.value = 1; load() })
 watch(page, load)
-onMounted(load)
+onMounted(() => { load(); loadFilterOptions() })
 
 function maskLabel(label, id) {
   if (!store.hideAddresses) return label
@@ -123,9 +129,10 @@ function explorerUrl(addr) {
         {{ lbl }}
       </button>
 
-      <input v-if="filterMode === 'epoch'"
-             v-model="filterEpoch" type="number" placeholder="Epoch-Nr…"
-             class="input text-xs w-32 py-1" />
+      <select v-if="filterMode === 'epoch'" v-model="filterEpoch" class="input text-xs py-1">
+        <option value="">Epoch wählen…</option>
+        <option v-for="ep in availableEpochs" :key="ep" :value="ep">{{ ep }}</option>
+      </select>
 
       <select v-if="filterMode === 'month'" v-model="filterMonth" class="input text-xs py-1">
         <option value="">Monat wählen…</option>

@@ -23,6 +23,30 @@ def _base_query(db, wallet_id=None, epoch=None, month=None, year=None):
     return q
 
 
+@router.get("/events/filter-options")
+def filter_options(
+    wallet_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+):
+    base = db.query(Event).join(Wallet, Wallet.id == Event.wallet_id).filter(Wallet.deleted_at.is_(None))
+    if wallet_id:
+        base = base.filter(Event.wallet_id == wallet_id)
+
+    years = sorted(
+        {r[0] for r in base.with_entities(func.strftime('%Y', Event.timestamp)).distinct() if r[0]},
+        reverse=True,
+    )
+    months = sorted(
+        {r[0] for r in base.with_entities(func.strftime('%Y-%m', Event.timestamp)).distinct() if r[0]},
+        reverse=True,
+    )
+    epochs = sorted(
+        {r[0] for r in base.with_entities(Event.epoch).distinct() if r[0] is not None},
+        reverse=True,
+    )
+    return {"years": years, "months": months, "epochs": epochs}
+
+
 @router.get("/events/count")
 def count_events(
     wallet_id: str | None = Query(None),
