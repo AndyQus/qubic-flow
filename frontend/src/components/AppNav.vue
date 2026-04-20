@@ -31,9 +31,9 @@ function navigate(to) {
         <li v-for="item in items" :key="item.to">
           <router-link
             :to="item.to"
-            class="inline-block px-4 py-2 text-sm border-b-2 border-transparent hover:text-qubic-teal transition-colors"
-            active-class="text-qubic-teal border-qubic-teal"
-            exact-active-class="text-qubic-teal border-qubic-teal"
+            class="inline-block px-4 py-2 text-sm border-b-2 border-transparent text-gray-500 hover:text-qubic-teal transition-colors"
+            active-class="text-qubic-teal border-qubic-teal font-semibold"
+            exact-active-class="text-qubic-teal border-qubic-teal font-semibold"
           >
             {{ t(`nav.${item.key}`) }}
           </router-link>

@@ -70,7 +70,35 @@ html.light .border-qubic-border,
 html.light .border-qubic-border\/50,
 html.light .border-qubic-border\/30 { border-color: rgba(0, 0, 0, 0.1) !important; }
 html.light tr.hover\:bg-qubic-bg\/50:hover { background: rgba(0, 0, 0, 0.03) !important; }
-html.light .bg-qubic-teal\/5 { background: rgba(45, 212, 191, 0.08) !important; }
+html.light .bg-qubic-teal\/5 { background: rgba(0, 128, 128, 0.06) !important; }
+
+/* Light mode: #23FFFF is invisible on white — map teal to a dark accessible teal */
+html.light .text-qubic-teal                { color: #007A7A !important; }
+html.light .hover\:text-qubic-teal:hover   { color: #007A7A !important; }
+html.light .border-qubic-teal              { border-color: #007A7A !important; }
+html.light .bg-qubic-teal\/20              { background: rgba(0, 122, 122, 0.12) !important; }
+html.light .bg-qubic-teal\/10              { background: rgba(0, 122, 122, 0.08) !important; }
+html.light .bg-qubic-teal\/15              { background: rgba(0, 122, 122, 0.10) !important; }
+html.light .bg-qubic-teal\/60,
+html.light .bg-qubic-teal\/30             { background: rgba(0, 122, 122, 0.20) !important; }
+
+/* Pill: inverted in light mode — solid dark teal, white text → high contrast */
+html.light .pill {
+  background: #007A7A;
+  color: #ffffff !important;
+  border-color: #007A7A;
+}
+
+/* Nav inactive links: distinct muted color so active stands out clearly */
+html.light nav a.text-gray-500 { color: #6b7280 !important; }
+
+/* Active filter/tab buttons: text must stay readable on teal-tint bg */
+html.light .bg-qubic-teal\/20.text-qubic-teal,
+html.light .bg-qubic-teal\/20 .text-qubic-teal { color: #005f5f !important; }
+
+/* Settings preview table: dark bg becomes light in light mode */
+html.light .bg-qubic-bg\/50 { background: rgba(248, 250, 252, 0.95) !important; }
+html.light .bg-qubic-bg     { background: #f8fafc !important; }
 
 /* Push Down: Zeile klappt von oben auf (accordion) */
 @keyframes push-down {
