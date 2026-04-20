@@ -12,6 +12,7 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 - [Start mit Docker](#start-mit-docker)
 - [Start in VSCode (Entwicklung)](#start-in-vscode-entwicklung)
 - [Konfiguration (.env)](#konfiguration-env)
+- [Nodes konfigurieren](#nodes-konfigurieren)
 - [Projektstruktur](#projektstruktur)
 - [API-Übersicht](#api-übersicht)
 - [Export / Steuer-CSVs](#export--steuer-csvs)
@@ -24,7 +25,8 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 ## Features
 
 - **Unbegrenzte Wallets** — PRIVATE und BUSINESS, verwaltbar über die Oberfläche
-- **Event-Sync** — automatisch alle 60 Sekunden via Qubic RPC (`rpc.qubic.org`, getEventLogs)
+- **Dual-Node-Unterstützung** — Standard-RPC (`rpc.qubic.org`) **und** BOB-Node (`bobnet.qubic.li`) werden unterstützt; der beste verfügbare Node wird automatisch gewählt
+- **Event-Sync** — automatisch alle 60 Sekunden; RPC-Nodes via `getEventLogs`, BOB-Nodes via `POST /getQuTransferForIdentity`
 - **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events
 - **Tick-Range-Windowing** — überwindet das 10.000-Records-Limit der RPC-API durch rekursives Halbieren
 - **Adress-Namen-Auflösung** — automatische Auflösung von Qubic-Adressen zu Tokens/Labels (Assets-Seite + CSV)
@@ -136,6 +138,65 @@ npm run dev
 
 ---
 
+## Nodes konfigurieren
+
+Nodes werden über die Oberfläche unter **Einstellungen → Nodes** verwaltet.  
+QubicFlow wählt beim Sync automatisch den höchst-priorisierten ONLINE-Node.
+
+### Node-Typen
+
+| Typ         | Beschreibung                              | Standard-URL                          |
+|-------------|-------------------------------------------|---------------------------------------|
+| `RPC`       | Qubic Public RPC (REST)                   | `https://rpc.qubic.org`              |
+| `BOB_NODE`  | Qubic BOB-Node (Core-Team, REST + WS)    | `https://bobnet.qubic.li:40420`      |
+| `LITE_NODE` | Lite-Node (wie RPC, andere URL)           | individuell                           |
+
+### RPC-Node einrichten (Standard)
+
+```
+URL:      https://rpc.qubic.org
+Typ:      RPC
+Label:    Qubic RPC
+Priorität: 1
+```
+
+### BOB-Node einrichten
+
+```
+URL:      https://bobnet.qubic.li:40420
+Typ:      BOB_NODE
+Label:    BOB Public Node
+Priorität: 1
+```
+
+Der BOB-Node nutzt eine eigene REST-API auf Port **40420** — die Standard-RPC-Endpunkte (`/v1/tick-info` usw.) sind dort **nicht** verfügbar.  
+QubicFlow erkennt den Typ automatisch anhand von `node_type = BOB_NODE` und verwendet die richtigen Endpunkte.
+
+#### Verwendete BOB-Endpunkte
+
+| Endpunkt                         | Methode | Zweck                          |
+|----------------------------------|---------|--------------------------------|
+| `/status`                        | GET     | Health-Check, aktueller Tick   |
+| `/getQuTransferForIdentity`      | POST    | QU-Transfers je Wallet + Tick-Bereich |
+
+#### Bekannte Einschränkungen (BOB)
+
+- **Timestamps fehlen** in den Transfer-Log-Einträgen — Transaktionsdaten zeigen kein korrektes Datum. Eine Verbesserung über `GET /tick/{tickNumber}` ist geplant.
+- Der öffentliche BOB-Node (`bobnet.qubic.li:40420`) ist ein Community-Dienst ohne garantierte Verfügbarkeit. Für Produktion empfiehlt sich ein eigener BOB-Node.
+
+> Detaillierte BOB-API-Dokumentation: [`docs/bob_node.md`](docs/bob_node.md)
+
+### Node-Failover
+
+Der Sync-Job (`sync_all_wallets`, alle 60 s) wählt den Node nach folgender Logik:
+
+1. Nur `is_active = 1`-Nodes werden berücksichtigt
+2. ONLINE-Nodes haben Vorrang vor DEGRADED-Nodes
+3. Bei Gleichstand entscheidet die **Priorität** (niedrigere Zahl = höhere Priorität)
+4. Ist kein Node verfügbar, fällt das System auf `QUBIC_RPC_URL` aus `.env` zurück
+
+---
+
 ## Konfiguration (.env)
 
 Datei `backend/.env` anlegen (Vorlage: `backend/.env.example`):
@@ -190,8 +251,8 @@ qubic-flow/
 │   │   │   ├── snapshot.py
 │   │   │   └── settings.py
 │   │   ├── services/        # Business-Logik
-│   │   │   ├── sync_engine.py      # Tick-Sync mit Windowing (Event + TX)
-│   │   │   ├── qubic_client.py     # RPC-Client (3x Retry)
+│   │   │   ├── sync_engine.py      # Tick-Sync mit Windowing (Event + TX); Node-Auswahl dynamisch
+│   │   │   ├── qubic_client.py     # RPCClient + BOBClient (3x Retry, BOB-Response-Mapping)
 │   │   │   ├── coingecko.py        # Kurs-Abruf mit Rate-Limit
 │   │   │   ├── label_service.py    # Adress-Namen-Sync
 │   │   │   ├── export_service.py   # CSV-Generierung
@@ -290,8 +351,8 @@ Beide Exporte enthalten EUR-Werte, gerundet auf 2 Dezimalstellen.
 
 | Job                | Intervall              | Beschreibung                                      |
 |--------------------|------------------------|---------------------------------------------------|
-| `sync_all_wallets` | alle 60 Sekunden       | Event-Sync (getEventLogs) + TX-Sync (transfer-transactions) |
-| `health_monitor`   | alle 30 Sekunden       | Node-Status prüfen, WS-Broadcast                  |
+| `sync_all_wallets` | alle 60 Sekunden       | Event-Sync + TX-Sync; wählt dynamisch den besten verfügbaren Node (RPC oder BOB) |
+| `health_monitor`   | alle 30 Sekunden       | Node-Status prüfen (`/v1/tick-info` für RPC, `/status` für BOB), WS-Broadcast |
 | `sync_labels`      | alle 24 Stunden        | Adress-Namen-Auflösung (address_labels, tokens, issuances) |
 | `weekly_snapshot`  | Mi 12:00 UTC (Cron)   | Wöchentlichen Aggregations-Snapshot speichern     |
 

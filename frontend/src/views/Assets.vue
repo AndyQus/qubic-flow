@@ -79,17 +79,7 @@ function categoryLabel(cat) {
 
 <template>
   <div class="space-y-2">
-    <!-- Header & Stats -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div class="flex gap-4 text-sm text-gray-400">
-        <span>{{ t('assets.total') }}: <span class="font-medium">{{ stats.total }}</span></span>
-        <span v-for="(count, cat) in stats.byCategory" :key="cat">
-          {{ categoryLabel(cat) }}: <span class="font-medium">{{ count }}</span>
-        </span>
-      </div>
-    </div>
-
-    <!-- Filter & Search -->
+    <!-- Filter Tabs -->
     <div class="flex flex-wrap gap-2 items-center">
       <button
         v-for="cat in categories"
@@ -106,10 +96,20 @@ function categoryLabel(cat) {
       >
         {{ cat === 'all' ? t('filter.all') : categoryLabel(cat) }}
       </button>
+    </div>
+
+    <!-- Stats & Search -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex gap-4 text-sm text-gray-400">
+        <span>{{ t('assets.total') }}: <span class="font-medium">{{ stats.total }}</span></span>
+        <span v-for="(count, cat) in stats.byCategory" :key="cat">
+          {{ categoryLabel(cat) }}: <span class="font-medium">{{ count }}</span>
+        </span>
+      </div>
       <input
         v-model="search"
         :placeholder="t('assets.search')"
-        class="input ml-auto w-64 text-sm"
+        class="input w-64 text-sm"
       />
     </div>
 

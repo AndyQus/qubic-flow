@@ -7,18 +7,35 @@ import { useTranslation } from 'i18next-vue'
 const store = useAppStore()
 const { t } = useTranslation()
 const showForm = ref(false)
-const error = ref('')
+const error    = ref('')
+const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 })
 
 async function reload() { store.nodes = await api.nodes.list() }
 
+function startEdit(n) {
+  editId.value  = n.id
+  form.value    = { url: n.url, node_type: n.node_type, label: n.label, priority: n.priority }
+  showForm.value = true
+}
+
+function cancelForm() {
+  editId.value   = null
+  showForm.value = false
+  error.value    = ''
+  form.value     = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
+}
+
 async function submit() {
   error.value = ''
   try {
-    await api.nodes.create(form.value)
-    form.value = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
-    showForm.value = false
+    if (editId.value) {
+      await api.nodes.update(editId.value, form.value)
+    } else {
+      await api.nodes.create(form.value)
+    }
+    cancelForm()
     await reload()
   } catch (e) {
     error.value = e.message.includes('409') ? 'Diese URL existiert bereits.' : `Fehler: ${e.message}`
@@ -32,7 +49,7 @@ async function remove(id) {
 }
 
 function healthColor(status) {
-  if (status === 'ONLINE') return 'text-green-400'
+  if (status === 'ONLINE')   return 'text-green-400'
   if (status === 'DEGRADED') return 'text-yellow-400'
   return 'text-red-400'
 }
@@ -43,10 +60,11 @@ onMounted(reload)
 <template>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold">Nodes</h2>
-    <button class="btn" @click="showForm = !showForm">+ {{ t('node.add') }}</button>
+    <button class="btn" @click="editId = null; showForm = !showForm">+ {{ t('node.add') }}</button>
   </div>
 
   <div v-if="showForm" class="card mb-4 space-y-3">
+    <h3 class="text-sm font-bold uppercase text-gray-400">{{ editId ? 'Node bearbeiten' : t('node.add') }}</h3>
     <div>
       <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
       <p class="text-xs text-gray-400 mt-1">Standard: <span class="font-mono">https://rpc.qubic.org</span></p>
@@ -59,7 +77,10 @@ onMounted(reload)
     <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
     <input v-model.number="form.priority" type="number" min="1" max="5" class="input w-full" />
     <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
-    <button class="btn" @click="submit">{{ t('common.save') }}</button>
+    <div class="flex gap-2">
+      <button class="btn" @click="submit">{{ t('common.save') }}</button>
+      <button class="btn-ghost text-sm" @click="cancelForm">{{ t('common.cancel') }}</button>
+    </div>
   </div>
 
   <div class="card overflow-hidden">
@@ -83,7 +104,8 @@ onMounted(reload)
           <td class="p-3 font-mono">{{ n.tick || '—' }}</td>
           <td class="p-3">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
           <td class="p-3"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
-          <td class="p-3 text-right">
+          <td class="p-3 text-right flex justify-end gap-3">
+            <button @click="startEdit(n)" class="text-qubic-teal hover:text-qubic-cyan text-sm">{{ t('wallet.edit') }}</button>
             <button @click="remove(n.id)" class="text-red-400 hover:text-red-300 text-sm">{{ t('wallet.delete') }}</button>
           </td>
         </tr>

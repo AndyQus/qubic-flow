@@ -9,39 +9,56 @@ from ..models.event import Event
 from ..models.sync_state import SyncState
 from ..models.sync_gap import SyncGap
 from ..utils.time import now_utc_iso, unix_ms_to_iso, iso_to_date
-from .qubic_client import RPCClient
+from .qubic_client import RPCClient, BOBClient
 from .coingecko import get_price_for_date
 from ..websocket.manager import manager
+from ..models.node import Node
 
 logger = logging.getLogger(__name__)
 
 MAX_WINDOW_RECORDS = 10000
 PAGE_SIZE = 1000
 
-_client = RPCClient()
+
+def _get_active_client(db):
+    """Return the best-available client based on node priority and health."""
+    node = (
+        db.query(Node)
+        .filter(Node.is_active == 1, Node.health_status.in_(["ONLINE", "DEGRADED"]))
+        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .first()
+    )
+    if node is None:
+        return RPCClient()
+    if node.node_type == "BOB_NODE":
+        return BOBClient(node.url)
+    return RPCClient(node.url)
 
 
 async def sync_all_wallets():
     """Entry point — called by scheduler every 60s."""
     db = SessionLocal()
     try:
-        current_tick = await _client.get_current_tick()
+        client = _get_active_client(db)
+        current_tick = await client.get_current_tick()
         wallets = db.query(Wallet).filter(Wallet.active == 1, Wallet.deleted_at.is_(None)).all()
         for wallet in wallets:
             try:
-                await sync_wallet(db, wallet.id, current_tick)
+                await sync_wallet(db, wallet.id, current_tick, client)
             except Exception as e:
                 logger.error(f"Event sync failed for wallet {wallet.id}: {e}", exc_info=True)
                 _set_sync_failed(db, wallet.id, str(e))
             try:
-                await sync_wallet_tx(db, wallet.id, current_tick)
+                await sync_wallet_tx(db, wallet.id, current_tick, client)
             except Exception as e:
                 logger.error(f"TX sync failed for wallet {wallet.id}: {e}", exc_info=True)
     finally:
         db.close()
 
 
-async def sync_wallet(db: Session, wallet_id: str, current_tick: int):
+async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=None):
+    if client is None:
+        client = RPCClient()
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
     if state is None:
         state = SyncState(wallet_id=wallet_id, last_tick=0, status="IDLE", total_events=0)
@@ -60,7 +77,7 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int):
 
     try:
         owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
-        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses)
+        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, client)
 
         effective_tick = max_valid_tick if max_valid_tick is not None else to_tick
         if effective_tick < to_tick:
@@ -91,15 +108,15 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int):
         raise
 
 
-async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set) -> int:
-    probe = await _client.get_event_logs(wallet_id, from_tick, to_tick, offset=0, size=1)
+async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set, client) -> int:
+    probe = await client.get_event_logs(wallet_id, from_tick, to_tick, offset=0, size=1)
     total = probe.get("hits", {}).get("total", 0)
     valid_for_tick = probe.get("validForTick", to_tick)
 
     if total > MAX_WINDOW_RECORDS and from_tick < to_tick:
         mid = (from_tick + to_tick) // 2
-        v1 = await _sync_window(db, wallet_id, from_tick, mid, owned_addresses)
-        v2 = await _sync_window(db, wallet_id, mid + 1, to_tick, owned_addresses)
+        v1 = await _sync_window(db, wallet_id, from_tick, mid, owned_addresses, client)
+        v2 = await _sync_window(db, wallet_id, mid + 1, to_tick, owned_addresses, client)
         return max(v1, v2)
 
     if total > MAX_WINDOW_RECORDS:
@@ -107,7 +124,7 @@ async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int
 
     offset = 0
     while offset < min(total, MAX_WINDOW_RECORDS):
-        resp = await _client.get_event_logs(wallet_id, from_tick, to_tick, offset=offset, size=PAGE_SIZE)
+        resp = await client.get_event_logs(wallet_id, from_tick, to_tick, offset=offset, size=PAGE_SIZE)
         logs = resp.get("eventLogs", [])
         if not logs:
             break
@@ -185,7 +202,9 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
             await manager.broadcast("event.new", ev)
 
 
-async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int):
+async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=None):
+    if client is None:
+        client = RPCClient()
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
     if state is None:
         return
@@ -197,7 +216,7 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int):
         return
 
     owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
-    total_inserted = await _sync_transactions(db, wallet_id, from_tick, to_tick, owned_addresses)
+    total_inserted = await _sync_transactions(db, wallet_id, from_tick, to_tick, owned_addresses, client)
 
     state.last_tx_tick = to_tick
     if total_inserted > 0:
@@ -206,12 +225,12 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int):
     logger.info(f"TX sync done for wallet {wallet_id}: {total_inserted} new records (ticks {from_tick}–{to_tick})")
 
 
-async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set) -> int:
+async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set, client) -> int:
     page = 1
     total_inserted = 0
 
     while True:
-        resp = await _client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
+        resp = await client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
         tick_groups = resp.get("transactions", [])
         inserted = 0
 

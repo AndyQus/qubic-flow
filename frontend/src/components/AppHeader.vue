@@ -14,10 +14,14 @@ const { t } = useTranslation()
         <img :src="logoUrl" alt="QubicFlow" class="h-[72px] w-auto" />
       </router-link>
       <div class="flex items-center gap-3">
-        <span class="pill">
+        <span class="pill cursor-default"
+              :title="store.activeNode ? `${store.activeNode.label}\n${store.activeNode.url}` : ''">
           <span class="w-2 h-2 rounded-full mr-1.5"
                 :class="store.activeNode ? 'bg-green-500' : 'bg-red-500'"></span>
           {{ store.activeNode ? t('status.connected') : t('status.no_node') }}
+          <span v-if="store.activeNode" class="ml-1.5 text-[10px] text-gray-400 border-l border-gray-600 pl-1.5">
+            {{ store.activeNode.node_type }}
+          </span>
         </span>
          <!-- Adressen verbergen / anzeigen -->
         <button @click="store.toggleHideAddresses()"

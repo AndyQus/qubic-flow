@@ -20,14 +20,25 @@ async def check_nodes():
 
 
 async def _check_node(db, node: Node):
-    url = f"{node.url.rstrip('/')}/v1/tick-info"
+    base = node.url.rstrip('/')
+    if node.node_type == "BOB_NODE":
+        url = f"{base}/status"
+    else:
+        url = f"{base}/v1/tick-info"
     start = time.perf_counter()
     try:
         async with httpx.AsyncClient() as client:
             r = await client.get(url, timeout=10)
             r.raise_for_status()
             data = r.json()
-            tick = int(data.get("tickInfo", {}).get("tick", 0))
+            if node.node_type == "BOB_NODE":
+                tick = int(
+                    data.get("currentTick") or
+                    data.get("currentFetchingTick") or
+                    data.get("verifiedTick") or 0
+                )
+            else:
+                tick = int(data.get("tickInfo", {}).get("tick", 0))
             elapsed = int((time.perf_counter() - start) * 1000)
             node.tick = tick
             node.response_time_ms = elapsed
