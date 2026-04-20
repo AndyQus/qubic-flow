@@ -6,11 +6,11 @@ export default {
     extend: {
       colors: {
         qubic: {
-          bg: '#0d1117',
-          card: '#161b22',
-          border: '#30363d',
-          teal: '#2dd4bf',
-          cyan: '#06b6d4',
+          bg: '#0A0F1E',
+          card: '#0C1628',
+          border: '#1a2540',
+          teal: '#23FFFF',
+          cyan: '#00CCCC',
         },
       },
       backdropBlur: {
