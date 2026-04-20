@@ -45,7 +45,32 @@
   html.light .input {
     @apply bg-white/60 text-gray-900 border-gray-300;
   }
+  html.light .btn-ghost {
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #1a202c;
+  }
+  html.light .btn-ghost:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+  html.light .pill {
+    background: rgba(45, 212, 191, 0.15);
+    border-color: rgba(45, 212, 191, 0.4);
+  }
 }
+
+/* Light mode: gray text classes get darker equivalents for readability */
+html.light .text-gray-300 { color: #374151 !important; }
+html.light .text-gray-400 { color: #4b5563 !important; }
+html.light .text-gray-500 { color: #4b5563 !important; }
+html.light .text-gray-600 { color: #374151 !important; }
+html.light .text-white    { color: #111827 !important; }
+
+/* Table borders and hover rows in light mode */
+html.light .border-qubic-border,
+html.light .border-qubic-border\/50,
+html.light .border-qubic-border\/30 { border-color: rgba(0, 0, 0, 0.1) !important; }
+html.light tr.hover\:bg-qubic-bg\/50:hover { background: rgba(0, 0, 0, 0.03) !important; }
+html.light .bg-qubic-teal\/5 { background: rgba(45, 212, 191, 0.08) !important; }
 
 /* Push Down: Zeile klappt von oben auf (accordion) */
 @keyframes push-down {

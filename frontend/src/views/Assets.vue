@@ -82,9 +82,9 @@ function categoryLabel(cat) {
     <!-- Header & Stats -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="flex gap-4 text-sm text-gray-400">
-        <span>{{ t('assets.total') }}: <span class="text-white font-medium">{{ stats.total }}</span></span>
+        <span>{{ t('assets.total') }}: <span class="font-medium">{{ stats.total }}</span></span>
         <span v-for="(count, cat) in stats.byCategory" :key="cat">
-          {{ categoryLabel(cat) }}: <span class="text-white font-medium">{{ count }}</span>
+          {{ categoryLabel(cat) }}: <span class="font-medium">{{ count }}</span>
         </span>
       </div>
     </div>

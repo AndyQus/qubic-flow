@@ -66,7 +66,7 @@ function navigate(to) {
         <li v-for="item in items" :key="item.to">
           <button @click="navigate(item.to)"
                   class="w-full flex items-center gap-3 px-6 py-4 text-sm text-left hover:bg-qubic-teal/10 transition-colors"
-                  :class="$route?.path === item.to ? 'text-qubic-teal' : 'text-gray-300'">
+                  :class="$route?.path === item.to ? 'text-qubic-teal' : 'text-gray-400'">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon"/>
             </svg>

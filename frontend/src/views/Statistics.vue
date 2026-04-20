@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watchEffect } from 'vue'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
@@ -149,18 +149,24 @@ const barData = computed(() => {
   }
 })
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { labels: { color: '#e5e7eb', boxWidth: 12 } },
-    tooltip: { mode: 'index', intersect: false },
-  },
-  scales: {
-    x: { ticks: { color: '#9ca3af', maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.05)' } },
-    y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true },
-  },
-}
+const chartOptions = computed(() => {
+  const isLight = store.theme === 'light'
+  const labelColor  = isLight ? '#374151' : '#e5e7eb'
+  const tickColor   = isLight ? '#4b5563' : '#9ca3af'
+  const gridColor   = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.05)'
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: labelColor, boxWidth: 12 } },
+      tooltip: { mode: 'index', intersect: false },
+    },
+    scales: {
+      x: { ticks: { color: tickColor, maxRotation: 45 }, grid: { color: gridColor } },
+      y: { ticks: { color: tickColor }, grid: { color: gridColor }, beginAtZero: true },
+    },
+  }
+})
 </script>
 
 <template>
@@ -178,7 +184,7 @@ const chartOptions = {
       </div>
       <div class="card text-center">
         <div class="text-xs uppercase text-gray-400 mb-1">Volumen QUBIC</div>
-        <div class="text-2xl font-bold text-white">{{ fmt(totals.qubic) }}</div>
+        <div class="text-2xl font-bold">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card text-center">
         <div class="text-xs uppercase text-gray-400 mb-1">Volumen {{ store.currency }}</div>
