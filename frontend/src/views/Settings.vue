@@ -49,9 +49,9 @@ function simulate() {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
     <!-- Eingangsanimation (nach Darstellung) -->
-    <div class="card sm:col-span-2 xl:col-span-2" style="order:2">
+    <div class="card" style="order:2">
       <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('moneyAnim.title') }}</h3>
       <div class="flex flex-wrap gap-2 mb-3">
         <button v-for="[val, key] in [['none','none'],['coin-rain','coin_rain'],['money-burst','money_burst'],['floating-coins','floating_coins']]"

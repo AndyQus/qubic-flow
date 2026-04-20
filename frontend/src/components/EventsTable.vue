@@ -127,13 +127,13 @@ function counterpart(ev) {
         <table class="w-full text-xs">
           <thead class="border-b border-qubic-border text-gray-400 uppercase">
             <tr>
-              <th class="text-left px-3 py-1.5">{{ t('event.date') }}</th>
-              <th class="text-left px-3 py-1.5">{{ t('event.direction') }}</th>
-              <th class="text-left px-3 py-1.5">{{ t('event.amount') }}</th>
-              <th class="text-left px-3 py-1.5 hidden lg:table-cell">Kurs {{ store.currency }}</th>
-              <th class="text-left px-3 py-1.5">Wert {{ store.currency }}</th>
-              <th class="text-left px-3 py-1.5">Source</th>
-              <th class="text-left px-3 py-1.5">Destination</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.date') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.amount') }}</th>
+              <th class="text-left px-3 py-2.5 hidden lg:table-cell">Kurs {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5">Wert {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5">Source</th>
+              <th class="text-left px-3 py-2.5">Destination</th>
             </tr>
           </thead>
           <tbody>
@@ -146,18 +146,18 @@ function counterpart(ev) {
                   store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
                   'border-b border-qubic-border/50 hover:bg-qubic-bg/50'
                 ]">
-              <td class="px-3 py-1.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
-              <td class="px-3 py-1.5">
+              <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
+              <td class="px-3 py-2.5">
                 <span v-if="direction(ev) === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
                 <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
                 <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
                 <span v-else class="text-gray-500">—</span>
               </td>
-              <td class="px-3 py-1.5 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-              <td class="px-3 py-1.5 font-mono text-gray-400 hidden lg:table-cell">{{ fmtRate(ev) }}</td>
-              <td class="px-3 py-1.5 font-mono">{{ fmtValue(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
+              <td class="px-3 py-2.5 font-mono text-gray-400 hidden lg:table-cell">{{ fmtRate(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono">{{ fmtValue(ev) }}</td>
               <!-- Source -->
-              <td class="px-3 py-1.5">
+              <td class="px-3 py-2.5">
                 <div v-if="ev.source_address" class="flex items-center gap-1">
                   <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.source_address">
                     {{ maskName(ev.source_name, ev.source_address) }}
@@ -172,7 +172,7 @@ function counterpart(ev) {
                 <span v-else class="text-gray-500">—</span>
               </td>
               <!-- Destination -->
-              <td class="px-3 py-1.5">
+              <td class="px-3 py-2.5">
                 <div v-if="ev.destination_addr" class="flex items-center gap-1">
                   <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.destination_addr">
                     {{ maskName(ev.destination_name, ev.destination_addr) }}
