@@ -19,7 +19,7 @@ function walletLabel(w) {
 </script>
 
 <template>
-  <div v-if="store.wallets.length > 1" class="border border-qubic-border rounded-xl px-3 py-2 space-y-2 bg-[#1a2d4a]">
+  <div v-if="store.wallets.length > 1" class="card px-3 py-2 space-y-2">
     <div class="flex items-center justify-between">
       <span class="text-[10px] text-gray-400 uppercase tracking-wide">Wallet Filter</span>
       <button
