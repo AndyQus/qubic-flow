@@ -1,5 +1,14 @@
 const BASE = '/api/v1'
 
+function buildQuery(params) {
+  const q = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (Array.isArray(v)) v.forEach(item => q.append(k, item))
+    else if (v !== undefined && v !== null && v !== '') q.append(k, v)
+  }
+  return q.toString()
+}
+
 async function req(path, opts = {}) {
   const r = await fetch(BASE + path, {
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
@@ -19,11 +28,11 @@ export const api = {
   },
   events: {
     list: (params = {}) => {
-      const q = new URLSearchParams(params).toString()
+      const q = buildQuery(params)
       return req(`/events${q ? '?' + q : ''}`)
     },
     count: (params = {}) => {
-      const q = new URLSearchParams(params).toString()
+      const q = buildQuery(params)
       return req(`/events/count${q ? '?' + q : ''}`)
     },
     filterOptions: (walletId) => req(`/events/filter-options?wallet_id=${walletId}`),
@@ -36,9 +45,15 @@ export const api = {
     reorder: (order) => req('/nodes/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
   },
   stats: {
-    current:  () => req('/stats/current'),
+    current:  (walletIds = []) => {
+      const q = buildQuery({ wallet_ids: walletIds })
+      return req(`/stats/current${q ? '?' + q : ''}`)
+    },
     snapshots: () => req('/stats/snapshots'),
-    history:  (groupBy = 'week') => req(`/stats/history?group_by=${groupBy}`),
+    history:  (groupBy = 'week', walletIds = []) => {
+      const q = buildQuery({ group_by: groupBy, wallet_ids: walletIds })
+      return req(`/stats/history${q ? '?' + q : ''}`)
+    },
   },
   labels: {
     list: (params = {}) => {

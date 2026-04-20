@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from typing import List
 from datetime import datetime, timezone, timedelta
 from ...database import get_db
 from ...models.event import Event
@@ -10,7 +11,10 @@ router = APIRouter()
 
 
 @router.get("/stats/current")
-def current_stats(db: Session = Depends(get_db)):
+def current_stats(
+    wallet_ids: List[str] = Query(default=[]),
+    db: Session = Depends(get_db),
+):
     now = datetime.now(timezone.utc)
     hour_start = now.replace(minute=0, second=0, microsecond=0)
     prev_hour_start = hour_start - timedelta(hours=1)
@@ -25,8 +29,14 @@ def current_stats(db: Session = Depends(get_db)):
     current_epoch = db.query(func.max(Event.epoch)).scalar() or 0
     prev_epoch = max(0, current_epoch - 1)
 
+    def base_q():
+        q = db.query(Event)
+        if wallet_ids:
+            q = q.filter(Event.wallet_id.in_(wallet_ids))
+        return q
+
     def between(s, e):
-        q = db.query(
+        q = base_q().with_entities(
             func.count(Event.id),
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
@@ -37,7 +47,7 @@ def current_stats(db: Session = Depends(get_db)):
                 "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0)}
 
     def by_epoch(ep):
-        q = db.query(
+        q = base_q().with_entities(
             func.count(Event.id),
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
@@ -66,28 +76,30 @@ def snapshots(limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.get("/stats/history")
-def history(group_by: str = "week", db: Session = Depends(get_db)):
-    """Aggregate events from DB grouped by week or month."""
+def history(
+    group_by: str = "week",
+    wallet_ids: List[str] = Query(default=[]),
+    db: Session = Depends(get_db),
+):
     if group_by == "month":
         period_expr = func.strftime("%Y-%m", Event.timestamp)
     else:
         period_expr = func.strftime("%Y-%W", Event.timestamp)
 
-    rows = (
-        db.query(
-            period_expr.label("period"),
-            func.count(Event.id).label("count"),
-            func.sum(func.iif(Event.source_type == "TX",    1, 0)).label("tx_count"),
-            func.sum(func.iif(Event.source_type == "EVENT", 1, 0)).label("event_count"),
-            func.coalesce(func.sum(Event.amount_qubic), 0).label("volume_qubic"),
-            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0).label("volume_eur"),
-            func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0).label("volume_usd"),
-        )
-        .filter(Event.timestamp.isnot(None))
-        .group_by("period")
-        .order_by("period")
-        .all()
-    )
+    q = db.query(
+        period_expr.label("period"),
+        func.count(Event.id).label("count"),
+        func.sum(func.iif(Event.source_type == "TX",    1, 0)).label("tx_count"),
+        func.sum(func.iif(Event.source_type == "EVENT", 1, 0)).label("event_count"),
+        func.coalesce(func.sum(Event.amount_qubic), 0).label("volume_qubic"),
+        func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0).label("volume_eur"),
+        func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0).label("volume_usd"),
+    ).filter(Event.timestamp.isnot(None))
+
+    if wallet_ids:
+        q = q.filter(Event.wallet_id.in_(wallet_ids))
+
+    rows = q.group_by("period").order_by("period").all()
 
     result = []
     for r in rows:

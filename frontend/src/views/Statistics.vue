@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, computed, watchEffect } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 import { Line, Bar } from 'vue-chartjs'
+import WalletFilter from '../components/WalletFilter.vue'
 import {
   Chart as ChartJS, Title, Tooltip, Legend, LineElement, BarElement,
   CategoryScale, LinearScale, PointElement, Filler,
@@ -16,18 +17,23 @@ const store = useAppStore()
 
 const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
 const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
-const stats   = ref(null)
-const snaps   = ref([])
-const history = ref([])
-const mode    = ref('count')
+const stats          = ref(null)
+const snaps          = ref([])
+const history        = ref([])
+const mode           = ref('count')
+const selectedWallets = ref([])
 
-onMounted(async () => {
+async function loadStats() {
+  const ids = selectedWallets.value
   ;[stats.value, snaps.value, history.value] = await Promise.all([
-    api.stats.current(),
-    api.stats.snapshots(),
-    api.stats.history('week'),
+    api.stats.current(ids),
+    ids.length ? Promise.resolve([]) : api.stats.snapshots(),
+    api.stats.history('week', ids),
   ])
-})
+}
+
+watch(selectedWallets, loadStats, { deep: true })
+onMounted(loadStats)
 
 // ── Formatierung ────────────────────────────────────────────────
 function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString('de-DE') }
@@ -171,6 +177,8 @@ const chartOptions = computed(() => {
 
 <template>
   <div class="space-y-6">
+
+    <WalletFilter v-model="selectedWallets" />
 
     <!-- Gesamt-KPIs -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
