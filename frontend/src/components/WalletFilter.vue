@@ -17,9 +17,14 @@ function walletLabel(w) {
   return w.label || (w.id.length > 14 ? `${w.id.slice(0, 6)}…${w.id.slice(-6)}` : w.id)
 }
 
-function walletTooltip(w) {
-  if (store.hideAddresses) return ''
-  return w.label ? `${w.label}\n${w.id}` : w.id
+function btnClass(id) {
+  const selected = props.modelValue.includes(id)
+  return [
+    'btn-ghost text-xs py-1 transition-colors',
+    selected
+      ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal hover:bg-qubic-teal/30'
+      : 'hover:bg-qubic-teal/10 hover:border-qubic-teal/60 hover:text-qubic-teal',
+  ]
 }
 </script>
 
@@ -39,8 +44,7 @@ function walletTooltip(w) {
       <button
         v-for="w in store.wallets"
         :key="w.id"
-        :class="['btn-ghost text-xs py-1', modelValue.includes(w.id) && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-        :title="walletTooltip(w)"
+        :class="btnClass(w.id)"
         @click="toggle(w.id)"
       >
         {{ walletLabel(w) }}

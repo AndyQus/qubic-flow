@@ -15,6 +15,14 @@ ChartJS.register(Title, Tooltip, Legend, LineElement, BarElement, CategoryScale,
 const { t } = useTranslation()
 const store = useAppStore()
 
+const periodIcons = {
+  hour:  'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+  day:   'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+  epoch: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15',
+  month: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  year:  'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+}
+
 const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
 const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
 const stats          = ref(null)
@@ -202,14 +210,19 @@ const chartOptions = computed(() => {
 
     <!-- Perioden: aktuell vs. vorher -->
     <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-      <div v-for="p in periods" :key="p.key" class="card">
-        <div class="text-xs uppercase tracking-wide text-gray-400 mb-2 flex items-center justify-between">
-          {{ p.label }}
-          <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-xs font-medium">
+      <div v-for="p in periods" :key="p.key" class="card !p-3">
+        <div class="flex items-center justify-between mb-1">
+          <div class="flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" :d="periodIcons[p.key]"/>
+            </svg>
+            <span class="text-[10px] uppercase tracking-wide text-gray-500">{{ p.label }}</span>
+          </div>
+          <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-[10px] font-medium">
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
-        <div class="text-xl font-bold text-qubic-teal">{{ fmt(p.cur.volume_qubic) }} QU</div>
+        <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(p.cur.volume_qubic) }} QU</div>
         <div class="text-xs text-gray-400">{{ fmt(p.cur.count) }} {{ t('stats.count') }}</div>
         <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
