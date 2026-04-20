@@ -7,7 +7,9 @@ from .health_monitor import check_nodes
 from .sync_engine import sync_all_wallets
 from .snapshot_service import create_snapshot
 from .label_service import sync_labels
+from .coingecko import get_price_for_date
 from ..database import SessionLocal
+from ..models.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,50 @@ scheduler.add_job(
     "interval",
     hours=24,
     id="sync_labels",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
+
+
+async def backfill_missing_rates():
+    """Fetch EUR/USD rates for events that have none."""
+    db = SessionLocal()
+    try:
+        events = db.query(Event).filter(
+            Event.qubic_eur_rate == None,  # noqa: E711
+            Event.timestamp != None,       # noqa: E711
+        ).all()
+        if not events:
+            return
+        logger.info(f"Backfilling rates for {len(events)} events without a rate")
+        updated = 0
+        for ev in events:
+            try:
+                date_str = ev.timestamp[:10]  # YYYY-MM-DD
+            except Exception:
+                continue
+            prices = await get_price_for_date(db, date_str)
+            eur = prices.get("eur")
+            usd = prices.get("usd")
+            if eur is not None:
+                ev.qubic_eur_rate = eur
+                ev.qubic_usd_rate = usd
+                updated += 1
+        if updated:
+            db.commit()
+            logger.info(f"Backfilled rates for {updated} events")
+    except Exception as e:
+        logger.error(f"backfill_missing_rates failed: {e}")
+    finally:
+        db.close()
+
+
+scheduler.add_job(
+    backfill_missing_rates,
+    "interval",
+    hours=6,
+    id="backfill_rates",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),

@@ -75,6 +75,12 @@ watch([filterEpoch, filterMonth, filterYear], () => { page.value = 1; load() })
 watch(page, load)
 onMounted(load)
 
+function maskLabel(label, id) {
+  if (!store.hideAddresses) return label
+  const n = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 101
+  return `Wallet ${n}`
+}
+
 function explorerUrl(addr) {
   return `https://explorer.qubic.org/network/address/${addr}`
 }
@@ -87,7 +93,7 @@ function explorerUrl(addr) {
     <div v-if="wallet" class="card">
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="min-w-0">
-          <div class="text-base font-bold">{{ wallet.label }}</div>
+          <div class="text-base font-bold">{{ maskLabel(wallet.label, wallet.id) }}</div>
           <div class="flex items-center gap-2 mt-1 flex-wrap">
             <span class="text-xs font-mono text-gray-400 break-all">
               {{ store.hideAddresses ? '••••••••••••••••••••' : wallet.id }}
