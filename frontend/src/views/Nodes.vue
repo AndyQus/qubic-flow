@@ -3,16 +3,22 @@ import { ref, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
+import PageLoader from '../components/PageLoader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const showForm = ref(false)
+const loading  = ref(true)
 const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 })
 
-async function reload() { store.nodes = await api.nodes.list() }
+async function reload() {
+  loading.value = true
+  try { store.nodes = await api.nodes.list() }
+  finally { loading.value = false }
+}
 
 function startEdit(n) {
   editId.value  = n.id
@@ -63,6 +69,9 @@ onMounted(reload)
     <button class="btn" @click="editId = null; showForm = !showForm">+ {{ t('node.add') }}</button>
   </div>
 
+  <PageLoader v-if="loading" />
+
+  <template v-else>
   <div v-if="showForm" class="card mb-4 space-y-3">
     <h3 class="text-sm font-bold uppercase text-gray-400">{{ editId ? t('node.edit') : t('node.add') }}</h3>
     <div>
@@ -112,4 +121,4 @@ onMounted(reload)
       </tbody>
     </table>
   </div>
-</template>
+  </template>

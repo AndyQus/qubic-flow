@@ -3,16 +3,22 @@ import { ref, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
+import PageLoader from '../components/PageLoader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const showForm  = ref(false)
+const loading   = ref(true)
 const editingId = ref(null)
 const error     = ref('')
 const form      = ref({ id: '', label: '', note: '', wallet_type: 'PRIVATE' })
 const editForm  = ref({ label: '', note: '', wallet_type: 'PRIVATE' })
 
-async function reload() { store.wallets = await api.wallets.list() }
+async function reload() {
+  loading.value = true
+  try { store.wallets = await api.wallets.list() }
+  finally { loading.value = false }
+}
 
 async function submit() {
   error.value = ''
@@ -93,6 +99,9 @@ onMounted(reload)
     <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
   </div>
 
+  <PageLoader v-if="loading" />
+
+  <template v-else>
   <!-- Add-Form -->
   <div v-if="showForm" class="card mb-4 space-y-3">
     <input v-model="form.id"    :placeholder="t('wallet.address')" class="input w-full font-mono text-xs" />
@@ -262,4 +271,4 @@ onMounted(reload)
       </tbody>
     </table>
   </div>
-</template>
+  </template>

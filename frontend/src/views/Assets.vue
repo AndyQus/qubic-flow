@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
+import PageLoader from '../components/PageLoader.vue'
 
 const { t } = useTranslation()
 
@@ -114,9 +115,9 @@ function categoryLabel(cat) {
     </div>
 
     <!-- Table -->
-    <div class="card overflow-hidden p-0">
-      <div v-if="loading" class="p-8 text-center text-gray-500">{{ t('common.loading') }}</div>
-      <table v-else class="w-full text-xs">
+    <PageLoader v-if="loading" />
+    <div v-else class="card overflow-hidden p-0">
+      <table class="w-full text-xs">
         <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
           <tr>
             <th class="text-left p-3">{{ t('assets.name') }}</th>

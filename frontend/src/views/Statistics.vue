@@ -5,6 +5,7 @@ import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
 import { Line, Bar } from 'vue-chartjs'
 import WalletFilter from '../components/WalletFilter.vue'
+import PageLoader from '../components/PageLoader.vue'
 import {
   Chart as ChartJS, Title, Tooltip, Legend, LineElement, BarElement,
   CategoryScale, LinearScale, PointElement, Filler,
@@ -38,14 +39,18 @@ const snaps          = ref([])
 const history        = ref([])
 const mode           = ref('count')
 const selectedWallets = ref([])
+const loading = ref(true)
 
 async function loadStats() {
-  const ids = selectedWallets.value
-  ;[stats.value, snaps.value, history.value] = await Promise.all([
-    api.stats.current(ids),
-    ids.length ? Promise.resolve([]) : api.stats.snapshots(),
-    api.stats.history('week', ids),
-  ])
+  loading.value = true
+  try {
+    const ids = selectedWallets.value
+    ;[stats.value, snaps.value, history.value] = await Promise.all([
+      api.stats.current(ids),
+      ids.length ? Promise.resolve([]) : api.stats.snapshots(),
+      api.stats.history('week', ids),
+    ])
+  } finally { loading.value = false }
 }
 
 watch(selectedWallets, loadStats, { deep: true })
@@ -196,6 +201,9 @@ const chartOptions = computed(() => {
 
     <WalletFilter v-model="selectedWallets" />
 
+    <PageLoader v-if="loading" />
+    <template v-else>
+
     <!-- Gesamt-KPIs -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="card text-center">
@@ -280,5 +288,6 @@ const chartOptions = computed(() => {
       {{ t('stats.no_events') }}
     </div>
 
+    </template>
   </div>
 </template>
