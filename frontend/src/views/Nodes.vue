@@ -56,6 +56,8 @@ async function submit() {
 }
 
 async function toggle(id) {
+  const node = store.nodes.find(n => n.id === id)
+  if (node) node.is_active = node.is_active ? 0 : 1
   await api.nodes.toggle(id)
   await reload()
 }

@@ -23,7 +23,7 @@ export const useAppStore = defineStore('app', () => {
     return wallets.value.filter(w => w.wallet_type === walletFilter.value.toUpperCase())
   })
 
-  const activeNode = computed(() => nodes.value.find(n => n.health_status === 'ONLINE'))
+  const activeNode = computed(() => nodes.value.find(n => n.is_active && n.health_status === 'ONLINE'))
 
   function setAnimation(a)  { animation.value  = a; localStorage.setItem('animation',  a) }
   function setMoneyAnim(a)   { moneyAnim.value   = a; localStorage.setItem('moneyAnim',   a) }
