@@ -55,6 +55,11 @@ async function submit() {
   }
 }
 
+async function toggle(id) {
+  await api.nodes.toggle(id)
+  await reload()
+}
+
 async function remove(id) {
   if (!confirm(t('node.delete_confirm'))) return
   await api.nodes.remove(id)
@@ -110,11 +115,12 @@ onMounted(reload)
           <th class="text-left p-3">{{ t('node.tick') }}</th>
           <th class="text-left p-3">{{ t('node.response') }}</th>
           <th class="text-left p-3">{{ t('node.health') }}</th>
+          <th class="text-center p-3">{{ t('node.active') }}</th>
           <th class="text-right p-3">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="n in store.nodes" :key="n.id" class="border-b border-qubic-border/50">
+        <tr v-for="n in store.nodes" :key="n.id" :class="['border-b border-qubic-border/50 transition-opacity', !n.is_active && 'opacity-40']">
           <td class="p-3">{{ n.priority }}</td>
           <td class="p-3 font-mono text-xs">{{ n.url }}</td>
           <td class="p-3"><span class="pill text-xs">{{ n.node_type }}</span></td>
@@ -122,6 +128,14 @@ onMounted(reload)
           <td class="p-3 font-mono">{{ n.tick || '—' }}</td>
           <td class="p-3">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
           <td class="p-3"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
+          <td class="p-3 text-center">
+            <button @click="toggle(n.id)"
+                    :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                             n.is_active ? 'bg-qubic-teal' : 'bg-gray-600']">
+              <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200',
+                             n.is_active ? 'translate-x-4' : 'translate-x-1']" />
+            </button>
+          </td>
           <td class="p-3 text-right flex justify-end gap-3">
             <button @click="startEdit(n)" class="text-qubic-teal hover:text-qubic-cyan">{{ t('wallet.edit') }}</button>
             <button @click="remove(n.id)" class="text-red-400 hover:text-red-300">{{ t('wallet.delete') }}</button>

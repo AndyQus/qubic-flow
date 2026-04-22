@@ -1,20 +1,12 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 
+defineProps({
+  stats:   { type: Object,  default: null },
+  loading: { type: Boolean, default: true },
+})
+
 const { t } = useTranslation()
-const stats = ref(null)
-const loading = ref(true)
-
-async function load() {
-  loading.value = true
-  try { stats.value = await api.stats.current() } catch (e) { console.error(e) }
-  finally { loading.value = false }
-}
-
-onMounted(load)
-setInterval(load, 60_000)
 
 const keys = ['hour', 'day', 'epoch', 'month', 'year']
 
@@ -49,7 +41,7 @@ function fmt(n) {
         </svg>
         <span :class="['text-sm uppercase tracking-wide', colors[k]]">{{ t(`stats.${k}`) }}</span>
       </div>
-      <div class="min-h-[2.75rem] flex flex-col justify-center">
+      <div class="min-h-[3.5rem] flex flex-col justify-center">
         <template v-if="loading">
           <div class="flex justify-center">
             <svg class="w-5 h-5 text-gray-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -60,7 +52,10 @@ function fmt(n) {
         </template>
         <template v-else>
           <div class="text-lg font-bold text-qubic-teal leading-tight">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }} QU</div>
-          <div class="text-xs text-gray-400">{{ stats ? fmt(stats[k].current.count) : '—' }} {{ t('stats.count') }}</div>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="text-xs font-semibold text-violet-400">{{ stats ? fmt(stats[k].current.event_count) : '—' }} Events</span>
+            <span class="text-xs font-semibold text-amber-400">{{ stats ? fmt(stats[k].current.tx_count) : '—' }} TX</span>
+          </div>
         </template>
       </div>
     </div>

@@ -62,6 +62,17 @@ def update_node(node_id: int, payload: NodeCreate, db: Session = Depends(get_db)
     return node
 
 
+@router.patch("/nodes/{node_id}/toggle", response_model=NodeOut)
+def toggle_node(node_id: int, db: Session = Depends(get_db)):
+    node = db.query(Node).filter(Node.id == node_id).first()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    node.is_active = 0 if node.is_active else 1
+    db.commit()
+    db.refresh(node)
+    return node
+
+
 @router.delete("/nodes/{node_id}", status_code=204)
 def delete_node(node_id: int, db: Session = Depends(get_db)):
     node = db.query(Node).filter(Node.id == node_id).first()

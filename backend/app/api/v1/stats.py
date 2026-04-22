@@ -41,10 +41,13 @@ def current_stats(
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0),
+            func.sum(func.iif(Event.source_type == "TX",    1, 0)),
+            func.sum(func.iif(Event.source_type == "EVENT", 1, 0)),
         ).filter(Event.timestamp >= s, Event.timestamp < e)
-        c, vq, ve, vu = q.one()
+        c, vq, ve, vu, tx_c, ev_c = q.one()
         return {"count": int(c or 0), "volume_qubic": int(vq or 0),
-                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0)}
+                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0),
+                "tx_count": int(tx_c or 0), "event_count": int(ev_c or 0)}
 
     def by_epoch(ep):
         q = base_q().with_entities(
@@ -52,10 +55,13 @@ def current_stats(
             func.coalesce(func.sum(Event.amount_qubic), 0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_eur_rate), 0.0),
             func.coalesce(func.sum(Event.amount_qubic * Event.qubic_usd_rate), 0.0),
+            func.sum(func.iif(Event.source_type == "TX",    1, 0)),
+            func.sum(func.iif(Event.source_type == "EVENT", 1, 0)),
         ).filter(Event.epoch == ep)
-        c, vq, ve, vu = q.one()
+        c, vq, ve, vu, tx_c, ev_c = q.one()
         return {"count": int(c or 0), "volume_qubic": int(vq or 0),
-                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0)}
+                "volume_eur": float(ve or 0.0), "volume_usd": float(vu or 0.0),
+                "tx_count": int(tx_c or 0), "event_count": int(ev_c or 0)}
 
     return {
         "hour":  {"current": between(hour_start.isoformat(), now.isoformat()),

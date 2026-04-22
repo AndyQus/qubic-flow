@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
@@ -7,12 +7,23 @@ import PageLoader from '../components/PageLoader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
-const showForm  = ref(false)
-const loading   = ref(true)
-const editingId = ref(null)
-const error     = ref('')
-const form      = ref({ id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
-const editForm  = ref({ label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
+const showForm      = ref(false)
+const loading       = ref(true)
+const editingId     = ref(null)
+const error         = ref('')
+const selectedOwner = ref(null)
+const form          = ref({ id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
+const editForm      = ref({ label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
+
+const uniqueOwners = computed(() =>
+  [...new Set(store.wallets.map(w => w.owner).filter(Boolean))].sort()
+)
+
+const displayedWallets = computed(() => {
+  const base = Array.isArray(store.filteredWallets) ? store.filteredWallets : []
+  if (!selectedOwner.value) return base
+  return base.filter(w => w && w.owner === selectedOwner.value)
+})
 
 async function reload() {
   loading.value = true
@@ -87,7 +98,7 @@ onMounted(reload)
 
 <template>
   <!-- Toolbar -->
-  <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
+  <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
     <div class="flex gap-2">
       <button :class="['btn-ghost text-sm', store.walletFilter === 'all'      && 'bg-qubic-teal/20 border-qubic-teal']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
@@ -97,6 +108,21 @@ onMounted(reload)
               @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
     </div>
     <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
+  </div>
+
+  <!-- Owner filter pills -->
+  <div v-if="uniqueOwners.length" class="flex flex-wrap items-center gap-2 mb-4">
+    <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('filter.owner') }}:</span>
+    <button
+      v-for="owner in uniqueOwners"
+      :key="owner"
+      :class="['btn-ghost text-xs py-1 px-3 transition-colors', selectedOwner === owner
+        ? 'bg-violet-500/20 border-violet-400 text-violet-300 hover:bg-violet-500/30'
+        : 'text-gray-400 hover:bg-violet-500/10 hover:border-violet-400/60 hover:text-violet-300']"
+      @click="selectedOwner = selectedOwner === owner ? null : owner"
+    >
+      {{ store.hideAddresses ? '••••••' : owner }}
+    </button>
   </div>
 
   <PageLoader v-if="loading" />
@@ -122,10 +148,10 @@ onMounted(reload)
 
   <!-- Mobile: card list -->
   <div class="sm:hidden space-y-2">
-    <div v-if="!store.filteredWallets.length" class="card p-6 text-center text-gray-500 text-xs">
+    <div v-if="!displayedWallets.length" class="card p-6 text-center text-gray-500 text-xs">
       {{ t('wallet.none') }}
     </div>
-    <div v-for="w in store.filteredWallets" :key="w.id" class="card">
+    <div v-for="w in displayedWallets" :key="w.id" class="card">
       <!-- Edit-Form (mobile) -->
       <div v-if="editingId === w.id" class="space-y-2 mb-2">
         <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
@@ -197,10 +223,10 @@ onMounted(reload)
         </tr>
       </thead>
       <tbody>
-        <tr v-if="!store.filteredWallets.length">
+        <tr v-if="!displayedWallets.length">
           <td colspan="5" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
         </tr>
-        <template v-for="w in store.filteredWallets" :key="w.id">
+        <template v-for="w in displayedWallets" :key="w.id">
           <!-- Edit-Row -->
           <tr v-if="editingId === w.id" class="border-b border-qubic-border/50 bg-qubic-teal/5">
             <td class="p-2">

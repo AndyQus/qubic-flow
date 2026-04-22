@@ -11,6 +11,14 @@ const store = useAppStore()
 const { t } = useTranslation()
 const selectedWallets = ref([])
 const loadingEvents = ref(true)
+const loadingStats  = ref(true)
+const stats         = ref(null)
+
+async function loadStats() {
+  loadingStats.value = true
+  try { stats.value = await api.stats.current(selectedWallets.value) } catch (e) { console.error(e) }
+  finally { loadingStats.value = false }
+}
 
 async function loadEvents() {
   loadingEvents.value = true
@@ -22,14 +30,15 @@ async function loadEvents() {
   finally { loadingEvents.value = false }
 }
 
-watch(selectedWallets, loadEvents, { deep: true })
-onMounted(loadEvents)
+watch(selectedWallets, () => { loadStats(); loadEvents() }, { deep: true })
+onMounted(() => { loadStats(); loadEvents() })
+setInterval(loadStats, 60_000)
 </script>
 
 <template>
   <div class="space-y-3">
     <WalletFilter v-model="selectedWallets" />
-    <StatsPanel />
+    <StatsPanel :stats="stats" :loading="loadingStats" />
     <EventsTable :events="store.events" :loading="loadingEvents" :title="t('event.last10')" />
   </div>
 </template>

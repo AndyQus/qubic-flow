@@ -239,10 +239,18 @@ const chartOptions = computed(() => {
           </span>
         </div>
         <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(p.cur.volume_qubic) }} QU</div>
-        <div class="text-xs text-gray-400">{{ fmt(p.cur.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="text-xs text-gray-400 mb-0.5">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-violet-400">{{ fmt(p.cur.event_count) }} Events</span>
+          <span class="text-xs font-semibold text-amber-400">{{ fmt(p.cur.tx_count) }} TX</span>
+        </div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
           <div class="text-sm font-semibold text-gray-400">{{ fmt(p.prev.volume_qubic) }} QU</div>
-          <div class="text-xs text-gray-400">{{ fmt(p.prev.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="text-xs text-gray-400 mb-0.5">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-violet-400/70">{{ fmt(p.prev.event_count) }} Events</span>
+            <span class="text-xs text-amber-400/70">{{ fmt(p.prev.tx_count) }} TX</span>
+          </div>
         </div>
       </div>
     </div>

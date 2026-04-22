@@ -44,6 +44,7 @@ export const api = {
     update: (id, data) => req(`/nodes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => req(`/nodes/${id}`, { method: 'DELETE' }),
     reorder: (order) => req('/nodes/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
+    toggle:  (id) => req(`/nodes/${id}/toggle`, { method: 'PATCH' }),
   },
   stats: {
     current:  (walletIds = []) => {
