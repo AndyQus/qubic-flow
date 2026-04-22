@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from ...database import get_db
 from ...models.wallet import Wallet
+from ...models.sync_state import SyncState
 from ...schemas.wallet import WalletCreate, WalletUpdate, WalletOut
 from ...utils.time import now_utc_iso
 from ...services.balance_service import initialize_wallet_balance
@@ -47,6 +48,16 @@ def update_wallet(wallet_id: str, payload: WalletUpdate, db: Session = Depends(g
     db.commit()
     db.refresh(wallet)
     return wallet
+
+
+@router.post("/wallets/{wallet_id}/resync-tx", status_code=204)
+def resync_tx(wallet_id: str, db: Session = Depends(get_db)):
+    """Reset last_tx_tick to 0 so the next scheduler run re-scans all TX history."""
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    if not state:
+        raise HTTPException(status_code=404, detail="Sync state not found")
+    state.last_tx_tick = 0
+    db.commit()
 
 
 @router.delete("/wallets/{wallet_id}", status_code=204)

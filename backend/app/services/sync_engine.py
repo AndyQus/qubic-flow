@@ -225,6 +225,9 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
                 await manager.broadcast("event.new", ev)
 
 
+TX_WINDOW_SIZE = 500_000  # max ticks per API call
+
+
 async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=None):
     if client is None:
         client = RPCClient()
@@ -239,7 +242,15 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=
         return
 
     owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
-    total_inserted = await _sync_transactions(db, wallet_id, from_tick, to_tick, owned_addresses, client)
+    total_inserted = 0
+
+    # Split into windows so the API is not overwhelmed by huge tick ranges
+    chunk_start = from_tick
+    while chunk_start <= to_tick:
+        chunk_end = min(chunk_start + TX_WINDOW_SIZE - 1, to_tick)
+        inserted = await _sync_transactions(db, wallet_id, chunk_start, chunk_end, owned_addresses, client)
+        total_inserted += inserted
+        chunk_start = chunk_end + 1
 
     state.last_tx_tick = to_tick
     if total_inserted > 0:

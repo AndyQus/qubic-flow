@@ -16,9 +16,29 @@ const page    = ref(1)
 
 // Opening positions
 const openingPositions = ref([])
-const showAddPos = ref(false)
-const addError   = ref('')
-const newPos     = ref({ date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' })
+const showAddPos  = ref(false)
+const addError    = ref('')
+const priceLoading = ref(false)
+const newPos      = ref({ date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' })
+
+watch(() => newPos.value.date, async (date) => {
+  if (!date) return
+  priceLoading.value = true
+  try {
+    const p = await api.tax.getPriceForDate(date)
+    if (p.eur != null) newPos.value.price_eur = p.eur
+    if (p.usd != null) newPos.value.price_usd = p.usd
+  } catch (e) {
+    console.error(e)
+  } finally {
+    priceLoading.value = false
+  }
+})
+
+function fmtPrice(val) {
+  if (val == null) return '—'
+  return Number(val).toFixed(10).replace(/\.?0+$/, '') || '0'
+}
 
 async function loadOpeningPositions() {
   try { openingPositions.value = await api.tax.getOpeningPositions(props.id) || [] }
@@ -135,6 +155,16 @@ function explorerUrl(addr) {
 async function copyAddress(addr) {
   if (addr) await navigator.clipboard.writeText(addr)
 }
+
+const resyncing = ref(false)
+async function resyncTx() {
+  resyncing.value = true
+  try {
+    await api.wallets.resyncTx(props.id)
+  } finally {
+    resyncing.value = false
+  }
+}
 </script>
 
 <template>
@@ -166,9 +196,19 @@ async function copyAddress(addr) {
           </div>
         </div>
         <div class="flex flex-col items-end gap-1.5">
-          <span :class="['pill', wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
-            {{ wallet.wallet_type }}
-          </span>
+          <div class="flex items-center gap-2">
+            <button :disabled="resyncing"
+                    :title="resyncing ? 'Resyncing…' : 'Re-Sync TX'"
+                    :class="['text-xs text-gray-500 hover:text-qubic-teal transition-colors disabled:opacity-40', resyncing && 'animate-spin']"
+                    @click="resyncTx">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+            <span :class="['pill', wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+              {{ wallet.wallet_type }}
+            </span>
+          </div>
           <div class="text-right">
             <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QUBIC</div>
             <div class="flex items-center justify-end gap-1.5 mt-0.5">
@@ -186,6 +226,83 @@ async function copyAddress(addr) {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Opening Positions -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.opening_positions') }}</h3>
+        <button class="btn-ghost text-sm py-1.5 px-3" @click="showAddPos = !showAddPos; addError = ''">
+          + {{ t('tax.opening_add') }}
+        </button>
+      </div>
+
+      <!-- Add form -->
+      <div v-if="showAddPos" class="rounded-lg border border-qubic-border bg-qubic-bg/50 p-4 mb-4 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_date') }}</label>
+            <input v-model="newPos.date" type="date" class="input w-full text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_amount') }}</label>
+            <input v-model="newPos.amount_qubic" type="number" min="1" class="input w-full text-sm" placeholder="0" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">
+              {{ t('tax.opening_price_eur') }}
+              <span v-if="priceLoading" class="ml-1 text-qubic-teal">↻</span>
+            </label>
+            <input v-model="newPos.price_eur" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">
+              {{ t('tax.opening_price_usd') }}
+              <span v-if="priceLoading" class="ml-1 text-qubic-teal">↻</span>
+            </label>
+            <input v-model="newPos.price_usd" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
+          </div>
+          <div class="col-span-2 sm:col-span-2">
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_note') }}</label>
+            <input v-model="newPos.note" type="text" class="input w-full text-sm" placeholder="…" />
+          </div>
+        </div>
+        <p v-if="addError" class="text-red-400 text-xs">{{ addError }}</p>
+        <div class="flex gap-2 justify-end">
+          <button class="btn-ghost text-sm py-1.5 px-4" @click="showAddPos = false; addError = ''">{{ t('common.cancel') }}</button>
+          <button class="btn text-sm py-1.5 px-4" @click="addOpeningPosition">{{ t('common.save') }}</button>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div v-if="openingPositions.length" class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-qubic-border text-gray-500 uppercase">
+              <th class="text-left py-2 pr-3">{{ t('tax.opening_date') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_amount') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_eur') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_usd') }}</th>
+              <th class="text-left py-2 pr-3">{{ t('tax.opening_note') }}</th>
+              <th class="py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in openingPositions" :key="p.id"
+                class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
+              <td class="py-2 pr-3 whitespace-nowrap">{{ p.date }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_eur) }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_usd) }}</td>
+              <td class="py-2 pr-3 text-gray-400">{{ p.note || '' }}</td>
+              <td class="py-2 text-right">
+                <button class="text-red-400/60 hover:text-red-400 transition-colors" @click="deleteOpeningPosition(p.id)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="text-xs text-gray-500">—</p>
     </div>
 
     <!-- Filter-Leiste -->
@@ -229,77 +346,6 @@ async function copyAddress(addr) {
               class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
         {{ t('walletDetail.next') }}
       </button>
-    </div>
-
-    <!-- Opening Positions -->
-    <div class="card">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.opening_positions') }}</h3>
-        <button class="btn-ghost text-sm py-1.5 px-3" @click="showAddPos = !showAddPos; addError = ''">
-          + {{ t('tax.opening_add') }}
-        </button>
-      </div>
-
-      <!-- Add form -->
-      <div v-if="showAddPos" class="rounded-lg border border-qubic-border bg-qubic-bg/50 p-4 mb-4 space-y-3">
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_date') }}</label>
-            <input v-model="newPos.date" type="date" class="input w-full text-sm" />
-          </div>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_amount') }}</label>
-            <input v-model="newPos.amount_qubic" type="number" min="1" class="input w-full text-sm" placeholder="0" />
-          </div>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_price_eur') }}</label>
-            <input v-model="newPos.price_eur" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
-          </div>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_price_usd') }}</label>
-            <input v-model="newPos.price_usd" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
-          </div>
-          <div class="col-span-2 sm:col-span-2">
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_note') }}</label>
-            <input v-model="newPos.note" type="text" class="input w-full text-sm" placeholder="…" />
-          </div>
-        </div>
-        <p v-if="addError" class="text-red-400 text-xs">{{ addError }}</p>
-        <div class="flex gap-2 justify-end">
-          <button class="btn-ghost text-sm py-1.5 px-4" @click="showAddPos = false; addError = ''">{{ t('common.cancel') }}</button>
-          <button class="btn text-sm py-1.5 px-4" @click="addOpeningPosition">{{ t('common.save') }}</button>
-        </div>
-      </div>
-
-      <!-- List -->
-      <div v-if="openingPositions.length" class="overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead>
-            <tr class="border-b border-qubic-border text-gray-500 uppercase">
-              <th class="text-left py-2 pr-3">{{ t('tax.opening_date') }}</th>
-              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_amount') }}</th>
-              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_eur') }}</th>
-              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_usd') }}</th>
-              <th class="text-left py-2 pr-3">{{ t('tax.opening_note') }}</th>
-              <th class="py-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in openingPositions" :key="p.id"
-                class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
-              <td class="py-2 pr-3 whitespace-nowrap">{{ p.date }}</td>
-              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}</td>
-              <td class="py-2 pr-3 text-right font-mono">{{ p.price_eur != null ? p.price_eur : '—' }}</td>
-              <td class="py-2 pr-3 text-right font-mono">{{ p.price_usd != null ? p.price_usd : '—' }}</td>
-              <td class="py-2 pr-3 text-gray-400">{{ p.note || '' }}</td>
-              <td class="py-2 text-right">
-                <button class="text-red-400/60 hover:text-red-400 transition-colors" @click="deleteOpeningPosition(p.id)">✕</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p v-else class="text-xs text-gray-500">—</p>
     </div>
 
   </div>

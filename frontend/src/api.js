@@ -25,6 +25,7 @@ export const api = {
     create: (data) => req('/wallets', { method: 'POST', body: JSON.stringify(data) }),
     update: (id, data) => req(`/wallets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => req(`/wallets/${id}`, { method: 'DELETE' }),
+    resyncTx: (id) => req(`/wallets/${id}/resync-tx`, { method: 'POST' }),
   },
   events: {
     list: (params = {}) => {
@@ -74,6 +75,7 @@ export const api = {
       const q = buildQuery(params)
       return req(`/tax/report${q ? '?' + q : ''}`)
     },
+    getPriceForDate: (date) => req(`/tax/price?date=${date}`),
   },
 }
 
