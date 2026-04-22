@@ -111,13 +111,13 @@ async function copyAddress(addr) {
               {{ store.hideAddresses ? '••••••••••••••••••••' : wallet.id }}
             </span>
             <button v-if="!store.hideAddresses" @click="copyAddress(wallet.id)"
-                    class="text-gray-500 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                    class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
             </button>
             <a :href="explorerUrl(wallet.id)" target="_blank" rel="noopener"
-               class="text-gray-500 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('walletDetail.explorer')">
+               class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('walletDetail.explorer')">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
