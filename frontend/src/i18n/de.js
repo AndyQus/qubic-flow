@@ -82,8 +82,12 @@ export const de = {
     yes: 'Ja',
     no: 'Nein',
     method_fifo: 'FIFO (First In, First Out)',
+    method_fifo_desc: 'Älteste Bestände werden zuerst verkauft. Standardmethode in DE, AT und den meisten EU-Ländern.',
     method_lifo: 'LIFO (Last In, First Out)',
+    method_lifo_desc: 'Zuletzt erworbene Bestände werden zuerst verkauft. Üblich in US und IT.',
     method_hifo: 'HIFO (Highest In, First Out)',
+    method_hifo_desc: 'Bestände mit dem höchsten Einkaufspreis werden zuerst verkauft — minimiert steuerpflichtige Gewinne.',
     method_avco: 'AVCO (Durchschnitt)',
+    method_avco_desc: 'Gewichteter Durchschnittspreis aller Bestände wird als Kostenbasis verwendet.',
   },
 }

@@ -82,8 +82,12 @@ export const en = {
     yes: 'Yes',
     no: 'No',
     method_fifo: 'FIFO (First In, First Out)',
+    method_fifo_desc: 'Oldest lots sold first. Standard method in DE, AT and most EU countries.',
     method_lifo: 'LIFO (Last In, First Out)',
+    method_lifo_desc: 'Most recently acquired lots sold first. Common in US and IT.',
     method_hifo: 'HIFO (Highest In, First Out)',
+    method_hifo_desc: 'Lots with the highest purchase price sold first — minimises taxable gains.',
     method_avco: 'AVCO (Average Cost)',
+    method_avco_desc: 'Weighted average purchase price across all lots used as cost basis.',
   },
 }

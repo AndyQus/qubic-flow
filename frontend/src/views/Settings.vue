@@ -221,13 +221,18 @@ function simulate() {
           </div>
           <div class="flex items-start gap-4">
             <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.method') }}</span>
-            <div class="flex flex-wrap gap-1">
-              <button v-for="[val, lbl] in [['FIFO', t('tax.method_fifo')], ['LIFO', t('tax.method_lifo')], ['HIFO', t('tax.method_hifo')], ['AVCO', t('tax.method_avco')]]"
-                      :key="val"
-                      :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                      @click="taxSettings.method = val">
-                {{ val }}
-              </button>
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap gap-1">
+                <button v-for="[val] in [['FIFO'], ['LIFO'], ['HIFO'], ['AVCO']]"
+                        :key="val"
+                        :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                        @click="taxSettings.method = val">
+                  {{ val }}
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 leading-snug">
+                {{ t(`tax.method_${taxSettings.method.toLowerCase()}_desc`) }}
+              </p>
             </div>
           </div>
 

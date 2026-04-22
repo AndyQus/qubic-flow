@@ -52,6 +52,109 @@ def _price(lot_or_evt: dict, currency: str) -> float:
     return float(v) if v is not None else 0.0
 
 
+def _match_lots(
+    q: deque,
+    amount: int,
+    disposal_value_per_qu: float,
+    ts: datetime,
+    method: str,
+    holding_days_threshold,
+    mode: str,
+    currency: str,
+) -> tuple[list, float]:
+    """Match disposal against lot queue using the specified cost-basis method."""
+    remaining = amount
+    total_cost = 0.0
+    sub_disposals = []
+    m = method.upper()
+
+    if m == "AVCO":
+        total_held = sum(l["amount"] for l in q)
+        if total_held > 0:
+            total_cost_held = sum(l["amount"] * _price(l, currency) for l in q)
+            avg_cost_per_qu = total_cost_held / total_held
+        else:
+            avg_cost_per_qu = 0.0
+        cost = remaining * avg_cost_per_qu
+        proceeds = remaining * disposal_value_per_qu
+        sub_disposals.append({
+            "amount_qubic": remaining,
+            "acquired_date": None,
+            "disposed_date": ts.isoformat(),
+            "cost_basis": cost,
+            "proceeds": proceeds,
+            "gain": proceeds - cost,
+            "holding_days": None,
+            "tax_free": False,
+        })
+        total_cost = cost
+        # Consume lots proportionally from front (order irrelevant for AVCO)
+        rem = remaining
+        while rem > 0 and q:
+            lot = q[0]
+            take = min(rem, lot["amount"])
+            lot["amount"] -= take
+            rem -= take
+            if lot["amount"] <= 0:
+                q.popleft()
+        return sub_disposals, total_cost
+
+    # FIFO / LIFO / HIFO — lot-based matching
+    while remaining > 0 and q:
+        if m == "LIFO":
+            idx = len(q) - 1
+        elif m == "HIFO":
+            idx = max(range(len(q)), key=lambda i: _price(q[i], currency))
+        else:  # FIFO (default)
+            idx = 0
+
+        lot = q[idx]
+        take = min(remaining, lot["amount"])
+        cost_per_qu = _price(lot, currency)
+        cost = take * cost_per_qu
+        proceeds = take * disposal_value_per_qu
+        gain = proceeds - cost
+        holding_days = (ts - lot["date"]).days
+        tax_free = (
+            holding_days_threshold is not None
+            and mode == "private"
+            and holding_days >= holding_days_threshold
+        )
+
+        sub_disposals.append({
+            "amount_qubic": take,
+            "acquired_date": lot["date"].isoformat(),
+            "disposed_date": ts.isoformat(),
+            "cost_basis": cost,
+            "proceeds": proceeds,
+            "gain": gain,
+            "holding_days": holding_days,
+            "tax_free": tax_free,
+        })
+
+        total_cost += cost
+        lot["amount"] -= take
+        remaining -= take
+        if lot["amount"] <= 0:
+            del q[idx]
+
+    # Unmatched remainder (missing history) → zero cost basis
+    if remaining > 0:
+        proceeds = remaining * disposal_value_per_qu
+        sub_disposals.append({
+            "amount_qubic": remaining,
+            "acquired_date": None,
+            "disposed_date": ts.isoformat(),
+            "cost_basis": 0.0,
+            "proceeds": proceeds,
+            "gain": proceeds,
+            "holding_days": None,
+            "tax_free": False,
+        })
+
+    return sub_disposals, total_cost
+
+
 async def calculate_tax_report(
     db: Session,
     wallet_ids: list[str],
@@ -168,61 +271,19 @@ async def calculate_tax_report(
         # disposal (outgoing)
         elif src_in and not dest_in:
             source_wallet = evt.source_address
-            remaining = amount
             disposal_value_per_qu = price_eur if currency == "EUR" else price_usd
             total_proceeds = amount * disposal_value_per_qu
-            total_cost = 0.0
-            sub_disposals = []
 
-            q = lots[source_wallet]
-            while remaining > 0 and q:
-                lot = q[0]
-                take = min(remaining, lot["amount"])
-                cost_per_qu = lot["price_eur"] if currency == "EUR" else lot["price_usd"]
-                cost = take * cost_per_qu
-                proceeds = take * disposal_value_per_qu
-                gain = proceeds - cost
-                holding_days = (ts - lot["date"]).days
-                tax_free = False
-                if (
-                    holding_days_threshold is not None
-                    and mode == "private"
-                    and holding_days >= holding_days_threshold
-                ):
-                    tax_free = True
-
-                sub_disposals.append({
-                    "amount_qubic": take,
-                    "acquired_date": lot["date"].isoformat(),
-                    "disposed_date": evt.timestamp,
-                    "cost_basis": cost,
-                    "proceeds": proceeds,
-                    "gain": gain,
-                    "holding_days": holding_days,
-                    "tax_free": tax_free,
-                })
-
-                total_cost += cost
-                lot["amount"] -= take
-                remaining -= take
-                if lot["amount"] <= 0:
-                    q.popleft()
-
-            # If we couldn't match all (missing history) treat unmatched as zero-cost
-            if remaining > 0:
-                cost_per_qu = 0.0
-                proceeds = remaining * disposal_value_per_qu
-                sub_disposals.append({
-                    "amount_qubic": remaining,
-                    "acquired_date": None,
-                    "disposed_date": evt.timestamp,
-                    "cost_basis": 0.0,
-                    "proceeds": proceeds,
-                    "gain": proceeds,
-                    "holding_days": None,
-                    "tax_free": False,
-                })
-                remaining = 0
+            sub_disposals, total_cost = _match_lots(
+                q=lots[source_wallet],
+                amount=amount,
+                disposal_value_per_qu=disposal_value_per_qu,
+                ts=ts,
+                method=method,
+                holding_days_threshold=holding_days_threshold,
+                mode=mode,
+                currency=currency,
+            )
 
             if ts.year == year:
                 disposals.append({
