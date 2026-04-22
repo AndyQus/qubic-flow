@@ -24,6 +24,10 @@ class WalletOut(BaseModel):
     wallet_type: str
     active: int
     created_at: str
+    balance: Optional[int] = None
+    balance_updated_at: Optional[str] = None
+    balance_live: Optional[int] = None
+    balance_live_at: Optional[str] = None
 
     class Config:
         from_attributes = True

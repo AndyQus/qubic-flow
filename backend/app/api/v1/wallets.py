@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from ...database import get_db
 from ...models.wallet import Wallet
 from ...schemas.wallet import WalletCreate, WalletUpdate, WalletOut
 from ...utils.time import now_utc_iso
+from ...services.balance_service import initialize_wallet_balance
 
 router = APIRouter()
 
@@ -14,7 +15,7 @@ def list_wallets(db: Session = Depends(get_db)):
 
 
 @router.post("/wallets", response_model=WalletOut, status_code=201)
-def create_wallet(payload: WalletCreate, db: Session = Depends(get_db)):
+async def create_wallet(payload: WalletCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     if db.query(Wallet).filter(Wallet.id == payload.id).first():
         raise HTTPException(status_code=409, detail="Wallet already exists")
     now = now_utc_iso()
@@ -30,6 +31,7 @@ def create_wallet(payload: WalletCreate, db: Session = Depends(get_db)):
     db.add(wallet)
     db.commit()
     db.refresh(wallet)
+    background_tasks.add_task(initialize_wallet_balance, wallet.id)
     return wallet
 
 

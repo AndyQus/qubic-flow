@@ -59,6 +59,23 @@ function maskLabel(label, id) {
   return `Wallet ${n}`
 }
 
+function fmtBalance(w) {
+  if (w.balance == null) return t('wallet.balance_pending')
+  if (store.hideAddresses) return '••••••'
+  return w.balance.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')
+}
+
+function balanceSyncClass(w) {
+  if (w.balance == null || w.balance_live == null) return 'text-gray-500'
+  return w.balance === w.balance_live ? 'text-green-400' : 'text-yellow-400'
+}
+
+function balanceSyncTitle(w) {
+  if (w.balance == null) return ''
+  if (w.balance_live == null) return t('wallet.balance_no_live')
+  return w.balance === w.balance_live ? t('wallet.balance_synced') : `${t('wallet.balance_drift')}: ${w.balance_live.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')}`
+}
+
 onMounted(reload)
 </script>
 
@@ -113,6 +130,10 @@ onMounted(reload)
           <div class="min-w-0">
             <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</div>
             <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
+            <div class="flex items-center gap-1 mt-0.5">
+              <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}</span>
+              <span v-if="w.balance != null" :class="['text-xs', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
+            </div>
           </div>
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-qubic-teal flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"/>
@@ -150,6 +171,7 @@ onMounted(reload)
           <th class="text-left p-3">{{ t('wallet.address') }}</th>
           <th class="text-left p-3">{{ t('wallet.type') }}</th>
           <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.note') }}</th>
+          <th class="text-right p-3 hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
           <th class="text-right p-3">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
@@ -175,6 +197,7 @@ onMounted(reload)
             <td class="p-2 hidden md:table-cell">
               <input v-model="editForm.note" :placeholder="t('wallet.note')" class="input w-full text-xs" />
             </td>
+            <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 text-right">
               <div class="flex justify-end gap-2">
                 <button class="btn text-sm py-1" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
@@ -220,6 +243,14 @@ onMounted(reload)
               </span>
             </td>
             <td class="p-3 text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
+            <td class="p-3 hidden lg:table-cell text-right">
+              <div class="flex items-center justify-end gap-1.5">
+                <span class="font-mono whitespace-nowrap" :class="w.balance == null ? 'text-gray-500 italic' : 'text-gray-300'">
+                  {{ fmtBalance(w) }}
+                </span>
+                <span v-if="w.balance != null" :class="['text-xs', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
+              </div>
+            </td>
             <td class="p-3 text-right">
               <div class="flex justify-end gap-3">
                 <button @click="startEdit(w)" class="text-qubic-teal hover:text-qubic-cyan">{{ t('wallet.edit') }}</button>

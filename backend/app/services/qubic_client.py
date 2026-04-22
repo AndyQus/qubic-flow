@@ -65,6 +65,13 @@ class RPCClient:
         }
         return await self._request("POST", "/query/v1/getEventLogs", json=payload)
 
+    async def get_balance(self, wallet_id: str) -> int | None:
+        try:
+            data = await self._request("GET", f"/v1/balances/{wallet_id}")
+            return data.get("balance", {}).get("balance")
+        except Exception:
+            return None
+
     async def get_transfer_transactions(self, wallet_id: str, from_tick: int, to_tick: int, page: int = 1, page_size: int = 100) -> dict:
         params = {
             "start_tick": from_tick,

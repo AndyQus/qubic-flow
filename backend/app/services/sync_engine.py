@@ -135,6 +135,26 @@ async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int
     return valid_for_tick
 
 
+def _apply_balance_delta(db: Session, wallet_id: str, events: list):
+    """Update the tracked wallet balance for events newer than the baseline tick."""
+    wallet = db.query(Wallet).filter(Wallet.id == wallet_id).first()
+    if not wallet or wallet.balance is None or wallet.balance_since_tick is None:
+        return
+    delta = 0
+    for ev in events:
+        tick = ev.get("tick_number")
+        if tick is None or tick <= wallet.balance_since_tick:
+            continue
+        amount = ev.get("amount_qubic", 0) or 0
+        if ev.get("destination_addr") == wallet_id:
+            delta += amount
+        if ev.get("source_address") == wallet_id:
+            delta -= amount
+    if delta != 0:
+        wallet.balance = (wallet.balance or 0) + delta
+        wallet.balance_updated_at = now_utc_iso()
+
+
 async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set):
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
     inserted = 0
@@ -196,6 +216,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
 
     if inserted > 0:
         state.total_events = (state.total_events or 0) + inserted
+        _apply_balance_delta(db, wallet_id, new_events)
         db.commit()
         logger.info(f"Wallet {wallet_id}: persisted {inserted} new events")
         for ev in new_events:

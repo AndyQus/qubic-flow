@@ -14,6 +14,11 @@ class Wallet(Base):
     created_at = Column(Text, nullable=False)
     updated_at = Column(Text)
     deleted_at = Column(Text, nullable=True)
+    balance = Column(Integer, nullable=True)
+    balance_updated_at = Column(Text, nullable=True)
+    balance_live = Column(Integer, nullable=True)
+    balance_live_at = Column(Text, nullable=True)
+    balance_since_tick = Column(Integer, nullable=True)
 
     sync_state = relationship(
         "SyncState",

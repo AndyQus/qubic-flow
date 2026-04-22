@@ -8,6 +8,7 @@ from .sync_engine import sync_all_wallets
 from .snapshot_service import create_snapshot
 from .label_service import sync_labels
 from .coingecko import get_price_for_date
+from .balance_service import check_all_balances
 from ..database import SessionLocal
 from ..models.event import Event
 
@@ -88,6 +89,17 @@ scheduler.add_job(
     "interval",
     hours=6,
     id="backfill_rates",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
+
+
+scheduler.add_job(
+    check_all_balances,
+    "interval",
+    hours=1,
+    id="check_balances",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),

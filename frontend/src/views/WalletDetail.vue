@@ -126,9 +126,26 @@ async function copyAddress(addr) {
             </a>
           </div>
         </div>
-        <span :class="['pill', wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
-          {{ wallet.wallet_type }}
-        </span>
+        <div class="flex flex-col items-end gap-1.5">
+          <span :class="['pill', wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+            {{ wallet.wallet_type }}
+          </span>
+          <div class="text-right">
+            <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QUBIC</div>
+            <div class="flex items-center justify-end gap-1.5 mt-0.5">
+              <span class="font-mono text-sm" :class="wallet.balance == null ? 'text-gray-600 italic' : 'text-gray-200'">
+                {{ wallet.balance == null ? t('wallet.balance_pending') : (store.hideAddresses ? '••••••' : wallet.balance.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')) }}
+              </span>
+              <span v-if="wallet.balance != null"
+                    :class="['text-xs', wallet.balance_live == null ? 'text-gray-500' : wallet.balance === wallet.balance_live ? 'text-green-400' : 'text-yellow-400']"
+                    :title="wallet.balance_live == null ? t('wallet.balance_no_live') : wallet.balance === wallet.balance_live ? t('wallet.balance_synced') : t('wallet.balance_drift')">●</span>
+            </div>
+            <div v-if="wallet.balance != null && wallet.balance_live != null && wallet.balance !== wallet.balance_live"
+                 class="text-xs text-yellow-400 mt-0.5">
+              {{ t('wallet.balance_drift') }}: {{ store.hideAddresses ? '••••••' : wallet.balance_live.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
