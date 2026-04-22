@@ -167,3 +167,9 @@ async def get_tax_report(
 @router.get("/tax/countries")
 def get_countries():
     return tax_engine.TAX_RULES
+
+
+@router.get("/tax/price")
+async def get_price_for_date(date: str = Query(...), db: Session = Depends(get_db)):
+    from ...services.coingecko import get_price_for_date as _get_price
+    return await _get_price(db, date)

@@ -6,8 +6,10 @@ import StatsPanel from '../components/StatsPanel.vue'
 import EventsTable from '../components/EventsTable.vue'
 import WalletFilter from '../components/WalletFilter.vue'
 import PageLoader from '../components/PageLoader.vue'
+import { useTranslation } from 'i18next-vue'
 
 const store = useAppStore()
+const { t } = useTranslation()
 const selectedWallets = ref([])
 const loading = ref(true)
 
@@ -31,7 +33,7 @@ onMounted(loadEvents)
     <PageLoader v-if="loading" />
     <template v-else>
       <StatsPanel />
-      <EventsTable :events="store.events" />
+      <EventsTable :events="store.events" :title="t('event.last10')" />
     </template>
   </div>
 </template>

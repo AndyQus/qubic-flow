@@ -181,6 +181,7 @@ onMounted(reload)
           <th class="text-left p-3">{{ t('wallet.type') }}</th>
           <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.note') }}</th>
           <th class="text-right p-3 hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
+          <th class="text-right p-3 hidden lg:table-cell whitespace-nowrap">{{ t('wallet.entries') }}</th>
           <th class="text-right p-3">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
@@ -206,6 +207,7 @@ onMounted(reload)
             <td class="p-2 hidden md:table-cell">
               <input v-model="editForm.note" :placeholder="t('wallet.note')" class="input w-full text-xs" />
             </td>
+            <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 text-right">
               <div class="flex justify-end gap-2">
@@ -259,6 +261,9 @@ onMounted(reload)
                 </span>
                 <span v-if="w.balance != null" :class="['text-xs', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
               </div>
+            </td>
+            <td class="p-3 hidden lg:table-cell text-right font-mono text-gray-400">
+              {{ w.total_events != null ? w.total_events.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') : '—' }}
             </td>
             <td class="p-3 text-right">
               <div class="flex justify-end gap-3">

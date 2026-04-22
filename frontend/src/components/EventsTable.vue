@@ -6,6 +6,7 @@ import { useTranslation } from 'i18next-vue'
 const props = defineProps({
   events:  { type: Array, required: true },
   loading: { type: Boolean, default: false },
+  title:   { type: String, default: null },
 })
 const store = useAppStore()
 const { t } = useTranslation()
@@ -95,7 +96,7 @@ function counterpart(ev) {
 
 <template>
   <div class="card overflow-hidden">
-    <div class="px-3 pt-3 pb-1 text-sm text-gray-500 uppercase tracking-wide">{{ t('event.last10') }}</div>
+    <div v-if="title" class="px-3 pt-3 pb-1 text-sm text-gray-500 uppercase tracking-wide">{{ title }}</div>
     <div v-if="loading" class="p-8 text-center text-gray-500 text-xs">{{ t('common.loading') }}</div>
 
     <template v-else>

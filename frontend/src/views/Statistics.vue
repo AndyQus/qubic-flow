@@ -234,16 +234,15 @@ const chartOptions = computed(() => {
             </svg>
             <span :class="['text-sm uppercase tracking-wide', periodColors[p.key]]">{{ p.label }}</span>
           </div>
-          <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-[10px] font-medium">
+          <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-xs font-medium">
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
         <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(p.cur.volume_qubic) }} QU</div>
-        <div class="text-xs text-gray-400">{{ fmt(p.cur.count) }} {{ t('stats.count') }}</div>
-        <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="text-xs text-gray-400">{{ fmt(p.cur.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
           <div class="text-sm font-semibold text-gray-400">{{ fmt(p.prev.volume_qubic) }} QU</div>
-          <div class="text-[10px] text-gray-500">{{ fmt(p.prev.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="text-xs text-gray-400">{{ fmt(p.prev.count) }} {{ t('stats.count') }} · {{ fmtCurrency(p.prev[volumeKey]) }}</div>
         </div>
       </div>
     </div>

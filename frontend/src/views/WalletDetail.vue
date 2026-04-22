@@ -67,6 +67,7 @@ async function addOpeningPosition() {
 }
 
 async function deleteOpeningPosition(id) {
+  if (!confirm(t('tax.opening_delete_confirm'))) return
   try {
     await api.tax.deleteOpeningPosition(id)
     openingPositions.value = openingPositions.value.filter(p => p.id !== id)

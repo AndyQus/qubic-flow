@@ -28,6 +28,7 @@ class WalletOut(BaseModel):
     balance_updated_at: Optional[str] = None
     balance_live: Optional[int] = None
     balance_live_at: Optional[str] = None
+    total_events: Optional[int] = None
 
     class Config:
         from_attributes = True
