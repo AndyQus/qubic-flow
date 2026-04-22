@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from .health_monitor import check_nodes
-from .sync_engine import sync_all_wallets
+from .sync_engine import sync_all_wallets, backfill_tx_epochs
 from .snapshot_service import create_snapshot
 from .label_service import sync_labels
 from .coingecko import get_price_for_date
@@ -100,6 +100,25 @@ scheduler.add_job(
     "interval",
     hours=1,
     id="check_balances",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
+
+
+async def run_backfill_tx_epochs():
+    db = SessionLocal()
+    try:
+        await backfill_tx_epochs(db)
+    finally:
+        db.close()
+
+
+scheduler.add_job(
+    run_backfill_tx_epochs,
+    "interval",
+    hours=1,
+    id="backfill_tx_epochs",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),

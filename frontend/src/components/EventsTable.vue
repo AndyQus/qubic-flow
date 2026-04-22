@@ -50,7 +50,8 @@ function shortAddr(a) {
 
 function maskName(name, addr) {
   if (store.hideAddresses) return '••••••••••••'
-  return name || shortAddr(addr)
+  if (name) return name.length > 13 ? name.slice(0, 13) + '…' : name
+  return shortAddr(addr)
 }
 
 function fmtValue(ev) {
@@ -85,11 +86,38 @@ function shortTx(id) {
   return id.length > 10 ? `${id.slice(0, 5)}…${id.slice(-5)}` : id
 }
 
-function counterpart(ev) {
-  const owned = new Set(store.wallets.map(w => w.id))
+function walletLabel(addr) {
+  const w = store.wallets.find(w => w.id === addr)
+  return w ? w.label : null
+}
+
+function isOwnWallet(addr) {
+  return !!store.wallets.find(w => w.id === addr)
+}
+
+function sign(ev) {
   const dir = direction(ev)
-  if (dir === 'IN')  return { addr: ev.source_address,  name: ev.source_name }
-  if (dir === 'OUT') return { addr: ev.destination_addr, name: ev.destination_name }
+  if (dir === 'IN') return '+'
+  if (dir === 'OUT') return '−'
+  if (dir === 'INTERNAL') return ev.wallet_id === ev.source_address ? '−' : '+'
+  return ''
+}
+
+function signClass(ev) {
+  const s = sign(ev)
+  if (s === '+') return 'text-green-400'
+  if (s === '−') return 'text-red-400'
+  return 'text-gray-400'
+}
+
+function counterpart(ev) {
+  const dir = direction(ev)
+  if (dir === 'IN')  return { addr: ev.source_address,  name: ev.source_name || walletLabel(ev.source_address) }
+  if (dir === 'OUT') return { addr: ev.destination_addr, name: ev.destination_name || walletLabel(ev.destination_addr) }
+  if (dir === 'INTERNAL') {
+    const otherAddr = ev.wallet_id === ev.source_address ? ev.destination_addr : ev.source_address
+    return { addr: otherAddr, name: walletLabel(otherAddr) }
+  }
   return { addr: ev.source_address, name: ev.source_name }
 }
 </script>
@@ -113,19 +141,21 @@ function counterpart(ev) {
           <div class="flex-shrink-0 mt-0.5">
             <span v-if="direction(ev) === 'IN'"       class="text-green-400 text-xs font-bold">▲ IN</span>
             <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 text-xs font-bold">▼ OUT</span>
+            <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '−'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
+            <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '+'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
             <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400 text-xs font-bold">⇄ INT</span>
             <span v-else class="text-gray-500 text-xs">—</span>
           </div>
           <!-- Main info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-xs font-medium">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
+              <span :class="['font-mono text-xs font-medium', signClass(ev)]"><span class="mr-0.5">{{ sign(ev) }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
               <span class="text-xs text-gray-400">{{ fmtValue(ev) }}</span>
             </div>
             <div class="text-xs text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
-              <span class="text-xs text-gray-400 font-mono truncate">
+              <span :class="['text-xs font-mono truncate', isOwnWallet(counterpart(ev).addr) ? 'text-violet-300' : 'text-gray-400']">
                 {{ maskName(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
               <button v-if="!store.hideAddresses" @click="copyToClipboard(counterpart(ev).addr)"
@@ -169,7 +199,7 @@ function counterpart(ev) {
               <th class="text-left px-3 py-2.5">{{ t('event.date') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.epoch') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
-              <th class="text-left px-3 py-2.5">{{ t('event.amount') }}</th>
+              <th class="text-right px-3 py-2.5">{{ t('event.amount') }}</th>
               <th class="text-left px-3 py-2.5 hidden lg:table-cell whitespace-nowrap">{{ t('event.rate') }} {{ store.currency }}</th>
               <th class="text-left px-3 py-2.5 whitespace-nowrap">{{ t('event.value_col') }} {{ store.currency }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.source') }}</th>
@@ -192,17 +222,19 @@ function counterpart(ev) {
               <td class="px-3 py-2.5">
                 <span v-if="direction(ev) === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
                 <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
+                <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
+                <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
                 <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
                 <span v-else class="text-gray-500">—</span>
               </td>
-              <td class="px-3 py-2.5 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
+              <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]"><span class="mr-0.5">{{ sign(ev) }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
               <td class="px-3 py-2.5 font-mono text-gray-400 hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
               <td class="px-3 py-2.5 font-mono whitespace-nowrap">{{ fmtValue(ev) }}</td>
               <!-- Source -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.source_address" class="flex items-center gap-2 font-mono text-xs text-gray-400">
-                  <span :title="store.hideAddresses ? '' : ev.source_address">
-                    {{ maskName(ev.source_name, ev.source_address) }}
+                  <span :class="isOwnWallet(ev.source_address) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.source_address">
+                    {{ maskName(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
                   </span>
                   <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.source_address)"
                           class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
@@ -222,8 +254,8 @@ function counterpart(ev) {
               <!-- Destination -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.destination_addr" class="flex items-center gap-2 font-mono text-xs text-gray-400">
-                  <span :title="store.hideAddresses ? '' : ev.destination_addr">
-                    {{ maskName(ev.destination_name, ev.destination_addr) }}
+                  <span :class="isOwnWallet(ev.destination_addr) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.destination_addr">
+                    {{ maskName(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
                   </span>
                   <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.destination_addr)"
                           class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">

@@ -228,6 +228,59 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
 TX_WINDOW_SIZE = 500_000  # max ticks per API call
 
 
+def _epoch_for_tick(db: Session, tick_number: int | None) -> int | None:
+    """Look up epoch from existing events that share the same tick number."""
+    if tick_number is None:
+        return None
+    row = db.query(Event.epoch).filter(
+        Event.tick_number == tick_number,
+        Event.epoch.isnot(None),
+    ).first()
+    return row[0] if row else None
+
+
+async def _epoch_from_api(tick_number: int, cache: dict) -> int | None:
+    """Fetch epoch for a tick from the Qubic API, with in-memory cache."""
+    if tick_number in cache:
+        return cache[tick_number]
+    try:
+        async with __import__("httpx").AsyncClient() as client:
+            r = await client.get(
+                f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
+                timeout=10,
+            )
+            if r.status_code == 200:
+                epoch = r.json().get("tickData", {}).get("epoch")
+                cache[tick_number] = epoch
+                return epoch
+    except Exception:
+        pass
+    cache[tick_number] = None
+    return None
+
+
+async def backfill_tx_epochs(db: Session) -> int:
+    """Fill epoch=NULL on TX records: DB lookup first, API fallback."""
+    rows = db.query(Event).filter(
+        Event.source_type == "TX",
+        Event.epoch.is_(None),
+        Event.tick_number.isnot(None),
+    ).all()
+    updated = 0
+    api_cache: dict = {}
+    for ev in rows:
+        epoch = _epoch_for_tick(db, ev.tick_number)
+        if epoch is None:
+            epoch = await _epoch_from_api(ev.tick_number, api_cache)
+        if epoch is not None:
+            ev.epoch = epoch
+            updated += 1
+    if updated:
+        db.commit()
+        logger.info(f"backfill_tx_epochs: updated {updated} TX records")
+    return updated
+
+
 async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=None):
     if client is None:
         client = RPCClient()
@@ -268,8 +321,12 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
         tick_groups = resp.get("transactions", [])
         inserted = 0
 
+        epoch_cache: dict = {}
         for tick_group in tick_groups:
             tick_number = tick_group.get("tickNumber")
+            epoch = _epoch_for_tick(db, tick_number)
+            if epoch is None:
+                epoch = await _epoch_from_api(tick_number, epoch_cache)
             for tx_data in tick_group.get("transactions", []):
                 if not tx_data.get("moneyFlew", False):
                     continue
@@ -298,6 +355,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                 event = Event(
                     id=tx_id,
                     wallet_id=wallet_id,
+                    epoch=epoch,
                     tick_number=tick_number,
                     timestamp_raw=str(ts_unix_s),
                     timestamp=ts_iso,
