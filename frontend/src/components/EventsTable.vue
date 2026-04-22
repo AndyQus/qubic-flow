@@ -44,7 +44,7 @@ function flashClass(ev) {
 function shortAddr(a) {
   if (!a) return '—'
   if (store.hideAddresses) return '••••••••••••'
-  return a.length > 16 ? `${a.slice(0, 6)}…${a.slice(-6)}` : a
+  return a.length > 10 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a
 }
 
 function maskName(name, addr) {
@@ -81,7 +81,7 @@ async function copyToClipboard(text) {
 function shortTx(id) {
   if (!id) return '—'
   if (store.hideAddresses) return '••••••••••••'
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id
+  return id.length > 10 ? `${id.slice(0, 5)}…${id.slice(-5)}` : id
 }
 
 function counterpart(ev) {

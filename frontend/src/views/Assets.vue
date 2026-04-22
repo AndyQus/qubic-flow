@@ -59,7 +59,7 @@ function displayName(l) {
 
 function truncate(addr) {
   if (!addr) return '—'
-  return addr.slice(0, 8) + '…' + addr.slice(-8)
+  return addr.slice(0, 5) + '…' + addr.slice(-5)
 }
 
 async function copyAddress(addr) {

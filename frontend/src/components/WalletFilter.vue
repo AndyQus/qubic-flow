@@ -18,7 +18,7 @@ function toggle(id) {
 
 function walletLabel(w) {
   if (store.hideAddresses) return '••••••••••••'
-  const name = w.label || (w.id.length > 14 ? `${w.id.slice(0, 6)}…${w.id.slice(-6)}` : w.id)
+  const name = w.label || (w.id.length > 10 ? `${w.id.slice(0, 5)}…${w.id.slice(-5)}` : w.id)
   return name.length > 15 ? name.slice(0, 15) + '…' : name
 }
 

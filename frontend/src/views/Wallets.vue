@@ -164,7 +164,7 @@ onMounted(reload)
               <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
             </td>
             <td class="p-2 font-mono text-gray-500 text-xs">
-              {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0,8) + '…' + w.id.slice(-8) }}
+              {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 5) + '…' + w.id.slice(-5) }}
             </td>
             <td class="p-2">
               <select v-model="editForm.wallet_type" class="input text-xs">
@@ -196,7 +196,7 @@ onMounted(reload)
             <td class="p-3">
               <div class="flex items-center gap-1.5">
                 <span class="font-mono text-gray-400 text-xs" :title="store.hideAddresses ? '' : w.id">
-                  {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 8) + '…' + w.id.slice(-8) }}
+                  {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 5) + '…' + w.id.slice(-5) }}
                 </span>
                 <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
                         class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
