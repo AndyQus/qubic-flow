@@ -3,7 +3,10 @@ import { ref } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 
-const props = defineProps({ modelValue: { type: Array, default: () => [] } })
+const props = defineProps({
+  modelValue: { type: Array, default: () => [] },
+  wallets:    { type: Array, default: null },
+})
 const emit  = defineEmits(['update:modelValue'])
 const store = useAppStore()
 const { t } = useTranslation()
@@ -39,7 +42,7 @@ function btnClass(id) {
 </script>
 
 <template>
-  <div v-if="store.wallets.length > 1" class="card border-teal">
+  <div v-if="props.wallets ? props.wallets.length >= 1 : store.wallets.length > 1" class="card border-teal">
     <!-- Header (immer sichtbar) -->
     <div class="flex items-center justify-between cursor-pointer select-none" @click="open = !open">
       <div class="flex items-center gap-1.5">
@@ -66,7 +69,7 @@ function btnClass(id) {
     <!-- Buttons (ein-/ausklappbar) -->
     <div v-if="open" class="flex flex-wrap gap-2 mt-3">
       <button
-        v-for="w in store.wallets"
+        v-for="w in (props.wallets ?? store.wallets)"
         :key="w.id"
         :class="btnClass(w.id)"
         :title="walletTitle(w)"

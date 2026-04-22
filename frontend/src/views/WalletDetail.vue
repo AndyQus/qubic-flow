@@ -13,6 +13,45 @@ const events  = ref([])
 const total   = ref(0)
 const loading = ref(false)
 const page    = ref(1)
+
+// Opening positions
+const openingPositions = ref([])
+const showAddPos = ref(false)
+const addError   = ref('')
+const newPos     = ref({ date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' })
+
+async function loadOpeningPositions() {
+  try { openingPositions.value = await api.tax.getOpeningPositions(props.id) || [] }
+  catch (e) { console.error(e) }
+}
+
+async function addOpeningPosition() {
+  addError.value = ''
+  const p = newPos.value
+  if (!p.date || !p.amount_qubic) { addError.value = 'Datum und Menge sind Pflichtfelder.'; return }
+  try {
+    const created = await api.tax.createOpeningPosition({
+      wallet_id: props.id,
+      date: p.date,
+      amount_qubic: parseInt(p.amount_qubic, 10),
+      price_eur: p.price_eur ? parseFloat(p.price_eur) : null,
+      price_usd: p.price_usd ? parseFloat(p.price_usd) : null,
+      note: p.note || null,
+    })
+    openingPositions.value.push(created)
+    newPos.value = { date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' }
+    showAddPos.value = false
+  } catch (e) {
+    addError.value = `Fehler: ${e.message}`
+  }
+}
+
+async function deleteOpeningPosition(id) {
+  try {
+    await api.tax.deleteOpeningPosition(id)
+    openingPositions.value = openingPositions.value.filter(p => p.id !== id)
+  } catch (e) { console.error(e) }
+}
 const PAGE_SIZE = 50
 
 const filterMode  = ref('all')   // 'all' | 'epoch' | 'month' | 'year'
@@ -81,7 +120,7 @@ function setFilter(mode) {
 
 watch([filterEpoch, filterMonth, filterYear], () => { page.value = 1; load() })
 watch(page, load)
-onMounted(() => { load(); loadFilterOptions() })
+onMounted(() => { load(); loadFilterOptions(); loadOpeningPositions() })
 
 function maskLabel(label, id) {
   if (!store.hideAddresses) return label
@@ -190,6 +229,77 @@ async function copyAddress(addr) {
               class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
         {{ t('walletDetail.next') }}
       </button>
+    </div>
+
+    <!-- Opening Positions -->
+    <div class="card">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.opening_positions') }}</h3>
+        <button class="btn-ghost text-sm py-1.5 px-3" @click="showAddPos = !showAddPos; addError = ''">
+          + {{ t('tax.opening_add') }}
+        </button>
+      </div>
+
+      <!-- Add form -->
+      <div v-if="showAddPos" class="rounded-lg border border-qubic-border bg-qubic-bg/50 p-4 mb-4 space-y-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_date') }}</label>
+            <input v-model="newPos.date" type="date" class="input w-full text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_amount') }}</label>
+            <input v-model="newPos.amount_qubic" type="number" min="1" class="input w-full text-sm" placeholder="0" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_price_eur') }}</label>
+            <input v-model="newPos.price_eur" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_price_usd') }}</label>
+            <input v-model="newPos.price_usd" type="number" step="0.00000001" class="input w-full text-sm" placeholder="0.00" />
+          </div>
+          <div class="col-span-2 sm:col-span-2">
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.opening_note') }}</label>
+            <input v-model="newPos.note" type="text" class="input w-full text-sm" placeholder="…" />
+          </div>
+        </div>
+        <p v-if="addError" class="text-red-400 text-xs">{{ addError }}</p>
+        <div class="flex gap-2 justify-end">
+          <button class="btn-ghost text-sm py-1.5 px-4" @click="showAddPos = false; addError = ''">{{ t('common.cancel') }}</button>
+          <button class="btn text-sm py-1.5 px-4" @click="addOpeningPosition">{{ t('common.save') }}</button>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div v-if="openingPositions.length" class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-qubic-border text-gray-500 uppercase">
+              <th class="text-left py-2 pr-3">{{ t('tax.opening_date') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_amount') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_eur') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('tax.opening_price_usd') }}</th>
+              <th class="text-left py-2 pr-3">{{ t('tax.opening_note') }}</th>
+              <th class="py-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in openingPositions" :key="p.id"
+                class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
+              <td class="py-2 pr-3 whitespace-nowrap">{{ p.date }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ p.price_eur != null ? p.price_eur : '—' }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ p.price_usd != null ? p.price_usd : '—' }}</td>
+              <td class="py-2 pr-3 text-gray-400">{{ p.note || '' }}</td>
+              <td class="py-2 text-right">
+                <button class="text-red-400/60 hover:text-red-400 transition-colors" @click="deleteOpeningPosition(p.id)">✕</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="text-xs text-gray-500">—</p>
     </div>
 
   </div>

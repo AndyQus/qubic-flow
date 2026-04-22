@@ -6,6 +6,7 @@ import Nodes from '../views/Nodes.vue'
 import Statistics from '../views/Statistics.vue'
 import Settings from '../views/Settings.vue'
 import Assets from '../views/Assets.vue'
+import Tax from '../views/Tax.vue'
 
 export default createRouter({
   history: createWebHistory(),
@@ -15,6 +16,7 @@ export default createRouter({
     { path: '/wallets/:id', component: WalletDetail, props: true },
     { path: '/nodes', component: Nodes },
     { path: '/stats', component: Statistics },
+    { path: '/tax', component: Tax },
     { path: '/settings', component: Settings },
     { path: '/assets', component: Assets },
   ],

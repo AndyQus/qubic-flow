@@ -63,6 +63,18 @@ export const api = {
   },
   metrics: () => req('/metrics'),
   health: () => req('/health'),
+  tax: {
+    getSettings: () => req('/tax/settings'),
+    saveSettings: (data) => req('/tax/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    getCountries: () => req('/tax/countries'),
+    getOpeningPositions: (walletId) => req(`/tax/opening-positions${walletId ? `?wallet_id=${walletId}` : ''}`),
+    createOpeningPosition: (data) => req('/tax/opening-positions', { method: 'POST', body: JSON.stringify(data) }),
+    deleteOpeningPosition: (id) => req(`/tax/opening-positions/${id}`, { method: 'DELETE' }),
+    getReport: (params = {}) => {
+      const q = buildQuery(params)
+      return req(`/tax/report${q ? '?' + q : ''}`)
+    },
+  },
 }
 
 export function exportUrl(kind, year) {

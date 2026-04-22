@@ -2,12 +2,48 @@
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import i18next from 'i18next'
-import { exportUrl } from '../api'
-import { ref, computed } from 'vue'
+import { exportUrl, api } from '../api'
+import { ref, computed, onMounted } from 'vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const year = ref(new Date().getFullYear())
+
+// Tax settings
+const taxSettings = ref({
+  country: 'DE',
+  method: 'FIFO',
+  name: '',
+  tax_id: '',
+  address: '',
+  company_name: '',
+  company_tax_nr: '',
+  company_vat: '',
+  company_reg: '',
+  company_address: '',
+  fiscal_year: 'jan',
+})
+const taxCountries = ref({})
+const taxSaving = ref(false)
+
+onMounted(async () => {
+  try {
+    const [s, c] = await Promise.all([api.tax.getSettings(), api.tax.getCountries()])
+    if (s) Object.assign(taxSettings.value, s)
+    if (c) taxCountries.value = c
+  } catch (e) {
+    console.error(e)
+  }
+})
+
+async function saveTaxSettings() {
+  taxSaving.value = true
+  try {
+    await api.tax.saveSettings(taxSettings.value)
+  } finally {
+    taxSaving.value = false
+  }
+}
 
 function setLang(l) {
   store.setLang(l)
@@ -165,6 +201,104 @@ function simulate() {
       <div class="flex gap-2">
         <a :href="exportUrl('cointracking', year)" class="btn">{{ t('export.cointracking') }}</a>
         <a :href="exportUrl('steuerberater', year)" class="btn">{{ t('export.steuerberater') }}</a>
+      </div>
+    </div>
+
+    <!-- Tax Settings -->
+    <div class="card sm:col-span-2" style="order:4">
+      <h3 class="text-sm font-bold uppercase text-gray-400 mb-4">{{ t('tax.settings_title') }}</h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <!-- Country + Method -->
+        <div class="space-y-4">
+          <div class="flex items-start gap-4">
+            <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.country') }}</span>
+            <select v-model="taxSettings.country" class="input flex-1 text-sm">
+              <option v-for="(rules, code) in taxCountries" :key="code" :value="code">
+                {{ code }} <template v-if="rules.currency"> ({{ rules.currency }})</template>
+              </option>
+            </select>
+          </div>
+          <div class="flex items-start gap-4">
+            <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.method') }}</span>
+            <div class="flex flex-wrap gap-1">
+              <button v-for="[val, lbl] in [['FIFO', t('tax.method_fifo')], ['LIFO', t('tax.method_lifo')], ['HIFO', t('tax.method_hifo')], ['AVCO', t('tax.method_avco')]]"
+                      :key="val"
+                      :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                      @click="taxSettings.method = val">
+                {{ val }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Info box -->
+          <div class="rounded-lg border border-qubic-border/40 bg-qubic-bg/50 px-3 py-2.5 text-xs text-gray-500 leading-relaxed">
+            {{ t('tax.country_rules') }}
+          </div>
+        </div>
+
+        <!-- Private Data -->
+        <div class="space-y-3">
+          <p class="text-xs font-semibold text-gray-400 uppercase">{{ t('tax.private_data') }}</p>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.name') }}</label>
+            <input v-model="taxSettings.name" type="text" class="input w-full text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.tax_id') }}</label>
+            <input v-model="taxSettings.tax_id" type="text" class="input w-full text-sm" />
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.address') }}</label>
+            <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
+          </div>
+        </div>
+
+        <!-- Business Data -->
+        <div class="space-y-3 sm:col-span-2">
+          <p class="text-xs font-semibold text-gray-400 uppercase">{{ t('tax.business_data') }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_name') }}</label>
+              <input v-model="taxSettings.company_name" type="text" class="input w-full text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_tax_nr') }}</label>
+              <input v-model="taxSettings.company_tax_nr" type="text" class="input w-full text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_vat') }}</label>
+              <input v-model="taxSettings.company_vat" type="text" class="input w-full text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_reg') }}</label>
+              <input v-model="taxSettings.company_reg" type="text" class="input w-full text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_address') }}</label>
+              <input v-model="taxSettings.company_address" type="text" class="input w-full text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.fiscal_year') }}</label>
+              <div class="flex gap-1">
+                <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'jan' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                        @click="taxSettings.fiscal_year = 'jan'">
+                  {{ t('tax.fiscal_jan') }}
+                </button>
+                <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'custom' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                        @click="taxSettings.fiscal_year = 'custom'">
+                  {{ t('tax.fiscal_custom') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end mt-4">
+        <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
+          {{ taxSaving ? t('common.loading') : t('common.save') }}
+        </button>
       </div>
     </div>
   </div>
