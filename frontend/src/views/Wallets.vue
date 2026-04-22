@@ -11,8 +11,8 @@ const showForm  = ref(false)
 const loading   = ref(true)
 const editingId = ref(null)
 const error     = ref('')
-const form      = ref({ id: '', label: '', note: '', wallet_type: 'PRIVATE' })
-const editForm  = ref({ label: '', note: '', wallet_type: 'PRIVATE' })
+const form      = ref({ id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
+const editForm  = ref({ label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
 
 async function reload() {
   loading.value = true
@@ -24,7 +24,7 @@ async function submit() {
   error.value = ''
   try {
     await api.wallets.create(form.value)
-    form.value = { id: '', label: '', note: '', wallet_type: 'PRIVATE' }
+    form.value = { id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' }
     showForm.value = false
     await reload()
   } catch (e) {
@@ -34,7 +34,7 @@ async function submit() {
 
 function startEdit(w) {
   editingId.value = w.id
-  editForm.value = { label: w.label, note: w.note || '', wallet_type: w.wallet_type }
+  editForm.value = { label: w.label, owner: w.owner || '', note: w.note || '', wallet_type: w.wallet_type }
 }
 
 async function saveEdit(id) {
@@ -106,6 +106,11 @@ onMounted(reload)
   <div v-if="showForm" class="card mb-4 space-y-3">
     <input v-model="form.id"    :placeholder="t('wallet.address')" class="input w-full font-mono text-xs" />
     <input v-model="form.label" :placeholder="t('wallet.label')"   class="input w-full text-xs" />
+    <input v-model="form.owner" :placeholder="t('wallet.owner')"   class="input w-full text-xs"
+           list="owner-list-add" autocomplete="off" />
+    <datalist id="owner-list-add">
+      <option v-for="o in [...new Set(store.wallets.map(w => w.owner).filter(Boolean))]" :key="o" :value="o" />
+    </datalist>
     <input v-model="form.note"  :placeholder="t('wallet.note')"    class="input w-full text-xs" />
     <select v-model="form.wallet_type" class="input w-full text-xs">
       <option value="PRIVATE">PRIVATE</option>
@@ -124,6 +129,11 @@ onMounted(reload)
       <!-- Edit-Form (mobile) -->
       <div v-if="editingId === w.id" class="space-y-2 mb-2">
         <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
+        <input v-model="editForm.owner" :placeholder="t('wallet.owner')" class="input w-full text-xs"
+               list="owner-list-edit" autocomplete="off" />
+        <datalist id="owner-list-edit">
+          <option v-for="o in [...new Set(store.wallets.map(ww => ww.owner).filter(Boolean))]" :key="o" :value="o" />
+        </datalist>
         <input v-model="editForm.note"  :placeholder="t('wallet.note')"  class="input w-full text-xs" />
         <select v-model="editForm.wallet_type" class="input w-full text-xs">
           <option value="PRIVATE">PRIVATE</option>
@@ -177,6 +187,7 @@ onMounted(reload)
       <thead class="border-b border-qubic-border text-gray-400 uppercase">
         <tr>
           <th class="text-left p-3">{{ t('wallet.label') }}</th>
+          <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.owner') }}</th>
           <th class="text-left p-3">{{ t('wallet.address') }}</th>
           <th class="text-left p-3">{{ t('wallet.type') }}</th>
           <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.note') }}</th>
@@ -194,6 +205,13 @@ onMounted(reload)
           <tr v-if="editingId === w.id" class="border-b border-qubic-border/50 bg-qubic-teal/5">
             <td class="p-2">
               <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
+            </td>
+            <td class="p-2 hidden md:table-cell">
+              <input v-model="editForm.owner" :placeholder="t('wallet.owner')" class="input w-full text-xs"
+                     list="owner-list-desktop-edit" autocomplete="off" />
+              <datalist id="owner-list-desktop-edit">
+                <option v-for="o in [...new Set(store.wallets.map(ww => ww.owner).filter(Boolean))]" :key="o" :value="o" />
+              </datalist>
             </td>
             <td class="p-2 font-mono text-gray-500 text-xs">
               {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 5) + '…' + w.id.slice(-5) }}
@@ -227,6 +245,7 @@ onMounted(reload)
                 </svg>
               </router-link>
             </td>
+            <td class="p-3 text-gray-400 hidden md:table-cell">{{ store.hideAddresses ? '••••••' : (w.owner || '—') }}</td>
             <td class="p-3">
               <div class="flex items-center gap-2 font-mono text-xs text-gray-400">
                 <span :title="store.hideAddresses ? '' : w.id">

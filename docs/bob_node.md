@@ -27,10 +27,11 @@ Interaktiver Playground: `rpc_playground.html` im Repository.
 
 ### Verwendete Endpunkte (QubicFlow)
 
-| Endpunkt                         | Methode | Verwendung in QubicFlow         |
-|----------------------------------|---------|----------------------------------|
-| `GET /status`                    | GET     | Health-Check, aktueller Tick     |
-| `POST /getQuTransferForIdentity` | POST    | QU-Transfer-Sync je Wallet       |
+| Endpunkt                         | Methode | Verwendung in QubicFlow                        |
+|----------------------------------|---------|------------------------------------------------|
+| `GET /status`                    | GET     | Health-Check, aktueller Tick                   |
+| `POST /getQuTransferForIdentity` | POST    | QU-Transfer-Sync je Wallet                     |
+| `GET /tick/{tickNumber}`         | GET     | Timestamp-Nachladung je Tick                   |
 
 ### Alle verfügbaren Endpunkte
 
@@ -169,18 +170,12 @@ Response:
 
 ## Bekannte Einschränkungen
 
-### ⚠ Timestamps fehlen in Transfer-Logs (offene Aufgabe)
+### Timestamps in Transfer-Logs
 
-**Problem:** `POST /getQuTransferForIdentity` liefert kein `timestamp`-Feld in den Log-Einträgen.  
-QubicFlow speichert BOB-Events deshalb mit Timestamp `"0"` → Anzeige als `01.01.1970`.
+`POST /getQuTransferForIdentity` liefert kein `timestamp`-Feld in den Log-Einträgen.  
+QubicFlow löst das, indem nach jedem Fetch für alle einzigartigen Tick-Nummern ein `GET /tick/{tickNumber}`-Aufruf gemacht wird. Der so ermittelte Timestamp wird in das Event-Objekt eingetragen, bevor es in der Datenbank gespeichert wird.
 
-**Geplante Lösung:** Nach dem Sync für jeden einzigartigen Tick-Wert einen `GET /tick/{tickNumber}`-Aufruf durchführen und den Timestamp aus der Tick-Antwort nachträglich einsetzen. Alternativ: Batched-Lookup über `POST /getTickLogRanges`.
-
-**Betroffene Dateien:**
-- `backend/app/services/qubic_client.py` — `BOBClient.get_event_logs()` / `_map_bob_transfer()`
-- `backend/app/services/sync_engine.py` — `_persist_logs()`
-
-**Workaround bis zur Lösung:** Der Hintergrund-Job `backfill_missing_rates` (alle 6 h) füllt fehlende EUR/USD-Kurse nach — Beträge sind also korrekt. Nur das angezeigte Datum ist falsch.
+Bereits gespeicherte BOB-Events mit Timestamp `"0"` (vor diesem Fix) behalten das falsche Datum — ein rückwirkendes Backfill ist nicht implementiert.
 
 ---
 

@@ -160,7 +160,7 @@ function simulate() {
       <div class="flex items-center gap-4">
         <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.font_size') }}</span>
         <div class="flex items-center gap-2 flex-wrap">
-          <button v-for="[val, lbl] in [['85', t('settings.font_xs')],['100', t('settings.font_sm')],['115', t('settings.font_md')],['130', t('settings.font_lg')]]"
+          <button v-for="[val, lbl] in [['100', t('settings.font_sm')],['115', t('settings.font_md')],['130', t('settings.font_lg')]]"
                   :key="val"
                   :class="['btn-ghost text-sm py-2', store.fontSize === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="store.setFontSize(val)">

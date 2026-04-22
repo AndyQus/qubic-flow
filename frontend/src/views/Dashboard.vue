@@ -5,22 +5,21 @@ import { api } from '../api'
 import StatsPanel from '../components/StatsPanel.vue'
 import EventsTable from '../components/EventsTable.vue'
 import WalletFilter from '../components/WalletFilter.vue'
-import PageLoader from '../components/PageLoader.vue'
 import { useTranslation } from 'i18next-vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const selectedWallets = ref([])
-const loading = ref(true)
+const loadingEvents = ref(true)
 
 async function loadEvents() {
-  loading.value = true
+  loadingEvents.value = true
   try {
     const params = { limit: 10 }
     if (selectedWallets.value.length) params.wallet_ids = selectedWallets.value
     store.events = await api.events.list(params)
   } catch (e) { console.error(e) }
-  finally { loading.value = false }
+  finally { loadingEvents.value = false }
 }
 
 watch(selectedWallets, loadEvents, { deep: true })
@@ -30,10 +29,7 @@ onMounted(loadEvents)
 <template>
   <div class="space-y-3">
     <WalletFilter v-model="selectedWallets" />
-    <PageLoader v-if="loading" />
-    <template v-else>
-      <StatsPanel />
-      <EventsTable :events="store.events" :title="t('event.last10')" />
-    </template>
+    <StatsPanel />
+    <EventsTable :events="store.events" :loading="loadingEvents" :title="t('event.last10')" />
   </div>
 </template>

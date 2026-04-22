@@ -20,7 +20,8 @@ const modeWallets = computed(() =>
   store.wallets.filter(w => w.wallet_type === mode.value.toUpperCase())
 )
 
-watch(mode, () => { selectedWallets.value = [] })
+watch(mode, () => { selectedWallets.value = []; report.value = null })
+watch(year, () => { report.value = null })
 
 function fmtNum(val, dec = 2) {
   if (val === undefined || val === null) return '—'
@@ -325,8 +326,8 @@ function exportPDF() {
 
       <!-- Export buttons -->
       <div class="flex flex-wrap gap-2 justify-end">
-        <a :href="exportUrl('cointracking', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.cointracking') }}</a>
-        <a :href="exportUrl('steuerberater', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.steuerberater') }}</a>
+        <a v-if="mode === 'private'" :href="exportUrl('cointracking', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.cointracking') }}</a>
+        <a v-if="mode === 'business'" :href="exportUrl('steuerberater', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.steuerberater') }}</a>
         <button class="btn-ghost text-sm py-1.5 px-4" @click="exportCSV">{{ t('tax.export_csv') }}</button>
         <button class="btn text-sm py-1.5 px-4" @click="exportPDF">{{ t('tax.export_pdf') }}</button>
       </div>
@@ -476,8 +477,8 @@ function exportPDF() {
     </template>
 
     <!-- Disclaimer -->
-    <div class="rounded-lg border border-qubic-border/40 bg-qubic-bg/30 px-4 py-3 text-xs text-gray-500 leading-relaxed">
-      {{ t('tax.disclaimer') }}
+    <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-400 leading-relaxed text-center">
+      ⚠ {{ t('tax.disclaimer') }}
     </div>
 
   </div>

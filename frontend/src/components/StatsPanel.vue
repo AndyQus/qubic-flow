@@ -5,9 +5,12 @@ import { useTranslation } from 'i18next-vue'
 
 const { t } = useTranslation()
 const stats = ref(null)
+const loading = ref(true)
 
 async function load() {
+  loading.value = true
   try { stats.value = await api.stats.current() } catch (e) { console.error(e) }
+  finally { loading.value = false }
 }
 
 onMounted(load)
@@ -38,7 +41,7 @@ function fmt(n) {
 </script>
 
 <template>
-  <div v-if="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
     <div v-for="k in keys" :key="k" class="card !p-3">
       <div class="flex items-center gap-1 mb-1">
         <svg xmlns="http://www.w3.org/2000/svg" :class="['w-3 h-3 flex-shrink-0', colors[k]]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -46,8 +49,20 @@ function fmt(n) {
         </svg>
         <span :class="['text-sm uppercase tracking-wide', colors[k]]">{{ t(`stats.${k}`) }}</span>
       </div>
-      <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(stats[k].current.volume_qubic) }} QU</div>
-      <div class="text-xs text-gray-400">{{ fmt(stats[k].current.count) }} {{ t('stats.count') }}</div>
+      <div class="min-h-[2.75rem] flex flex-col justify-center">
+        <template v-if="loading">
+          <div class="flex justify-center">
+            <svg class="w-5 h-5 text-gray-500 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>
+          </div>
+        </template>
+        <template v-else>
+          <div class="text-lg font-bold text-qubic-teal leading-tight">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }} QU</div>
+          <div class="text-xs text-gray-400">{{ stats ? fmt(stats[k].current.count) : '—' }} {{ t('stats.count') }}</div>
+        </template>
+      </div>
     </div>
   </div>
 </template>

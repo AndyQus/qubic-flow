@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
@@ -12,7 +12,14 @@ const loading  = ref(true)
 const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
-const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 })
+const DEFAULT_BOB = 'https://bobnet.qubic.li/'
+const form = ref({ url: DEFAULT_BOB, node_type: 'BOB_NODE', label: '', priority: 1 })
+
+watch(() => form.value.node_type, (type) => {
+  if (!editId.value) {
+    form.value.url = type === 'BOB_NODE' ? DEFAULT_BOB : DEFAULT_RPC
+  }
+})
 
 async function reload() {
   loading.value = true
@@ -30,7 +37,7 @@ function cancelForm() {
   editId.value   = null
   showForm.value = false
   error.value    = ''
-  form.value     = { url: DEFAULT_RPC, node_type: 'RPC', label: 'Qubic RPC', priority: 1 }
+  form.value     = { url: DEFAULT_BOB, node_type: 'BOB_NODE', label: '', priority: 1 }
 }
 
 async function submit() {
@@ -76,12 +83,12 @@ onMounted(reload)
     <h3 class="text-sm font-bold uppercase text-gray-400">{{ editId ? t('node.edit') : t('node.add') }}</h3>
     <div>
       <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
-      <p class="text-xs text-gray-400 mt-1">{{ t('node.url_default') }}: <span class="font-mono">https://rpc.qubic.org</span></p>
+      <p v-if="form.node_type === 'BOB_NODE'" class="text-xs text-amber-400 mt-1">⚠ {{ t('node.bob_hint') }}: <span class="font-mono">http://your-bob-node:40420</span></p>
+      <p v-else class="text-xs text-gray-400 mt-1">{{ t('node.url_default') }}: <span class="font-mono">https://rpc.qubic.org</span></p>
     </div>
     <select v-model="form.node_type" class="input w-full">
       <option value="RPC">RPC</option>
       <option value="BOB_NODE">BOB_NODE</option>
-      <option value="LITE_NODE">LITE_NODE</option>
     </select>
     <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
     <input v-model.number="form.priority" type="number" min="1" max="5" class="input w-full" />
@@ -99,6 +106,7 @@ onMounted(reload)
           <th class="text-left p-3">{{ t('node.priority') }}</th>
           <th class="text-left p-3">{{ t('node.url') }}</th>
           <th class="text-left p-3">{{ t('node.type') }}</th>
+          <th class="text-left p-3">{{ t('node.label') }}</th>
           <th class="text-left p-3">{{ t('node.tick') }}</th>
           <th class="text-left p-3">{{ t('node.response') }}</th>
           <th class="text-left p-3">{{ t('node.health') }}</th>
@@ -110,6 +118,7 @@ onMounted(reload)
           <td class="p-3">{{ n.priority }}</td>
           <td class="p-3 font-mono text-xs">{{ n.url }}</td>
           <td class="p-3"><span class="pill text-xs">{{ n.node_type }}</span></td>
+          <td class="p-3 text-gray-300">{{ n.label || '—' }}</td>
           <td class="p-3 font-mono">{{ n.tick || '—' }}</td>
           <td class="p-3">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
           <td class="p-3"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>

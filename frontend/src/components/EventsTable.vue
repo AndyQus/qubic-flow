@@ -54,6 +54,15 @@ function maskName(name, addr) {
   return shortAddr(addr)
 }
 
+function walletDisplay(name, addr) {
+  if (store.hideAddresses) return '••••••••••••'
+  const w = store.wallets.find(ww => ww.id === addr)
+  const owner = w?.owner
+  const base = name || shortAddr(addr)
+  const full = owner ? `${base} - ${owner}` : base
+  return full.length > 20 ? full.slice(0, 19) + '…' : full
+}
+
 function fmtValue(ev) {
   const isUsd = store.currency === 'USD'
   const rate = isUsd ? ev.qubic_usd_rate : ev.qubic_eur_rate
@@ -156,7 +165,7 @@ function counterpart(ev) {
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
               <span :class="['text-xs font-mono truncate', isOwnWallet(counterpart(ev).addr) ? 'text-violet-300' : 'text-gray-400']">
-                {{ maskName(counterpart(ev).name, counterpart(ev).addr) }}
+                {{ walletDisplay(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
               <button v-if="!store.hideAddresses" @click="copyToClipboard(counterpart(ev).addr)"
                       class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
@@ -234,7 +243,7 @@ function counterpart(ev) {
               <td class="px-3 py-2.5">
                 <div v-if="ev.source_address" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
                   <span :class="isOwnWallet(ev.source_address) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.source_address">
-                    {{ maskName(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
+                    {{ walletDisplay(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
                   </span>
                   <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.source_address)"
                           class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
@@ -255,7 +264,7 @@ function counterpart(ev) {
               <td class="px-3 py-2.5">
                 <div v-if="ev.destination_addr" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
                   <span :class="isOwnWallet(ev.destination_addr) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.destination_addr">
-                    {{ maskName(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
+                    {{ walletDisplay(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
                   </span>
                   <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.destination_addr)"
                           class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">

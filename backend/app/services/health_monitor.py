@@ -26,8 +26,9 @@ async def _check_node(db, node: Node):
     else:
         url = f"{base}/v1/tick-info"
     start = time.perf_counter()
+    verify = node.node_type != "BOB_NODE"
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(verify=verify) as client:
             r = await client.get(url, timeout=10)
             r.raise_for_status()
             data = r.json()

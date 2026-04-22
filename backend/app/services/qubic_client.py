@@ -82,7 +82,7 @@ class RPCClient:
         return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
 
-def _map_bob_transfer(t: dict) -> dict:
+def _map_bob_transfer(t: dict, timestamp: str = "0") -> dict:
     """Map a BOB LogEvent to RPC-compatible eventLog format."""
     msg = t.get("message") or {}
     # QU_TRANSFER message fields — try multiple naming conventions
@@ -100,7 +100,7 @@ def _map_bob_transfer(t: dict) -> dict:
         "logId": log_id,
         "epoch": t.get("epoch"),
         "tickNumber": t.get("tick"),
-        "timestamp": "0",
+        "timestamp": timestamp,
         "logType": t.get("logType", 0),
         "logDigest": log_id,
         "categories": [],
@@ -117,12 +117,14 @@ class BOBClient:
         self.base_url = url.rstrip('/')
         # Cache transfers per (wallet_id, from_tick, to_tick) within one sync cycle
         self._cache: dict[tuple, list] = {}
+        # Cache tick timestamps to avoid duplicate lookups across wallets
+        self._tick_ts_cache: dict[int, str] = {}
 
     async def _request(self, method: str, path: str, **kwargs) -> dict:
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
-                async with httpx.AsyncClient() as client:
+                async with httpx.AsyncClient(verify=False) as client:
                     r = await client.request(method, f"{self.base_url}{path}", timeout=30, **kwargs)
                     r.raise_for_status()
                     return r.json()
@@ -142,6 +144,31 @@ class BOBClient:
         )
         return {"tickInfo": {"tick": int(tick)}}
 
+    async def _get_tick_timestamp(self, tick: int) -> str:
+        """Fetch the Unix-ms timestamp for a tick via GET /tick/{tick}."""
+        if tick in self._tick_ts_cache:
+            return self._tick_ts_cache[tick]
+        try:
+            data = await self._request("GET", f"/tick/{tick}")
+            # Handle both flat and nested response shapes
+            ts_raw = (
+                data.get("timestamp") or
+                data.get("tick", {}).get("timestamp") or
+                data.get("time") or
+                data.get("tickTimestamp") or
+                0
+            )
+            ts = int(ts_raw)
+            # BOB may return Unix seconds; normalize to milliseconds
+            if 0 < ts < 1_000_000_000_000:
+                ts *= 1000
+            result = str(ts) if ts else "0"
+        except Exception as e:
+            logger.debug(f"BOB tick {tick} timestamp lookup failed: {e}")
+            result = "0"
+        self._tick_ts_cache[tick] = result
+        return result
+
     async def get_current_tick(self) -> int:
         info = await self.get_tick_info()
         return int(info.get("tickInfo", {}).get("tick", 0))
@@ -152,7 +179,20 @@ class BOBClient:
             payload = {"fromTick": from_tick, "toTick": to_tick, "identity": wallet_id}
             data = await self._request("POST", "/getQuTransferForIdentity", json=payload)
             raw = data.get("transfers") or []
-            self._cache[key] = [_map_bob_transfer(t) for t in raw]
+
+            # Fetch timestamps for all unique ticks (BOB transfers have no timestamp field)
+            unique_ticks = {t.get("tick") for t in raw if t.get("tick")}
+            tick_ts: dict[int, str] = {}
+            for tick in unique_ticks:
+                tick_ts[tick] = await self._get_tick_timestamp(tick)
+
+            mapped = []
+            for t in raw:
+                tick = t.get("tick")
+                ts = tick_ts.get(tick, "0") if tick else "0"
+                mapped.append(_map_bob_transfer(t, timestamp=ts))
+
+            self._cache[key] = mapped
             logger.debug(f"BOB: fetched {len(self._cache[key])} transfers for {wallet_id} ticks {from_tick}-{to_tick}")
 
         all_logs = self._cache[key]

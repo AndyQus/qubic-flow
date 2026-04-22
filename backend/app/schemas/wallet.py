@@ -7,12 +7,14 @@ class WalletCreate(BaseModel):
     id: str = Field(..., pattern=r"^[A-Z]{60}$", description="Qubic address: 60 uppercase letters")
     label: str = Field(..., min_length=1, max_length=200)
     note: Optional[str] = Field(None, max_length=1000)
+    owner: Optional[str] = Field(None, max_length=200)
     wallet_type: Literal["PRIVATE", "BUSINESS"]
 
 
 class WalletUpdate(BaseModel):
     label: Optional[str] = Field(None, min_length=1, max_length=200)
     note: Optional[str] = Field(None, max_length=1000)
+    owner: Optional[str] = Field(None, max_length=200)
     wallet_type: Optional[Literal["PRIVATE", "BUSINESS"]] = None
     active: Optional[int] = None
 
@@ -21,6 +23,7 @@ class WalletOut(BaseModel):
     id: str
     label: str
     note: Optional[str]
+    owner: Optional[str] = None
     wallet_type: str
     active: int
     created_at: str

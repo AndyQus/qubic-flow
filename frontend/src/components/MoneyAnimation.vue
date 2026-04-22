@@ -14,11 +14,14 @@ function playSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
     const now = ctx.currentTime
+    const master = ctx.createGain()
+    master.gain.value = 0.1
+    master.connect(ctx.destination)
 
     function tone(freq, waveType, start, dur, vol) {
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(ctx.destination)
+      osc.connect(gain); gain.connect(master)
       osc.type = waveType
       osc.frequency.value = freq
       gain.gain.setValueAtTime(vol, now + start)
@@ -39,13 +42,13 @@ function playSound() {
       filter.Q.value = 1.5
       const gain = ctx.createGain()
       gain.gain.setValueAtTime(vol, now + start)
-      src.connect(filter); filter.connect(gain); gain.connect(ctx.destination)
+      src.connect(filter); filter.connect(gain); gain.connect(master)
       src.start(now + start); src.stop(now + start + dur)
     }
 
     if (type === 'kaching') {
       // Klassische Registrierkasse: mechanisches "Ka" + metallisches "Ching"
-      noise(0, 0.06, 0.4, 180)              // "Ka" - mechanischer Klick
+      noise(0, 0.06, 0.4, 180)               // "Ka" - mechanischer Klick
       tone(880,  'triangle', 0.05, 0.9, 0.4)  // A5 - Hauptring
       tone(1320, 'triangle', 0.05, 0.7, 0.25) // E6 - Oberton
       tone(440,  'sine',     0.05, 0.6, 0.15) // A4 - Basston

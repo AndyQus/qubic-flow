@@ -14,6 +14,7 @@ class LabelOut(BaseModel):
     label: Optional[str]
     website: Optional[str]
     category: Optional[str]
+    decimal_places: Optional[int]
 
     class Config:
         from_attributes = True
