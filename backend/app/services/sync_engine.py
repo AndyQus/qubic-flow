@@ -290,7 +290,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                 dest = tx.get("destId")
                 amount = int(tx.get("amount") or "0")
                 ts_unix_s = tx_data.get("timestamp", 0)
-                ts_iso = unix_ms_to_iso(int(ts_unix_s) * 1000)
+                ts_iso = unix_ms_to_iso(int(ts_unix_s))
                 date_str = iso_to_date(ts_iso)
                 price = await get_price_for_date(db, date_str)
                 is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
