@@ -200,10 +200,10 @@ function counterpart(ev) {
               <th class="text-left px-3 py-2.5">{{ t('event.epoch') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
               <th class="text-right px-3 py-2.5">{{ t('event.amount') }}</th>
-              <th class="text-left px-3 py-2.5 hidden lg:table-cell whitespace-nowrap">{{ t('event.rate') }} {{ store.currency }}</th>
-              <th class="text-left px-3 py-2.5 whitespace-nowrap">{{ t('event.value_col') }} {{ store.currency }}</th>
-              <th class="text-left px-3 py-2.5">{{ t('event.source') }}</th>
-              <th class="text-left px-3 py-2.5">{{ t('event.destination') }}</th>
+              <th class="text-right px-3 py-2.5 hidden lg:table-cell whitespace-nowrap">{{ t('event.rate') }} {{ store.currency }}</th>
+              <th class="text-right px-3 py-2.5 whitespace-nowrap">{{ t('event.value_col') }} {{ store.currency }}</th>
+              <th class="text-right px-3 py-2.5">{{ t('event.source') }}</th>
+              <th class="text-right px-3 py-2.5">{{ t('event.destination') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.txid') }}</th>
             </tr>
           </thead>
@@ -228,11 +228,11 @@ function counterpart(ev) {
                 <span v-else class="text-gray-500">—</span>
               </td>
               <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]"><span class="mr-0.5">{{ sign(ev) }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-              <td class="px-3 py-2.5 font-mono text-gray-400 hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
-              <td class="px-3 py-2.5 font-mono whitespace-nowrap">{{ fmtValue(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono text-gray-400 text-right hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono text-right whitespace-nowrap">{{ fmtValue(ev) }}</td>
               <!-- Source -->
               <td class="px-3 py-2.5">
-                <div v-if="ev.source_address" class="flex items-center gap-2 font-mono text-xs text-gray-400">
+                <div v-if="ev.source_address" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
                   <span :class="isOwnWallet(ev.source_address) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.source_address">
                     {{ maskName(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
                   </span>
@@ -253,7 +253,7 @@ function counterpart(ev) {
               </td>
               <!-- Destination -->
               <td class="px-3 py-2.5">
-                <div v-if="ev.destination_addr" class="flex items-center gap-2 font-mono text-xs text-gray-400">
+                <div v-if="ev.destination_addr" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
                   <span :class="isOwnWallet(ev.destination_addr) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.destination_addr">
                     {{ maskName(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
                   </span>
