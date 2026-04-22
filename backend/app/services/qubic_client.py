@@ -79,7 +79,7 @@ class RPCClient:
             "page": page,
             "page_size": page_size,
         }
-        return await self._request("GET", f"/v2/identities/{wallet_id}/transfer-transactions", params=params)
+        return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
 
 def _map_bob_transfer(t: dict) -> dict:

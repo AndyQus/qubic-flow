@@ -2,12 +2,11 @@
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import i18next from 'i18next'
-import { exportUrl, api } from '../api'
+import { api } from '../api'
 import { ref, computed, onMounted } from 'vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
-const year = ref(new Date().getFullYear())
 
 // Tax settings
 const taxSettings = ref({
@@ -192,17 +191,6 @@ function simulate() {
       </div>
     </div>
 
-    <div class="card" style="order:3">
-      <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('settings.export') }}</h3>
-      <div class="flex items-center gap-3 mb-3">
-        <label class="text-sm">{{ t('export.year') }}:</label>
-        <input v-model.number="year" type="number" class="input w-32" />
-      </div>
-      <div class="flex gap-2">
-        <a :href="exportUrl('cointracking', year)" class="btn">{{ t('export.cointracking') }}</a>
-        <a :href="exportUrl('steuerberater', year)" class="btn">{{ t('export.steuerberater') }}</a>
-      </div>
-    </div>
 
     <!-- Tax Settings -->
     <div class="card sm:col-span-2" style="order:4">

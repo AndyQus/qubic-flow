@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { api } from '../api'
+import { api, exportUrl } from '../api'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import WalletFilter from '../components/WalletFilter.vue'
@@ -324,13 +324,11 @@ function exportPDF() {
       </div>
 
       <!-- Export buttons -->
-      <div class="flex gap-2 justify-end">
-        <button class="btn-ghost text-sm py-1.5 px-4" @click="exportCSV">
-          {{ t('tax.export_csv') }}
-        </button>
-        <button class="btn text-sm py-1.5 px-4" @click="exportPDF">
-          {{ t('tax.export_pdf') }}
-        </button>
+      <div class="flex flex-wrap gap-2 justify-end">
+        <a :href="exportUrl('cointracking', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.cointracking') }}</a>
+        <a :href="exportUrl('steuerberater', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.steuerberater') }}</a>
+        <button class="btn-ghost text-sm py-1.5 px-4" @click="exportCSV">{{ t('tax.export_csv') }}</button>
+        <button class="btn text-sm py-1.5 px-4" @click="exportPDF">{{ t('tax.export_pdf') }}</button>
       </div>
 
       <!-- Summary -->
