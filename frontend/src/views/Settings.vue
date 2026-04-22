@@ -28,8 +28,9 @@ const previewAnimClass = computed(() => {
 
 function simulate() {
   const dir = Math.random() > 0.5 ? 'IN' : 'OUT'
-  const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString('de-DE')
-  const now = new Date().toLocaleTimeString('de-DE')
+  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
+  const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString(locale)
+  const now = new Date().toLocaleTimeString(locale)
   const newRow = { id: `p${Date.now()}`, time: now, direction: dir, amount, isNew: true }
   previewRows.value.unshift(newRow)
   if (previewRows.value.length > 3) previewRows.value.pop()
@@ -73,7 +74,7 @@ function simulate() {
         </button>
       </div>
       <div v-if="store.moneySound" class="flex flex-wrap gap-2">
-        <button v-for="[val, lbl] in [['kaching','🏧 Ka-Ching'],['coins','🪙 Münzen'],['chime','🔔 Glocke']]"
+        <button v-for="[val, lbl] in [['kaching', t('moneyAnim.sound_kaching')],['coins', t('moneyAnim.sound_coins')],['chime', t('moneyAnim.sound_chime')]]"
                 :key="val"
                 :class="['btn-ghost text-sm py-2', store.soundStyle === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                 @click="store.setSoundStyle(val)">
@@ -84,9 +85,9 @@ function simulate() {
       <!-- Live-Vorschau -->
       <div class="rounded-lg border border-qubic-border overflow-hidden bg-qubic-bg/50 text-xs mt-3">
         <div class="flex border-b border-qubic-border text-gray-500 uppercase px-3 py-1.5">
-          <span class="w-20">Zeit</span>
-          <span class="w-16">Richtung</span>
-          <span class="font-mono">Betrag</span>
+          <span class="w-20">{{ t('common.time') }}</span>
+          <span class="w-16">{{ t('event.direction') }}</span>
+          <span class="font-mono">{{ t('event.amount') }}</span>
         </div>
         <div v-for="row in previewRows" :key="row.id"
              :class="[
@@ -110,7 +111,7 @@ function simulate() {
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.display') }}</h3>
 
       <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">Währung</span>
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.currency') }}</span>
         <div class="flex gap-2">
           <button v-for="[val, lbl, flag] in [['EUR','Euro','€'],['USD','US-Dollar','$']]"
                   :key="val"
@@ -122,9 +123,9 @@ function simulate() {
       </div>
 
       <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">Schriftgröße</span>
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.font_size') }}</span>
         <div class="flex items-center gap-2 flex-wrap">
-          <button v-for="[val, lbl] in [['85','Klein'],['100','Normal'],['115','Groß'],['130','Sehr groß']]"
+          <button v-for="[val, lbl] in [['85', t('settings.font_xs')],['100', t('settings.font_sm')],['115', t('settings.font_md')],['130', t('settings.font_lg')]]"
                   :key="val"
                   :class="['btn-ghost text-sm py-2', store.fontSize === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="store.setFontSize(val)">
@@ -156,7 +157,7 @@ function simulate() {
     </div>
 
     <div class="card" style="order:3">
-      <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">Export</h3>
+      <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('settings.export') }}</h3>
       <div class="flex items-center gap-3 mb-3">
         <label class="text-sm">{{ t('export.year') }}:</label>
         <input v-model.number="year" type="number" class="input w-32" />

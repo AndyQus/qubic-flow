@@ -17,11 +17,13 @@ const animClass = computed(() => {
 })
 
 function fmtDate(iso) {
-  try { return new Date(iso).toLocaleString('de-DE') } catch { return iso }
+  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
+  try { return new Date(iso).toLocaleString(locale) } catch { return iso }
 }
 
 function fmtDateShort(iso) {
-  try { return new Date(iso).toLocaleDateString('de-DE') } catch { return iso }
+  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
+  try { return new Date(iso).toLocaleDateString(locale) } catch { return iso }
 }
 
 function direction(ev) {
@@ -148,14 +150,14 @@ function counterpart(ev) {
           <thead class="border-b border-qubic-border text-gray-400 uppercase">
             <tr>
               <th class="text-left px-3 py-2.5">{{ t('event.date') }}</th>
-              <th class="text-left px-3 py-2.5">Epoch</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.epoch') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.amount') }}</th>
-              <th class="text-left px-3 py-2.5 hidden lg:table-cell">Kurs {{ store.currency }}</th>
-              <th class="text-left px-3 py-2.5">Wert {{ store.currency }}</th>
-              <th class="text-left px-3 py-2.5">Source</th>
-              <th class="text-left px-3 py-2.5">Destination</th>
-              <th class="text-left px-3 py-2.5">TxId</th>
+              <th class="text-left px-3 py-2.5 hidden lg:table-cell">{{ t('event.rate') }} {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.value_col') }} {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.source') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.destination') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.txid') }}</th>
             </tr>
           </thead>
           <tbody>

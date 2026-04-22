@@ -143,7 +143,7 @@ const lineData = computed(() => {
     return {
       labels,
       datasets: [
-        { label: `Volumen ${store.currency}`, data: items.map(s => +((s[volumeKey.value]) || 0).toFixed(2)),
+        { label: `${t('stats.volume')} ${store.currency}`, data: items.map(s => +((s[volumeKey.value]) || 0).toFixed(2)),
           borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)', fill: true, tension: 0.4 },
       ],
     }
@@ -151,7 +151,7 @@ const lineData = computed(() => {
   return {
     labels,
     datasets: [
-      { label: 'Volumen QUBIC', data: items.map(s => s.volume_qubic || 0),
+      { label: t('stats.volume_qubic'), data: items.map(s => s.volume_qubic || 0),
         borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)', fill: true, tension: 0.4 },
     ],
   }
@@ -199,19 +199,19 @@ const chartOptions = computed(() => {
     <!-- Gesamt-KPIs -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">Events gesamt</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.events_total') }}</div>
         <div class="text-2xl font-bold text-qubic-teal">{{ fmt(totals.events) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">TX gesamt</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.tx_total') }}</div>
         <div class="text-2xl font-bold text-amber-400">{{ fmt(totals.tx) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">Volumen QUBIC</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.volume_qubic') }}</div>
         <div class="text-2xl font-bold">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">Volumen {{ store.currency }}</div>
+        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.volume') }} {{ store.currency }}</div>
         <div class="text-2xl font-bold text-green-400">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
@@ -245,15 +245,15 @@ const chartOptions = computed(() => {
       <!-- Legende Live vs Snapshot -->
       <div class="flex items-center gap-4 text-sm text-gray-400 mb-3">
         <span class="flex items-center gap-1.5">
-          <span class="inline-block w-3 h-3 rounded-sm bg-qubic-teal/60"></span> Snapshot (Mi 12:00 UTC)
+          <span class="inline-block w-3 h-3 rounded-sm bg-qubic-teal/60"></span> {{ t('stats.snapshot_label') }}
         </span>
         <span class="flex items-center gap-1.5">
-          <span class="inline-block w-3 h-3 rounded-sm bg-qubic-teal/30"></span> Live-Daten (noch kein Snapshot)
+          <span class="inline-block w-3 h-3 rounded-sm bg-qubic-teal/30"></span> {{ t('stats.live_label') }}
         </span>
 
         <!-- Toggle -->
         <div class="flex gap-2 ml-auto">
-          <button v-for="[val, lbl] in [['count','Anzahl'],['volume_qubic','Vol. QU'],['volume_fiat',`Vol. ${store.currency}`]]"
+          <button v-for="[val, lbl] in [['count', t('stats.count')],['volume_qubic','Vol. QU'],['volume_fiat',`Vol. ${store.currency}`]]"
                   :key="val"
                   :class="['btn-ghost text-sm py-1', mode === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="mode = val">
@@ -269,7 +269,7 @@ const chartOptions = computed(() => {
 
       <!-- Balkendiagramm: letzte 12 Wochen TX vs Events -->
       <div class="card" style="height:260px">
-        <div class="text-sm uppercase text-gray-400 mb-2">TX vs. Events — letzte 12 Wochen</div>
+        <div class="text-sm uppercase text-gray-400 mb-2">{{ t('stats.bar_chart_title') }}</div>
         <div style="height:210px">
           <Bar :data="barData" :options="chartOptions" />
         </div>
@@ -277,7 +277,7 @@ const chartOptions = computed(() => {
     </div>
 
     <div v-else-if="stats" class="card text-center py-12 text-gray-500">
-      Noch keine Events in der Datenbank vorhanden.
+      {{ t('stats.no_events') }}
     </div>
 
   </div>

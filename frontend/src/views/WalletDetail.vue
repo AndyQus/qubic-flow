@@ -3,9 +3,11 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import EventsTable from '../components/EventsTable.vue'
+import { useTranslation } from 'i18next-vue'
 
 const props = defineProps({ id: String })
 const store = useAppStore()
+const { t } = useTranslation()
 
 const events  = ref([])
 const total   = ref(0)
@@ -27,7 +29,7 @@ const wallet = computed(() => store.wallets.find(w => w.id === props.id))
 const monthOptions = computed(() =>
   availableMonths.value.map(val => {
     const [y, m] = val.split('-')
-    const lbl = new Date(+y, +m - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' })
+    const lbl = new Date(+y, +m - 1, 1).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US', { month: 'long', year: 'numeric' })
     return { val, lbl }
   })
 )
@@ -105,7 +107,7 @@ function explorerUrl(addr) {
               {{ store.hideAddresses ? '••••••••••••••••••••' : wallet.id }}
             </span>
             <a :href="explorerUrl(wallet.id)" target="_blank" rel="noopener"
-               class="text-gray-500 hover:text-qubic-teal flex-shrink-0" title="Im Qubic Explorer öffnen">
+               class="text-gray-500 hover:text-qubic-teal flex-shrink-0" :title="t('walletDetail.explorer')">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
@@ -122,7 +124,7 @@ function explorerUrl(addr) {
 
     <!-- Filter-Leiste -->
     <div class="flex flex-wrap gap-2 items-center">
-      <button v-for="[mode, lbl] in [['all','Alle'],['epoch','Epoch'],['month','Monat'],['year','Jahr']]"
+      <button v-for="[mode, lbl] in [['all', t('filter.all')],['epoch', t('stats.epoch')],['month', t('stats.month')],['year', t('stats.year')]]"
               :key="mode"
               :class="['btn-ghost text-sm py-1', filterMode === mode && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
               @click="setFilter(mode)">
@@ -130,21 +132,21 @@ function explorerUrl(addr) {
       </button>
 
       <select v-if="filterMode === 'epoch'" v-model="filterEpoch" class="input text-sm py-1">
-        <option value="">Epoch wählen…</option>
+        <option value="">{{ t('walletDetail.select_epoch') }}</option>
         <option v-for="ep in availableEpochs" :key="ep" :value="ep">{{ ep }}</option>
       </select>
 
       <select v-if="filterMode === 'month'" v-model="filterMonth" class="input text-sm py-1">
-        <option value="">Monat wählen…</option>
+        <option value="">{{ t('walletDetail.select_month') }}</option>
         <option v-for="m in monthOptions" :key="m.val" :value="m.val">{{ m.lbl }}</option>
       </select>
 
       <select v-if="filterMode === 'year'" v-model="filterYear" class="input text-sm py-1">
-        <option value="">Jahr wählen…</option>
+        <option value="">{{ t('walletDetail.select_year') }}</option>
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
       </select>
 
-      <span class="ml-auto text-sm text-gray-500">{{ total.toLocaleString('de-DE') }} Einträge</span>
+      <span class="ml-auto text-sm text-gray-500">{{ total.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }} {{ t('walletDetail.entries') }}</span>
     </div>
 
     <!-- Events-Tabelle -->
@@ -154,12 +156,12 @@ function explorerUrl(addr) {
     <div v-if="totalPages > 1" class="flex items-center justify-center gap-4 py-2">
       <button @click="page--" :disabled="page <= 1"
               class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
-        ← Zurück
+        {{ t('walletDetail.prev') }}
       </button>
-      <span class="text-xs text-gray-400">Seite {{ page }} / {{ totalPages }}</span>
+      <span class="text-xs text-gray-400">{{ t('walletDetail.page') }} {{ page }} / {{ totalPages }}</span>
       <button @click="page++" :disabled="page >= totalPages"
               class="btn-ghost text-sm py-1 disabled:opacity-40 disabled:cursor-not-allowed">
-        Weiter →
+        {{ t('walletDetail.next') }}
       </button>
     </div>
 

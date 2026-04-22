@@ -38,12 +38,12 @@ async function submit() {
     cancelForm()
     await reload()
   } catch (e) {
-    error.value = e.message.includes('409') ? 'Diese URL existiert bereits.' : `Fehler: ${e.message}`
+    error.value = e.message.includes('409') ? t('node.url_exists') : `${t('node.url_error')}${e.message}`
   }
 }
 
 async function remove(id) {
-  if (!confirm('Delete node?')) return
+  if (!confirm(t('node.delete_confirm'))) return
   await api.nodes.remove(id)
   await reload()
 }
@@ -64,10 +64,10 @@ onMounted(reload)
   </div>
 
   <div v-if="showForm" class="card mb-4 space-y-3">
-    <h3 class="text-sm font-bold uppercase text-gray-400">{{ editId ? 'Node bearbeiten' : t('node.add') }}</h3>
+    <h3 class="text-sm font-bold uppercase text-gray-400">{{ editId ? t('node.edit') : t('node.add') }}</h3>
     <div>
       <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
-      <p class="text-xs text-gray-400 mt-1">Standard: <span class="font-mono">https://rpc.qubic.org</span></p>
+      <p class="text-xs text-gray-400 mt-1">{{ t('node.url_default') }}: <span class="font-mono">https://rpc.qubic.org</span></p>
     </div>
     <select v-model="form.node_type" class="input w-full">
       <option value="RPC">RPC</option>

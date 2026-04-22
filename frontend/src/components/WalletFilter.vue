@@ -1,10 +1,12 @@
 <script setup>
 import { ref } from 'vue'
 import { useAppStore } from '../stores/app'
+import { useTranslation } from 'i18next-vue'
 
 const props = defineProps({ modelValue: { type: Array, default: () => [] } })
 const emit  = defineEmits(['update:modelValue'])
 const store = useAppStore()
+const { t } = useTranslation()
 const open  = ref(false)
 
 function toggle(id) {
@@ -44,14 +46,14 @@ function btnClass(id) {
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-qubic-teal/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/>
         </svg>
-        <span class="text-sm text-gray-400 uppercase tracking-wide">Wallet Filter</span>
+        <span class="text-sm text-gray-400 uppercase tracking-wide">{{ t('filter.wallet_filter') }}</span>
         <span v-if="modelValue.length" class="text-xs text-qubic-teal ml-1">({{ modelValue.length }})</span>
       </div>
       <div class="flex items-center gap-3">
         <button v-if="modelValue.length"
                 class="btn-ghost text-[10px] py-0.5 px-3 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
                 @click.stop="emit('update:modelValue', [])">
-          × Alle
+          {{ t('filter.clear_all') }}
         </button>
         <svg xmlns="http://www.w3.org/2000/svg"
              :class="['w-4 h-4 text-gray-500 transition-transform duration-200', open && 'rotate-180']"

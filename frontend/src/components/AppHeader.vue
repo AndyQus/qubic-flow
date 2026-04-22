@@ -25,7 +25,7 @@ const { t } = useTranslation()
         </span>
          <!-- Adressen verbergen / anzeigen -->
         <button @click="store.toggleHideAddresses()"
-                :title="store.hideAddresses ? 'Adressen anzeigen' : 'Adressen verbergen'"
+                :title="store.hideAddresses ? t('header.show_addresses') : t('header.hide_addresses')"
                 class="p-1.5 rounded-lg text-gray-400 hover:text-qubic-teal hover:bg-qubic-teal/10 transition-colors">
           <!-- Auge offen -->
           <svg v-if="!store.hideAddresses" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">

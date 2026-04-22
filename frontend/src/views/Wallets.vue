@@ -22,7 +22,7 @@ async function submit() {
     showForm.value = false
     await reload()
   } catch (e) {
-    error.value = e.message.includes('409') ? 'Diese Adresse existiert bereits.' : `Fehler: ${e.message}`
+    error.value = e.message.includes('409') ? t('wallet.address_exists') : `${t('node.url_error')}${e.message}`
   }
 }
 
@@ -40,7 +40,7 @@ async function saveEdit(id) {
 function cancelEdit() { editingId.value = null }
 
 async function remove(id) {
-  if (!confirm('Wallet löschen?')) return
+  if (!confirm(t('wallet.delete_confirm'))) return
   await api.wallets.remove(id)
   await reload()
 }
