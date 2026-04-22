@@ -65,6 +65,7 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
         db.add(state)
         db.commit()
 
+    is_initial_sync = (state.last_tick or 0) == 0
     from_tick = (state.last_tick or 0) + 1
     to_tick = current_tick
 
@@ -77,7 +78,7 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
 
     try:
         owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
-        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, client)
+        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, client, broadcast=not is_initial_sync)
 
         effective_tick = max_valid_tick if max_valid_tick is not None else to_tick
         if effective_tick < to_tick:
@@ -108,15 +109,15 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
         raise
 
 
-async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set, client) -> int:
+async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set, client, broadcast: bool = True) -> int:
     probe = await client.get_event_logs(wallet_id, from_tick, to_tick, offset=0, size=1)
     total = probe.get("hits", {}).get("total", 0)
     valid_for_tick = probe.get("validForTick", to_tick)
 
     if total > MAX_WINDOW_RECORDS and from_tick < to_tick:
         mid = (from_tick + to_tick) // 2
-        v1 = await _sync_window(db, wallet_id, from_tick, mid, owned_addresses, client)
-        v2 = await _sync_window(db, wallet_id, mid + 1, to_tick, owned_addresses, client)
+        v1 = await _sync_window(db, wallet_id, from_tick, mid, owned_addresses, client, broadcast=broadcast)
+        v2 = await _sync_window(db, wallet_id, mid + 1, to_tick, owned_addresses, client, broadcast=broadcast)
         return max(v1, v2)
 
     if total > MAX_WINDOW_RECORDS:
@@ -128,7 +129,7 @@ async def _sync_window(db: Session, wallet_id: str, from_tick: int, to_tick: int
         logs = resp.get("eventLogs", [])
         if not logs:
             break
-        await _persist_logs(db, wallet_id, logs, owned_addresses)
+        await _persist_logs(db, wallet_id, logs, owned_addresses, broadcast=broadcast)
         offset += len(logs)
         valid_for_tick = resp.get("validForTick", valid_for_tick)
 
@@ -155,7 +156,7 @@ def _apply_balance_delta(db: Session, wallet_id: str, events: list):
         wallet.balance_updated_at = now_utc_iso()
 
 
-async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set):
+async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set, broadcast: bool = True):
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
     inserted = 0
     new_events = []
@@ -219,8 +220,9 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         _apply_balance_delta(db, wallet_id, new_events)
         db.commit()
         logger.info(f"Wallet {wallet_id}: persisted {inserted} new events")
-        for ev in new_events:
-            await manager.broadcast("event.new", ev)
+        if broadcast:
+            for ev in new_events:
+                await manager.broadcast("event.new", ev)
 
 
 async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=None):
