@@ -49,6 +49,10 @@ function explorerUrl(addr) {
   return `https://explorer.qubic.org/network/address/${addr}`
 }
 
+async function copyAddress(addr) {
+  if (addr) await navigator.clipboard.writeText(addr)
+}
+
 function maskLabel(label, id) {
   if (!store.hideAddresses) return label
   const n = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 101
@@ -118,7 +122,14 @@ onMounted(reload)
           <span :class="['pill text-[10px]', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
             {{ w.wallet_type }}
           </span>
-          <a :href="explorerUrl(w.id)" target="_blank" rel="noopener" class="text-gray-500 hover:text-qubic-teal">
+          <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
+                  class="text-gray-500 hover:text-qubic-teal transition-colors" :title="t('assets.copy')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+          </button>
+          <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
+             class="text-gray-500 hover:text-qubic-teal transition-colors" :title="t('assets.explorer')">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
@@ -187,8 +198,14 @@ onMounted(reload)
                 <span class="font-mono text-gray-400 text-[10px]" :title="store.hideAddresses ? '' : w.id">
                   {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 8) + '…' + w.id.slice(-8) }}
                 </span>
+                <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
+                        class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </button>
                 <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
-                   class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                   class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>

@@ -74,6 +74,10 @@ function txUrl(id) {
   return `https://explorer.qubic.org/network/tx/${id}`
 }
 
+async function copyToClipboard(text) {
+  if (text) await navigator.clipboard.writeText(text)
+}
+
 function shortTx(id) {
   if (!id) return '—'
   if (store.hideAddresses) return '••••••••••••'
@@ -123,8 +127,14 @@ function counterpart(ev) {
               <span class="text-[10px] text-gray-400 font-mono truncate">
                 {{ maskName(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
+              <button v-if="!store.hideAddresses" @click="copyToClipboard(counterpart(ev).addr)"
+                      class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
               <a :href="explorerUrl(counterpart(ev).addr)" target="_blank" rel="noopener"
-                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
@@ -133,8 +143,14 @@ function counterpart(ev) {
             <!-- TxId -->
             <div class="flex items-center gap-1 mt-1">
               <span class="text-xs text-gray-500 font-mono" :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
+              <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.id)"
+                      class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('event.copy_txid')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
               <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
-                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                 class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
@@ -187,8 +203,14 @@ function counterpart(ev) {
                   <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.source_address">
                     {{ maskName(ev.source_name, ev.source_address) }}
                   </span>
+                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.source_address)"
+                          class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
                   <a :href="explorerUrl(ev.source_address)" target="_blank" rel="noopener"
-                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
@@ -202,8 +224,14 @@ function counterpart(ev) {
                   <span class="font-mono text-gray-300" :title="store.hideAddresses ? '' : ev.destination_addr">
                     {{ maskName(ev.destination_name, ev.destination_addr) }}
                   </span>
+                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.destination_addr)"
+                          class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
                   <a :href="explorerUrl(ev.destination_addr)" target="_blank" rel="noopener"
-                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
@@ -215,8 +243,14 @@ function counterpart(ev) {
               <td class="px-3 py-2.5">
                 <div class="flex items-center gap-1">
                   <span class="font-mono text-gray-400" :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
+                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.id)"
+                          class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('event.copy_txid')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
                   <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
-                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0">
+                     class="text-gray-600 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
