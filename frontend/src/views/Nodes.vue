@@ -84,8 +84,8 @@ onMounted(reload)
   </div>
 
   <div class="card overflow-hidden">
-    <table class="w-full text-sm">
-      <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
+    <table class="w-full text-xs">
+      <thead class="border-b border-qubic-border text-gray-400 uppercase">
         <tr>
           <th class="text-left p-3">{{ t('node.priority') }}</th>
           <th class="text-left p-3">{{ t('node.url') }}</th>
@@ -100,13 +100,13 @@ onMounted(reload)
         <tr v-for="n in store.nodes" :key="n.id" class="border-b border-qubic-border/50">
           <td class="p-3">{{ n.priority }}</td>
           <td class="p-3 font-mono text-xs">{{ n.url }}</td>
-          <td class="p-3"><span class="pill">{{ n.node_type }}</span></td>
+          <td class="p-3"><span class="pill text-xs">{{ n.node_type }}</span></td>
           <td class="p-3 font-mono">{{ n.tick || '—' }}</td>
           <td class="p-3">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
           <td class="p-3"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
           <td class="p-3 text-right flex justify-end gap-3">
-            <button @click="startEdit(n)" class="text-qubic-teal hover:text-qubic-cyan text-sm">{{ t('wallet.edit') }}</button>
-            <button @click="remove(n.id)" class="text-red-400 hover:text-red-300 text-sm">{{ t('wallet.delete') }}</button>
+            <button @click="startEdit(n)" class="text-qubic-teal hover:text-qubic-cyan">{{ t('wallet.edit') }}</button>
+            <button @click="remove(n.id)" class="text-red-400 hover:text-red-300">{{ t('wallet.delete') }}</button>
           </td>
         </tr>
       </tbody>

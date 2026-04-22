@@ -169,8 +169,8 @@ function counterpart(ev) {
               <th class="text-left px-3 py-2.5">{{ t('event.epoch') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.direction') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.amount') }}</th>
-              <th class="text-left px-3 py-2.5 hidden lg:table-cell">{{ t('event.rate') }} {{ store.currency }}</th>
-              <th class="text-left px-3 py-2.5">{{ t('event.value_col') }} {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5 hidden lg:table-cell whitespace-nowrap">{{ t('event.rate') }} {{ store.currency }}</th>
+              <th class="text-left px-3 py-2.5 whitespace-nowrap">{{ t('event.value_col') }} {{ store.currency }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.source') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.destination') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.txid') }}</th>
@@ -195,8 +195,8 @@ function counterpart(ev) {
                 <span v-else class="text-gray-500">—</span>
               </td>
               <td class="px-3 py-2.5 font-mono">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
-              <td class="px-3 py-2.5 font-mono text-gray-400 hidden lg:table-cell">{{ fmtRate(ev) }}</td>
-              <td class="px-3 py-2.5 font-mono">{{ fmtValue(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono text-gray-400 hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
+              <td class="px-3 py-2.5 font-mono whitespace-nowrap">{{ fmtValue(ev) }}</td>
               <!-- Source -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.source_address" class="flex items-center gap-2 font-mono text-xs text-gray-400">
