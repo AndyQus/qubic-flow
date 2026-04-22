@@ -112,14 +112,14 @@ onMounted(reload)
         <router-link :to="`/wallets/${w.id}`" class="flex items-center gap-2 min-w-0 flex-1 group">
           <div class="min-w-0">
             <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</div>
-            <div class="text-[10px] font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
+            <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
           </div>
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500 group-hover:text-qubic-teal flex-shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         </router-link>
         <div class="flex items-center gap-2 flex-shrink-0">
-          <span :class="['pill text-[10px]', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+          <span :class="['pill text-xs', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
             {{ w.wallet_type }}
           </span>
           <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
@@ -163,7 +163,7 @@ onMounted(reload)
             <td class="p-2">
               <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
             </td>
-            <td class="p-2 font-mono text-gray-500 text-[10px]">
+            <td class="p-2 font-mono text-gray-500 text-xs">
               {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0,8) + '…' + w.id.slice(-8) }}
             </td>
             <td class="p-2">
@@ -195,7 +195,7 @@ onMounted(reload)
             </td>
             <td class="p-3">
               <div class="flex items-center gap-1.5">
-                <span class="font-mono text-gray-400 text-[10px]" :title="store.hideAddresses ? '' : w.id">
+                <span class="font-mono text-gray-400 text-xs" :title="store.hideAddresses ? '' : w.id">
                   {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 8) + '…' + w.id.slice(-8) }}
                 </span>
                 <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
@@ -215,7 +215,7 @@ onMounted(reload)
               </div>
             </td>
             <td class="p-3">
-              <span :class="['pill text-[10px]', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+              <span :class="['pill text-xs', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
                 {{ w.wallet_type }}
               </span>
             </td>

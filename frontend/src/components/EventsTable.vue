@@ -121,10 +121,10 @@ function counterpart(ev) {
               <span class="font-mono text-xs font-medium">{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
               <span class="text-xs text-gray-400">{{ fmtValue(ev) }}</span>
             </div>
-            <div class="text-[10px] text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
+            <div class="text-xs text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
-              <span class="text-[10px] text-gray-400 font-mono truncate">
+              <span class="text-xs text-gray-400 font-mono truncate">
                 {{ maskName(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
               <button v-if="!store.hideAddresses" @click="copyToClipboard(counterpart(ev).addr)"
