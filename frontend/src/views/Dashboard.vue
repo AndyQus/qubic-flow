@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import StatsPanel from '../components/StatsPanel.vue'
@@ -32,7 +32,8 @@ async function loadEvents() {
 
 watch(selectedWallets, () => { loadStats(); loadEvents() }, { deep: true })
 onMounted(() => { loadStats(); loadEvents() })
-setInterval(loadStats, 60_000)
+const intervalId = setInterval(loadStats, 60_000)
+onUnmounted(() => clearInterval(intervalId))
 </script>
 
 <template>

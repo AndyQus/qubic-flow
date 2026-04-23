@@ -63,9 +63,8 @@ const previewAnimClass = computed(() => {
 
 function simulate() {
   const dir = Math.random() > 0.5 ? 'IN' : 'OUT'
-  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-  const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString(locale)
-  const now = new Date().toLocaleTimeString(locale)
+  const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString(store.locale)
+  const now = new Date().toLocaleTimeString(store.locale)
   const newRow = { id: `p${Date.now()}`, time: now, direction: dir, amount, isNew: true }
   previewRows.value.unshift(newRow)
   if (previewRows.value.length > 3) previewRows.value.pop()

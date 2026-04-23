@@ -13,7 +13,7 @@ export const de = {
   settings: { animation: 'Animation', display: 'Darstellung', theme: 'Theme', dark: 'Dunkel', light: 'Hell', language: 'Sprache', push_down: 'Push Down', slide_in: 'Slide In', beam_drop: 'Beam Drop', preview: 'Vorschau', currency: 'Währung', font_size: 'Schriftgröße', font_xs: 'Sehr klein', font_sm: 'Klein', font_md: 'Normal', font_lg: 'Groß', export: 'Export' },
   header: { show_addresses: 'Adressen anzeigen', hide_addresses: 'Adressen verbergen' },
   export: { cointracking: 'CoinTracking CSV', steuerberater: 'Steuerberater CSV', year: 'Jahr', download: 'Herunterladen' },
-  common: { save: 'Speichern', cancel: 'Abbrechen', confirm: 'Bestätigen', loading: 'Lädt...', time: 'Zeit' },
+  common: { save: 'Speichern', cancel: 'Abbrechen', confirm: 'Bestätigen', loading: 'Lädt...', time: 'Zeit', error_prefix: 'Fehler: ' },
   tax: {
     title: 'Steuerreport',
     year: 'Steuerjahr',
@@ -63,6 +63,8 @@ export const de = {
     opening_price_usd: 'Preis USD',
     opening_note: 'Notiz',
     opening_delete_confirm: 'Eröffnungsposition löschen?',
+    opening_required_fields: 'Datum und Menge sind Pflichtfelder.',
+    opening_delete_error: 'Eröffnungsposition konnte nicht gelöscht werden.',
     settings_title: 'Steuer-Einstellungen',
     country: 'Land',
     method: 'Kostenbasis-Methode',

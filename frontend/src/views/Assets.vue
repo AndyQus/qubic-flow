@@ -117,15 +117,15 @@ function categoryLabel(cat) {
     <!-- Table -->
     <PageLoader v-if="loading" />
     <div v-else class="card overflow-hidden p-0">
-      <table class="w-full text-xs">
-        <thead class="border-b border-qubic-border text-gray-400 text-xs uppercase">
+      <table class="table-std">
+        <thead class="thead-std">
           <tr>
-            <th class="text-left p-3">{{ t('assets.name') }}</th>
-            <th class="text-left p-3">{{ t('assets.ticker') }}</th>
-            <th class="text-left p-3">{{ t('assets.address') }}</th>
-            <th class="text-left p-3">{{ t('assets.category') }}</th>
-            <th class="text-center p-3">{{ t('assets.decimals') }}</th>
-            <th class="text-left p-3">{{ t('assets.website') }}</th>
+            <th class="th">{{ t('assets.name') }}</th>
+            <th class="th">{{ t('assets.ticker') }}</th>
+            <th class="th">{{ t('assets.address') }}</th>
+            <th class="th">{{ t('assets.category') }}</th>
+            <th class="th-center">{{ t('assets.decimals') }}</th>
+            <th class="th">{{ t('assets.website') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -135,25 +135,25 @@ function categoryLabel(cat) {
           <tr
             v-for="l in filtered"
             :key="l.address"
-            class="border-b border-qubic-border/50 hover:bg-qubic-teal/5 transition-colors"
+            class="tr-row"
           >
             <!-- Name / Label -->
-            <td class="p-3">
+            <td class="td">
               {{ displayName(l) }}
             </td>
 
             <!-- Ticker -->
-            <td class="p-3">
-              <span v-if="l.name" class="pill text-xs">{{ l.name }}</span>
+            <td class="td">
+              <span v-if="l.name" class="pill">{{ l.name }}</span>
               <span v-else class="text-gray-500">—</span>
             </td>
 
             <!-- Address with copy + explorer link -->
-            <td class="p-3">
-              <div class="flex items-center gap-2 font-mono text-xs text-gray-400">
+            <td class="td">
+              <div class="flex items-center gap-2 font-mono text-gray-400">
                 <span :title="l.address">{{ truncate(l.address) }}</span>
                 <button
-                  class="hover:text-qubic-teal transition-colors"
+                  class="icon-btn"
                   :title="t('assets.copy')"
                   @click="copyAddress(l.address)"
                 >
@@ -166,7 +166,7 @@ function categoryLabel(cat) {
                   :href="explorerUrl(l.address)"
                   target="_blank"
                   rel="noopener"
-                  class="hover:text-qubic-teal transition-colors"
+                  class="icon-btn"
                   :title="t('assets.explorer')"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -179,11 +179,11 @@ function categoryLabel(cat) {
             </td>
 
             <!-- Category -->
-            <td class="p-3">
+            <td class="td">
               <span
                 v-if="l.category"
                 :class="[
-                  'pill text-xs',
+                  'pill',
                   l.category === 'smart_contract' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' :
                   l.category === 'exchange'        ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
                   l.category === 'liquid_staking'  ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
@@ -196,18 +196,18 @@ function categoryLabel(cat) {
             </td>
 
             <!-- Decimal places -->
-            <td class="p-3 text-center text-gray-400">
+            <td class="td text-center text-gray-400">
               {{ l.decimal_places ?? '—' }}
             </td>
 
             <!-- Website -->
-            <td class="p-3">
+            <td class="td">
               <a
                 v-if="l.website"
                 :href="l.website.startsWith('http') ? l.website : 'https://' + l.website"
                 target="_blank"
                 rel="noopener"
-                class="text-qubic-teal hover:text-qubic-cyan text-xs truncate max-w-[160px] inline-block"
+                class="btn-action truncate max-w-[160px] inline-block"
               >
                 {{ l.website }}
               </a>

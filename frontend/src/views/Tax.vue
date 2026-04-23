@@ -25,25 +25,22 @@ watch(year, () => { report.value = null })
 
 function fmtNum(val, dec = 2) {
   if (val === undefined || val === null) return '—'
-  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-  return Number(val).toLocaleString(locale, { minimumFractionDigits: dec, maximumFractionDigits: dec })
+  return Number(val).toLocaleString(store.locale, { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
 
 function fmtQu(val) {
   if (val === undefined || val === null) return '—'
-  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-  return Number(val).toLocaleString(locale, { maximumFractionDigits: 0 })
+  return Number(val).toLocaleString(store.locale, { maximumFractionDigits: 0 })
 }
 
 function fmtDate(iso) {
   if (!iso) return '—'
   try {
-    const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-    return new Date(iso).toLocaleDateString(locale)
+    return new Date(iso).toLocaleDateString(store.locale)
   } catch { return iso }
 }
 
-const ccy = () => report.value?.meta?.currency || report.value?.disposals?.[0]?.currency || 'EUR'
+const ccy = computed(() => report.value?.meta?.currency || report.value?.disposals?.[0]?.currency || 'EUR')
 
 async function generateReport() {
   loadingReport.value = true
@@ -65,7 +62,7 @@ async function generateReport() {
 function exportCSV() {
   if (!report.value) return
   const r = report.value
-  const currency = ccy()
+  const currency = ccy.value
   const sep = ','
   const lines = []
 
@@ -144,7 +141,7 @@ function exportPDF() {
   if (!report.value) return
   const r = report.value
   const s = r.summary
-  const currency = ccy()
+  const currency = ccy.value
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Header
@@ -339,25 +336,25 @@ function exportPDF() {
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.taxable_gains') }}</div>
             <div :class="['text-base font-mono font-semibold', (report.summary.taxable_gains_eur || 0) >= 0 ? 'text-green-400' : 'text-red-400']">
-              {{ fmtNum(report.summary.taxable_gains_eur) }} {{ ccy() }}
+              {{ fmtNum(report.summary.taxable_gains_eur) }} {{ ccy }}
             </div>
           </div>
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.tax_free_gains') }}</div>
             <div class="text-base font-mono font-semibold text-qubic-teal">
-              {{ fmtNum(report.summary.tax_free_gains_eur) }} {{ ccy() }}
+              {{ fmtNum(report.summary.tax_free_gains_eur) }} {{ ccy }}
             </div>
           </div>
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.income') }}</div>
             <div class="text-base font-mono font-semibold text-qubic-teal">
-              {{ fmtNum(report.summary.income_eur) }} {{ ccy() }}
+              {{ fmtNum(report.summary.income_eur) }} {{ ccy }}
             </div>
           </div>
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.total_volume') }}</div>
             <div class="text-base font-mono font-semibold text-gray-300">
-              {{ fmtNum(report.summary.total_volume_eur) }} {{ ccy() }}
+              {{ fmtNum(report.summary.total_volume_eur) }} {{ ccy }}
             </div>
           </div>
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
@@ -370,7 +367,7 @@ function exportPDF() {
                :class="['rounded-lg border px-4 py-3', report.summary.threshold_exceeded ? 'border-red-500/50 bg-red-500/10' : 'border-green-500/40 bg-green-500/10']">
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.threshold') }}</div>
             <div :class="['text-sm font-semibold', report.summary.threshold_exceeded ? 'text-red-400' : 'text-green-400']">
-              {{ fmtNum(report.summary.threshold) }} {{ ccy() }}
+              {{ fmtNum(report.summary.threshold) }} {{ ccy }}
             </div>
             <div :class="['text-xs mt-0.5', report.summary.threshold_exceeded ? 'text-red-400' : 'text-green-400']">
               {{ report.summary.threshold_exceeded ? t('tax.threshold_exceeded') : t('tax.threshold_not_exceeded') }}
@@ -388,7 +385,7 @@ function exportPDF() {
       <div v-if="report.disposals?.length" class="card">
         <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('tax.disposals') }}</h3>
         <div class="overflow-x-auto">
-          <table class="w-full text-xs">
+          <table class="table-std">
             <thead>
               <tr class="border-b border-qubic-border text-gray-500 uppercase">
                 <th class="text-left py-2 pr-3">{{ t('tax.disposal_date') }}</th>
@@ -428,7 +425,7 @@ function exportPDF() {
       <div v-if="report.income?.length" class="card">
         <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('tax.income_table') }}</h3>
         <div class="overflow-x-auto">
-          <table class="w-full text-xs">
+          <table class="table-std">
             <thead>
               <tr class="border-b border-qubic-border text-gray-500 uppercase">
                 <th class="text-left py-2 pr-3">{{ t('tax.income_date') }}</th>
@@ -442,7 +439,7 @@ function exportPDF() {
                   class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
                 <td class="py-2 pr-3 text-gray-300 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
                 <td class="py-2 pr-3 text-right font-mono whitespace-nowrap">{{ fmtQu(item.amount_qubic) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap text-qubic-teal">{{ fmtNum(item.value) }} {{ ccy() }}</td>
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap text-qubic-teal">{{ fmtNum(item.value) }} {{ ccy }}</td>
                 <td class="py-2 text-gray-400">{{ item.source_type === 'EVENT' ? t('tax.income_reward') : item.source_type }}</td>
               </tr>
             </tbody>
@@ -453,7 +450,7 @@ function exportPDF() {
       <!-- Year-end Holdings -->
       <div v-if="report.year_end_holdings?.length" class="card">
         <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('tax.holdings') }}</h3>
-        <table class="w-full text-xs">
+        <table class="table-std">
           <thead>
             <tr class="border-b border-qubic-border text-gray-500 uppercase">
               <th class="text-left py-2 pr-3">{{ t('tax.holdings_wallet') }}</th>
@@ -468,7 +465,7 @@ function exportPDF() {
                 {{ store.hideAddresses ? '••••••••••••' : (store.wallets.find(w => w.id === h.wallet_id)?.label || h.wallet_id.slice(0, 16) + '…') }}
               </td>
               <td class="py-2 pr-3 text-right font-mono">{{ fmtQu(h.amount_qubic) }}</td>
-              <td class="py-2 text-right font-mono">{{ fmtNum(h.cost_basis_eur) }} {{ ccy() }}</td>
+              <td class="py-2 text-right font-mono">{{ fmtNum(h.cost_basis_eur) }} {{ ccy }}</td>
             </tr>
           </tbody>
         </table>

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
+import { useQubicUtils } from '../composables/useQubicUtils'
 
 const props = defineProps({
   events:  { type: Array, required: true },
@@ -10,6 +11,9 @@ const props = defineProps({
 })
 const store = useAppStore()
 const { t } = useTranslation()
+const { explorerUrl, txUrl, copyAddress, shortAddr } = useQubicUtils()
+
+const ownedIds = computed(() => new Set(store.wallets.map(w => w.id)))
 
 const animClass = computed(() => {
   if (store.animation === 'push-down') return 'anim-push-down'
@@ -18,20 +22,17 @@ const animClass = computed(() => {
 })
 
 function fmtDate(iso) {
-  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-  try { return new Date(iso).toLocaleString(locale) } catch { return iso }
+  try { return new Date(iso).toLocaleString(store.locale) } catch { return iso }
 }
 
 function fmtDateShort(iso) {
-  const locale = store.lang === 'de' ? 'de-DE' : 'en-US'
-  try { return new Date(iso).toLocaleDateString(locale) } catch { return iso }
+  try { return new Date(iso).toLocaleDateString(store.locale) } catch { return iso }
 }
 
 function direction(ev) {
-  const owned = new Set(store.wallets.map(w => w.id))
   if (ev.is_internal) return 'INTERNAL'
-  if (owned.has(ev.destination_addr)) return 'IN'
-  if (owned.has(ev.source_address)) return 'OUT'
+  if (ownedIds.value.has(ev.destination_addr)) return 'IN'
+  if (ownedIds.value.has(ev.source_address)) return 'OUT'
   return '—'
 }
 
@@ -40,12 +41,6 @@ function flashClass(ev) {
   if (d === 'IN') return 'flash-in'
   if (d === 'OUT') return 'flash-out'
   return ''
-}
-
-function shortAddr(a) {
-  if (!a) return '—'
-  if (store.hideAddresses) return '••••••••••••'
-  return a.length > 10 ? `${a.slice(0, 5)}…${a.slice(-5)}` : a
 }
 
 function maskName(name, addr) {
@@ -77,17 +72,6 @@ function fmtRate(ev) {
   return rate.toFixed(8).replace(/\.?0+$/, '') + (isUsd ? ' $' : ' €')
 }
 
-function explorerUrl(addr) {
-  return `https://explorer.qubic.org/network/address/${addr}`
-}
-
-function txUrl(id) {
-  return `https://explorer.qubic.org/network/tx/${id}`
-}
-
-async function copyToClipboard(text) {
-  if (text) await navigator.clipboard.writeText(text)
-}
 
 function shortTx(id) {
   if (!id) return '—'
@@ -96,7 +80,7 @@ function shortTx(id) {
 }
 
 function walletLabel(addr) {
-  const w = store.wallets.find(w => w.id === addr)
+  const w = store.wallets.find(wallet => wallet.id === addr)
   return w ? w.label : null
 }
 
@@ -167,14 +151,14 @@ function counterpart(ev) {
               <span :class="['text-xs font-mono truncate', isOwnWallet(counterpart(ev).addr) ? 'text-violet-300' : 'text-gray-400']">
                 {{ walletDisplay(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
-              <button v-if="!store.hideAddresses" @click="copyToClipboard(counterpart(ev).addr)"
-                      class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+              <button v-if="!store.hideAddresses" @click="copyAddress(counterpart(ev).addr)"
+                      class="icon-btn" :title="t('assets.copy')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
               </button>
               <a :href="explorerUrl(counterpart(ev).addr)" target="_blank" rel="noopener"
-                 class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                 class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
@@ -183,14 +167,14 @@ function counterpart(ev) {
             <!-- TxId -->
             <div class="flex items-center gap-1 mt-1">
               <span class="text-xs text-gray-500 font-mono" :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
-              <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.id)"
-                      class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('event.copy_txid')">
+              <button v-if="!store.hideAddresses" @click="copyAddress(ev.id)"
+                      class="icon-btn" :title="t('event.copy_txid')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
               </button>
               <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
-                 class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                 class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
@@ -202,8 +186,8 @@ function counterpart(ev) {
 
       <!-- Desktop: table -->
       <div class="hidden sm:block overflow-x-auto">
-        <table class="w-full text-xs">
-          <thead class="border-b border-qubic-border text-gray-400 uppercase">
+        <table class="table-std">
+          <thead class="thead-std">
             <tr>
               <th class="text-left px-3 py-2.5">{{ t('event.date') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.epoch') }}</th>
@@ -224,7 +208,7 @@ function counterpart(ev) {
                 :class="[
                   store.newEventIds.includes(ev.id) ? animClass : '',
                   store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
-                  'border-b border-qubic-border/50 hover:bg-qubic-bg/50'
+                  'tr-row'
                 ]">
               <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
               <td class="px-3 py-2.5 text-gray-400 font-mono">{{ ev.epoch ?? '—' }}</td>
@@ -245,14 +229,14 @@ function counterpart(ev) {
                   <span :class="isOwnWallet(ev.source_address) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.source_address">
                     {{ walletDisplay(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
                   </span>
-                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.source_address)"
-                          class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.source_address)"
+                          class="icon-btn" :title="t('assets.copy')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                   </button>
                   <a :href="explorerUrl(ev.source_address)" target="_blank" rel="noopener"
-                     class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                     class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
@@ -266,14 +250,14 @@ function counterpart(ev) {
                   <span :class="isOwnWallet(ev.destination_addr) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.destination_addr">
                     {{ walletDisplay(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
                   </span>
-                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.destination_addr)"
-                          class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.destination_addr)"
+                          class="icon-btn" :title="t('assets.copy')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                   </button>
                   <a :href="explorerUrl(ev.destination_addr)" target="_blank" rel="noopener"
-                     class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                     class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
@@ -285,14 +269,14 @@ function counterpart(ev) {
               <td class="px-3 py-2.5">
                 <div class="flex items-center gap-2 font-mono text-xs text-gray-400">
                   <span :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
-                  <button v-if="!store.hideAddresses" @click="copyToClipboard(ev.id)"
-                          class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('event.copy_txid')">
+                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.id)"
+                          class="icon-btn" :title="t('event.copy_txid')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                   </button>
                   <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
-                     class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                     class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>

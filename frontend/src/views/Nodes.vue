@@ -57,9 +57,16 @@ async function submit() {
 
 async function toggle(id) {
   const node = store.nodes.find(n => n.id === id)
-  if (node) node.is_active = node.is_active ? 0 : 1
-  await api.nodes.toggle(id)
-  await reload()
+  if (!node) return
+  const prev = node.is_active
+  node.is_active = prev ? 0 : 1
+  try {
+    await api.nodes.toggle(id)
+    await reload()
+  } catch (e) {
+    node.is_active = prev
+    error.value = e.message
+  }
 }
 
 async function remove(id) {
@@ -107,30 +114,30 @@ onMounted(reload)
   </div>
 
   <div class="card overflow-hidden">
-    <table class="w-full text-xs">
-      <thead class="border-b border-qubic-border text-gray-400 uppercase">
+    <table class="table-std">
+      <thead class="thead-std">
         <tr>
-          <th class="text-left p-3">{{ t('node.priority') }}</th>
-          <th class="text-left p-3">{{ t('node.url') }}</th>
-          <th class="text-left p-3">{{ t('node.type') }}</th>
-          <th class="text-left p-3">{{ t('node.label') }}</th>
-          <th class="text-left p-3">{{ t('node.tick') }}</th>
-          <th class="text-left p-3">{{ t('node.response') }}</th>
-          <th class="text-left p-3">{{ t('node.health') }}</th>
-          <th class="text-center p-3">{{ t('node.active') }}</th>
-          <th class="text-right p-3">{{ t('wallet.actions') }}</th>
+          <th class="th">{{ t('node.priority') }}</th>
+          <th class="th">{{ t('node.url') }}</th>
+          <th class="th">{{ t('node.type') }}</th>
+          <th class="th">{{ t('node.label') }}</th>
+          <th class="th">{{ t('node.tick') }}</th>
+          <th class="th">{{ t('node.response') }}</th>
+          <th class="th">{{ t('node.health') }}</th>
+          <th class="th-center">{{ t('node.active') }}</th>
+          <th class="th-right">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="n in store.nodes" :key="n.id" :class="['border-b border-qubic-border/50 transition-opacity', !n.is_active && 'opacity-40']">
-          <td class="p-3">{{ n.priority }}</td>
-          <td class="p-3 font-mono text-xs">{{ n.url }}</td>
-          <td class="p-3"><span class="pill text-xs">{{ n.node_type }}</span></td>
-          <td class="p-3 text-gray-300">{{ n.label || '—' }}</td>
-          <td class="p-3 font-mono">{{ n.tick || '—' }}</td>
-          <td class="p-3">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
-          <td class="p-3"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
-          <td class="p-3 text-center">
+          <td class="td">{{ n.priority }}</td>
+          <td class="td font-mono">{{ n.url }}</td>
+          <td class="td"><span class="pill">{{ n.node_type }}</span></td>
+          <td class="td text-gray-300">{{ n.label || '—' }}</td>
+          <td class="td font-mono">{{ n.tick || '—' }}</td>
+          <td class="td">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
+          <td class="td"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
+          <td class="td text-center">
             <button @click="toggle(n.id)"
                     :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
                              n.is_active ? 'bg-qubic-teal' : 'bg-gray-600']">
@@ -138,9 +145,9 @@ onMounted(reload)
                              n.is_active ? 'translate-x-4' : 'translate-x-1']" />
             </button>
           </td>
-          <td class="p-3 text-right flex justify-end gap-3">
-            <button @click="startEdit(n)" class="text-qubic-teal hover:text-qubic-cyan">{{ t('wallet.edit') }}</button>
-            <button @click="remove(n.id)" class="text-red-400 hover:text-red-300">{{ t('wallet.delete') }}</button>
+          <td class="td text-right flex justify-end gap-3">
+            <button @click="startEdit(n)" class="btn-action">{{ t('wallet.edit') }}</button>
+            <button @click="remove(n.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
           </td>
         </tr>
       </tbody>

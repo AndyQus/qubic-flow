@@ -4,13 +4,16 @@ import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import PageLoader from '../components/PageLoader.vue'
+import { useQubicUtils } from '../composables/useQubicUtils'
 
 const store = useAppStore()
 const { t } = useTranslation()
+const { explorerUrl, copyAddress, maskLabel } = useQubicUtils()
 const showForm      = ref(false)
 const loading       = ref(true)
 const editingId     = ref(null)
 const error         = ref('')
+const editError     = ref('')
 const selectedOwner = ref(null)
 const form          = ref({ id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
 const editForm      = ref({ label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
@@ -49,37 +52,33 @@ function startEdit(w) {
 }
 
 async function saveEdit(id) {
-  await api.wallets.update(id, editForm.value)
-  editingId.value = null
-  await reload()
+  editError.value = ''
+  try {
+    await api.wallets.update(id, editForm.value)
+    editingId.value = null
+    await reload()
+  } catch (e) {
+    editError.value = e.message
+  }
 }
 
 function cancelEdit() { editingId.value = null }
 
 async function remove(id) {
   if (!confirm(t('wallet.delete_confirm'))) return
-  await api.wallets.remove(id)
-  await reload()
+  try {
+    await api.wallets.remove(id)
+    await reload()
+  } catch (e) {
+    error.value = e.message
+  }
 }
 
-function explorerUrl(addr) {
-  return `https://explorer.qubic.org/network/address/${addr}`
-}
-
-async function copyAddress(addr) {
-  if (addr) await navigator.clipboard.writeText(addr)
-}
-
-function maskLabel(label, id) {
-  if (!store.hideAddresses) return label
-  const n = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 101
-  return `Wallet ${n}`
-}
 
 function fmtBalance(w) {
   if (w.balance == null) return t('wallet.balance_pending')
   if (store.hideAddresses) return '••••••'
-  return w.balance.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')
+  return w.balance.toLocaleString(store.locale)
 }
 
 function balanceSyncClass(w) {
@@ -90,7 +89,7 @@ function balanceSyncClass(w) {
 function balanceSyncTitle(w) {
   if (w.balance == null) return ''
   if (w.balance_live == null) return t('wallet.balance_no_live')
-  return w.balance === w.balance_live ? t('wallet.balance_synced') : `${t('wallet.balance_drift')}: ${w.balance_live.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')}`
+  return w.balance === w.balance_live ? t('wallet.balance_synced') : `${t('wallet.balance_drift')}: ${w.balance_live.toLocaleString(store.locale)}`
 }
 
 onMounted(reload)
@@ -135,7 +134,7 @@ onMounted(reload)
     <input v-model="form.owner" :placeholder="t('wallet.owner')"   class="input w-full text-xs"
            list="owner-list-add" autocomplete="off" />
     <datalist id="owner-list-add">
-      <option v-for="o in [...new Set(store.wallets.map(w => w.owner).filter(Boolean))]" :key="o" :value="o" />
+      <option v-for="o in uniqueOwners" :key="o" :value="o" />
     </datalist>
     <input v-model="form.note"  :placeholder="t('wallet.note')"    class="input w-full text-xs" />
     <select v-model="form.wallet_type" class="input w-full text-xs">
@@ -158,13 +157,14 @@ onMounted(reload)
         <input v-model="editForm.owner" :placeholder="t('wallet.owner')" class="input w-full text-xs"
                list="owner-list-edit" autocomplete="off" />
         <datalist id="owner-list-edit">
-          <option v-for="o in [...new Set(store.wallets.map(ww => ww.owner).filter(Boolean))]" :key="o" :value="o" />
+          <option v-for="o in uniqueOwners" :key="o" :value="o" />
         </datalist>
         <input v-model="editForm.note"  :placeholder="t('wallet.note')"  class="input w-full text-xs" />
         <select v-model="editForm.wallet_type" class="input w-full text-xs">
           <option value="PRIVATE">PRIVATE</option>
           <option value="BUSINESS">BUSINESS</option>
         </select>
+        <p v-if="editError" class="text-red-400 text-xs">{{ editError }}</p>
         <div class="flex gap-2">
           <button class="btn text-sm" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
           <button class="btn-ghost text-sm" @click="cancelEdit">{{ t('common.cancel') }}</button>
@@ -189,19 +189,19 @@ onMounted(reload)
             {{ w.wallet_type }}
           </span>
           <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
-                  class="text-gray-400 hover:text-qubic-teal transition-colors" :title="t('assets.copy')">
+                  class="icon-btn" :title="t('assets.copy')">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
           </button>
           <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
-             class="text-gray-400 hover:text-qubic-teal transition-colors" :title="t('assets.explorer')">
+             class="icon-btn" :title="t('assets.explorer')">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
           </a>
-          <button @click="startEdit(w)" class="text-qubic-teal hover:text-qubic-cyan text-xs">{{ t('wallet.edit') }}</button>
-          <button @click="remove(w.id)" class="text-red-400 hover:text-red-300 text-xs">{{ t('wallet.delete') }}</button>
+          <button @click="startEdit(w)" class="btn-action text-xs">{{ t('wallet.edit') }}</button>
+          <button @click="remove(w.id)" class="btn-delete text-xs">{{ t('wallet.delete') }}</button>
         </div>
       </div>
     </div>
@@ -209,26 +209,26 @@ onMounted(reload)
 
   <!-- Desktop: table -->
   <div class="card overflow-hidden hidden sm:block">
-    <table class="w-full text-xs">
-      <thead class="border-b border-qubic-border text-gray-400 uppercase">
+    <table class="table-std">
+      <thead class="thead-std">
         <tr>
-          <th class="text-left p-3">{{ t('wallet.label') }}</th>
-          <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.owner') }}</th>
-          <th class="text-left p-3">{{ t('wallet.address') }}</th>
-          <th class="text-left p-3">{{ t('wallet.type') }}</th>
-          <th class="text-left p-3 hidden md:table-cell">{{ t('wallet.note') }}</th>
-          <th class="text-right p-3 hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
-          <th class="text-right p-3 hidden lg:table-cell whitespace-nowrap">{{ t('wallet.entries') }}</th>
-          <th class="text-right p-3">{{ t('wallet.actions') }}</th>
+          <th class="th">{{ t('wallet.label') }}</th>
+          <th class="th hidden md:table-cell">{{ t('wallet.owner') }}</th>
+          <th class="th">{{ t('wallet.address') }}</th>
+          <th class="th">{{ t('wallet.type') }}</th>
+          <th class="th hidden md:table-cell">{{ t('wallet.note') }}</th>
+          <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
+          <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.entries') }}</th>
+          <th class="th-right">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!displayedWallets.length">
-          <td colspan="5" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
+          <td colspan="8" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
         </tr>
         <template v-for="w in displayedWallets" :key="w.id">
           <!-- Edit-Row -->
-          <tr v-if="editingId === w.id" class="border-b border-qubic-border/50 bg-qubic-teal/5">
+          <tr v-if="editingId === w.id" class="tr-edit">
             <td class="p-2">
               <input v-model="editForm.label" :placeholder="t('wallet.label')" class="input w-full text-xs" />
             </td>
@@ -236,10 +236,10 @@ onMounted(reload)
               <input v-model="editForm.owner" :placeholder="t('wallet.owner')" class="input w-full text-xs"
                      list="owner-list-desktop-edit" autocomplete="off" />
               <datalist id="owner-list-desktop-edit">
-                <option v-for="o in [...new Set(store.wallets.map(ww => ww.owner).filter(Boolean))]" :key="o" :value="o" />
+                <option v-for="o in uniqueOwners" :key="o" :value="o" />
               </datalist>
             </td>
-            <td class="p-2 font-mono text-gray-500 text-xs">
+            <td class="p-2 font-mono text-gray-500">
               {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 5) + '…' + w.id.slice(-5) }}
             </td>
             <td class="p-2">
@@ -254,6 +254,7 @@ onMounted(reload)
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 text-right">
+              <p v-if="editError" class="text-red-400 text-xs text-right mb-1">{{ editError }}</p>
               <div class="flex justify-end gap-2">
                 <button class="btn text-sm py-1" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
                 <button class="btn-ghost text-sm py-1" @click="cancelEdit">{{ t('common.cancel') }}</button>
@@ -261,8 +262,8 @@ onMounted(reload)
             </td>
           </tr>
           <!-- Normal-Row -->
-          <tr v-else class="border-b border-qubic-border/50 hover:bg-qubic-bg/50">
-            <td class="p-3">
+          <tr v-else class="tr-row">
+            <td class="td">
               <router-link :to="`/wallets/${w.id}`"
                            class="flex items-center gap-1.5 group font-medium hover:text-qubic-teal transition-colors">
                 {{ maskLabel(w.label, w.id) }}
@@ -271,20 +272,20 @@ onMounted(reload)
                 </svg>
               </router-link>
             </td>
-            <td class="p-3 text-gray-400 hidden md:table-cell">{{ store.hideAddresses ? '••••••' : (w.owner || '—') }}</td>
-            <td class="p-3">
-              <div class="flex items-center gap-2 font-mono text-xs text-gray-400">
+            <td class="td text-gray-400 hidden md:table-cell">{{ store.hideAddresses ? '••••••' : (w.owner || '—') }}</td>
+            <td class="td">
+              <div class="flex items-center gap-2 font-mono text-gray-400">
                 <span :title="store.hideAddresses ? '' : w.id">
                   {{ store.hideAddresses ? '••••••••••••' : w.id.slice(0, 5) + '…' + w.id.slice(-5) }}
                 </span>
                 <button v-if="!store.hideAddresses" @click="copyAddress(w.id)"
-                        class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                        class="icon-btn" :title="t('assets.copy')">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                   </svg>
                 </button>
                 <a :href="explorerUrl(w.id)" target="_blank" rel="noopener"
-                   class="hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.explorer')">
+                   class="icon-btn" :title="t('assets.explorer')">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>
@@ -293,13 +294,13 @@ onMounted(reload)
                 </a>
               </div>
             </td>
-            <td class="p-3">
-              <span :class="['pill text-xs', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+            <td class="td">
+              <span :class="['pill', w.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
                 {{ w.wallet_type }}
               </span>
             </td>
-            <td class="p-3 text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
-            <td class="p-3 hidden lg:table-cell text-right">
+            <td class="td text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
+            <td class="td hidden lg:table-cell text-right">
               <div class="flex items-center justify-end gap-1.5">
                 <span class="font-mono whitespace-nowrap" :class="w.balance == null ? 'text-gray-500 italic' : 'text-gray-300'">
                   {{ fmtBalance(w) }}
@@ -307,13 +308,13 @@ onMounted(reload)
                 <span v-if="w.balance != null" :class="['text-xs', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
               </div>
             </td>
-            <td class="p-3 hidden lg:table-cell text-right font-mono text-gray-400">
-              {{ w.total_events != null ? w.total_events.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') : '—' }}
+            <td class="td hidden lg:table-cell text-right font-mono text-gray-400">
+              {{ w.total_events != null ? w.total_events.toLocaleString(store.locale) : '—' }}
             </td>
-            <td class="p-3 text-right">
+            <td class="td text-right">
               <div class="flex justify-end gap-3">
-                <button @click="startEdit(w)" class="text-qubic-teal hover:text-qubic-cyan">{{ t('wallet.edit') }}</button>
-                <button @click="remove(w.id)" class="text-red-400 hover:text-red-300">{{ t('wallet.delete') }}</button>
+                <button @click="startEdit(w)" class="btn-action">{{ t('wallet.edit') }}</button>
+                <button @click="remove(w.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
               </div>
             </td>
           </tr>

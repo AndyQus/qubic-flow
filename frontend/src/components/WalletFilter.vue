@@ -100,7 +100,7 @@ function ownerBtnClass(owner) {
       </div>
       <div class="flex items-center gap-3">
         <button v-if="modelValue.length || selectedOwners.length"
-                class="btn-ghost text-[10px] py-0.5 px-3 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
+                class="btn-ghost text-xs py-0.5 px-3 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
                 @click.stop="clearAll">
           {{ t('filter.clear_all') }}
         </button>

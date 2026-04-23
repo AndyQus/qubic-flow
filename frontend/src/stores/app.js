@@ -18,6 +18,8 @@ export const useAppStore = defineStore('app', () => {
   const wsConnected = ref(false)
   const newEventIds = ref([])
 
+  const locale = computed(() => lang.value === 'de' ? 'de-DE' : 'en-US')
+
   const filteredWallets = computed(() => {
     if (walletFilter.value === 'all') return wallets.value
     return wallets.value.filter(w => w.wallet_type === walletFilter.value.toUpperCase())
@@ -82,7 +84,7 @@ export const useAppStore = defineStore('app', () => {
     animation, moneyAnim, moneySound, soundStyle,
     theme, lang, fontSize, hideAddresses, currency, walletFilter,
     wallets, events, nodes, wsConnected, newEventIds,
-    filteredWallets, activeNode,
+    locale, filteredWallets, activeNode,
     setAnimation, setMoneyAnim, setMoneySound, setSoundStyle,
     setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
   }

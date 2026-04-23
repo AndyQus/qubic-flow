@@ -57,10 +57,10 @@ watch(selectedWallets, loadStats, { deep: true })
 onMounted(loadStats)
 
 // ── Formatierung ────────────────────────────────────────────────
-function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString('de-DE') }
+function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString(store.locale) }
 function fmtCurrency(n) {
   if (n == null) return '—'
-  return Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currencySymbol.value
+  return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currencySymbol.value
 }
 
 // ── Trend-Pfeil ─────────────────────────────────────────────────
@@ -119,9 +119,6 @@ const totals = computed(() => {
 })
 
 const hasData = computed(() => mergedData.value.length > 0)
-
-// ── Chart-Farben: snapshot = teal/amber, live = hellere Variante ─
-function borderColor(item, baseColor) { return item.source === 'live' ? baseColor + '99' : baseColor }
 
 // ── Liniendiagramm ───────────────────────────────────────────────
 const lineData = computed(() => {

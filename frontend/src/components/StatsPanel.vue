@@ -1,5 +1,6 @@
 <script setup>
 import { useTranslation } from 'i18next-vue'
+import { useAppStore } from '../stores/app'
 
 defineProps({
   stats:   { type: Object,  default: null },
@@ -7,6 +8,7 @@ defineProps({
 })
 
 const { t } = useTranslation()
+const store = useAppStore()
 
 const keys = ['hour', 'day', 'epoch', 'month', 'year']
 
@@ -28,7 +30,7 @@ const colors = {
 
 function fmt(n) {
   if (n == null) return '—'
-  return Number(n).toLocaleString('de-DE')
+  return Number(n).toLocaleString(store.locale)
 }
 </script>
 

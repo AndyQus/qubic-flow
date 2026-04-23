@@ -62,6 +62,21 @@
     background: rgba(45, 212, 191, 0.15);
     border-color: rgba(45, 212, 191, 0.4);
   }
+
+  /* ── Table primitives ─────────────────────────────────── */
+  .table-std { @apply w-full text-xs; }
+  .thead-std { @apply border-b border-qubic-border text-gray-400 uppercase; }
+  .th        { @apply text-left p-3; }
+  .th-right  { @apply text-right p-3; }
+  .th-center { @apply text-center p-3; }
+  .td        { @apply p-3; }
+  .tr-row    { @apply border-b border-qubic-border/50 hover:bg-qubic-bg/50 transition-colors; }
+  .tr-edit   { @apply border-b border-qubic-border/50 bg-qubic-teal/5; }
+
+  /* ── Inline action & icon buttons ────────────────────── */
+  .btn-action { @apply text-qubic-teal hover:text-qubic-cyan transition-colors; }
+  .btn-delete { @apply text-red-400 hover:text-red-300 transition-colors; }
+  .icon-btn   { @apply text-gray-400 hover:text-qubic-teal transition-colors flex-shrink-0; }
 }
 
 /* Light mode: gray text classes get darker equivalents for readability */
@@ -105,6 +120,15 @@ html.light .bg-qubic-teal\/20 .text-qubic-teal { color: #005f5f !important; }
 /* Settings preview table: dark bg becomes light in light mode */
 html.light .bg-qubic-bg\/50 { background: rgba(248, 250, 252, 0.95) !important; }
 html.light .bg-qubic-bg     { background: #f8fafc !important; }
+
+/* Table component classes */
+html.light .thead-std { border-color: rgba(0, 0, 0, 0.1) !important; color: #4b5563 !important; }
+html.light .tr-row { border-color: rgba(0, 0, 0, 0.07) !important; }
+html.light .tr-row:hover { background: rgba(0, 0, 0, 0.03) !important; }
+html.light .tr-edit { border-color: rgba(0, 0, 0, 0.07) !important; background: rgba(0, 128, 128, 0.06) !important; }
+html.light .btn-action { color: #007A7A !important; }
+html.light .btn-action:hover { color: #005f5f !important; }
+html.light .icon-btn:hover { color: #007A7A !important; }
 
 /* Push Down: Zeile klappt von oben auf (accordion) */
 @keyframes push-down {

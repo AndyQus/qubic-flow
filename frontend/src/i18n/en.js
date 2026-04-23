@@ -13,7 +13,7 @@ export const en = {
   settings: { animation: 'Animation', display: 'Display', theme: 'Theme', dark: 'Dark', light: 'Light', language: 'Language', push_down: 'Push Down', slide_in: 'Slide In', beam_drop: 'Beam Drop', preview: 'Preview', currency: 'Currency', font_size: 'Font Size', font_xs: 'X-Small', font_sm: 'Small', font_md: 'Normal', font_lg: 'Large', export: 'Export' },
   header: { show_addresses: 'Show addresses', hide_addresses: 'Hide addresses' },
   export: { cointracking: 'CoinTracking CSV', steuerberater: 'Tax Advisor CSV', year: 'Year', download: 'Download' },
-  common: { save: 'Save', cancel: 'Cancel', confirm: 'Confirm', loading: 'Loading...', time: 'Time' },
+  common: { save: 'Save', cancel: 'Cancel', confirm: 'Confirm', loading: 'Loading...', time: 'Time', error_prefix: 'Error: ' },
   tax: {
     title: 'Tax Report',
     year: 'Tax Year',
@@ -63,6 +63,8 @@ export const en = {
     opening_price_usd: 'Price USD',
     opening_note: 'Note',
     opening_delete_confirm: 'Delete opening position?',
+    opening_required_fields: 'Date and amount are required.',
+    opening_delete_error: 'Failed to delete opening position.',
     settings_title: 'Tax Settings',
     country: 'Country',
     method: 'Cost Basis Method',

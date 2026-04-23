@@ -4,10 +4,12 @@ import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import EventsTable from '../components/EventsTable.vue'
 import { useTranslation } from 'i18next-vue'
+import { useQubicUtils } from '../composables/useQubicUtils'
 
 const props = defineProps({ id: String })
 const store = useAppStore()
 const { t } = useTranslation()
+const { explorerUrl, copyAddress, maskLabel } = useQubicUtils()
 
 const events  = ref([])
 const total   = ref(0)
@@ -16,10 +18,11 @@ const page    = ref(1)
 
 // Opening positions
 const openingPositions = ref([])
-const showAddPos  = ref(false)
-const addError    = ref('')
+const showAddPos   = ref(false)
+const addError     = ref('')
+const posError     = ref('')
 const priceLoading = ref(false)
-const newPos      = ref({ date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' })
+const newPos       = ref({ date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' })
 
 watch(() => newPos.value.date, async (date) => {
   if (!date) return
@@ -48,7 +51,7 @@ async function loadOpeningPositions() {
 async function addOpeningPosition() {
   addError.value = ''
   const p = newPos.value
-  if (!p.date || !p.amount_qubic) { addError.value = 'Datum und Menge sind Pflichtfelder.'; return }
+  if (!p.date || !p.amount_qubic) { addError.value = t('tax.opening_required_fields'); return }
   try {
     const created = await api.tax.createOpeningPosition({
       wallet_id: props.id,
@@ -62,16 +65,19 @@ async function addOpeningPosition() {
     newPos.value = { date: '', amount_qubic: '', price_eur: '', price_usd: '', note: '' }
     showAddPos.value = false
   } catch (e) {
-    addError.value = `Fehler: ${e.message}`
+    addError.value = t('common.error_prefix') + e.message
   }
 }
 
 async function deleteOpeningPosition(id) {
   if (!confirm(t('tax.opening_delete_confirm'))) return
+  posError.value = ''
   try {
     await api.tax.deleteOpeningPosition(id)
     openingPositions.value = openingPositions.value.filter(p => p.id !== id)
-  } catch (e) { console.error(e) }
+  } catch (e) {
+    posError.value = t('tax.opening_delete_error')
+  }
 }
 const PAGE_SIZE = 50
 
@@ -89,7 +95,7 @@ const wallet = computed(() => store.wallets.find(w => w.id === props.id))
 const monthOptions = computed(() =>
   availableMonths.value.map(val => {
     const [y, m] = val.split('-')
-    const lbl = new Date(+y, +m - 1, 1).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US', { month: 'long', year: 'numeric' })
+    const lbl = new Date(+y, +m - 1, 1).toLocaleString(store.locale, { month: 'long', year: 'numeric' })
     return { val, lbl }
   })
 )
@@ -143,19 +149,6 @@ watch([filterEpoch, filterMonth, filterYear], () => { page.value = 1; load() })
 watch(page, load)
 onMounted(() => { load(); loadFilterOptions(); loadOpeningPositions() })
 
-function maskLabel(label, id) {
-  if (!store.hideAddresses) return label
-  const n = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % 101
-  return `Wallet ${n}`
-}
-
-function explorerUrl(addr) {
-  return `https://explorer.qubic.org/network/address/${addr}`
-}
-
-async function copyAddress(addr) {
-  if (addr) await navigator.clipboard.writeText(addr)
-}
 
 const resyncing = ref(false)
 async function resyncTx() {
@@ -181,13 +174,13 @@ async function resyncTx() {
               {{ store.hideAddresses ? '••••••••••••••••••••' : wallet.id }}
             </span>
             <button v-if="!store.hideAddresses" @click="copyAddress(wallet.id)"
-                    class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('assets.copy')">
+                    class="icon-btn" :title="t('assets.copy')">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
             </button>
             <a :href="explorerUrl(wallet.id)" target="_blank" rel="noopener"
-               class="text-gray-400 hover:text-qubic-teal flex-shrink-0 transition-colors" :title="t('walletDetail.explorer')">
+               class="icon-btn" :title="t('walletDetail.explorer')">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
@@ -214,7 +207,7 @@ async function resyncTx() {
             <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QUBIC</div>
             <div class="flex items-center justify-end gap-1.5 mt-0.5">
               <span class="font-mono text-sm" :class="wallet.balance == null ? 'text-gray-600 italic' : 'text-gray-200'">
-                {{ wallet.balance == null ? t('wallet.balance_pending') : (store.hideAddresses ? '••••••' : wallet.balance.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US')) }}
+                {{ wallet.balance == null ? t('wallet.balance_pending') : (store.hideAddresses ? '••••••' : wallet.balance.toLocaleString(store.locale)) }}
               </span>
               <span v-if="wallet.balance != null"
                     :class="['text-xs', wallet.balance_live == null ? 'text-gray-500' : wallet.balance === wallet.balance_live ? 'text-green-400' : 'text-yellow-400']"
@@ -222,7 +215,7 @@ async function resyncTx() {
             </div>
             <div v-if="wallet.balance != null && wallet.balance_live != null && wallet.balance !== wallet.balance_live"
                  class="text-xs text-yellow-400 mt-0.5">
-              {{ t('wallet.balance_drift') }}: {{ store.hideAddresses ? '••••••' : wallet.balance_live.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}
+              {{ t('wallet.balance_drift') }}: {{ store.hideAddresses ? '••••••' : wallet.balance_live.toLocaleString(store.locale) }}
             </div>
           </div>
         </div>
@@ -275,9 +268,11 @@ async function resyncTx() {
         </div>
       </div>
 
+      <p v-if="posError" class="text-red-400 text-xs mt-2">{{ posError }}</p>
+
       <!-- List -->
       <div v-if="openingPositions.length" class="overflow-x-auto">
-        <table class="w-full text-xs">
+        <table class="table-std">
           <thead>
             <tr class="border-b border-qubic-border text-gray-500 uppercase">
               <th class="text-left py-2 pr-3">{{ t('tax.opening_date') }}</th>
@@ -292,7 +287,7 @@ async function resyncTx() {
             <tr v-for="p in openingPositions" :key="p.id"
                 class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
               <td class="py-2 pr-3 whitespace-nowrap">{{ p.date }}</td>
-              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.locale) }}</td>
               <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_eur) }}</td>
               <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_usd) }}</td>
               <td class="py-2 pr-3 text-gray-400">{{ p.note || '' }}</td>
@@ -330,7 +325,7 @@ async function resyncTx() {
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
       </select>
 
-      <span class="ml-auto text-sm text-gray-500">{{ total.toLocaleString(store.lang === 'de' ? 'de-DE' : 'en-US') }} {{ t('walletDetail.entries') }}</span>
+      <span class="ml-auto text-sm text-gray-500">{{ total.toLocaleString(store.locale) }} {{ t('walletDetail.entries') }}</span>
     </div>
 
     <!-- Events-Tabelle -->
