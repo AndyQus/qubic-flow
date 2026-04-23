@@ -191,103 +191,112 @@ function simulate() {
     </div>
 
 
-    <!-- Tax Settings -->
-    <div class="card sm:col-span-2" style="order:4">
-      <h3 class="text-sm font-bold uppercase text-gray-400 mb-4">{{ t('tax.settings_title') }}</h3>
+    <!-- Tax Panel 1: Land & Methode -->
+    <div class="card space-y-4" style="order:4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.settings_title') }} — {{ t('tax.country') }} &amp; {{ t('tax.method') }}</h3>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <!-- Country + Method -->
-        <div class="space-y-4">
-          <div class="flex items-start gap-4">
-            <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.country') }}</span>
-            <select v-model="taxSettings.country" class="input flex-1 text-sm">
-              <option v-for="(rules, code) in taxCountries" :key="code" :value="code">
-                {{ code }} <template v-if="rules.currency"> ({{ rules.currency }})</template>
-              </option>
-            </select>
-          </div>
-          <div class="flex items-start gap-4">
-            <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.method') }}</span>
-            <div class="space-y-1.5">
-              <div class="flex flex-wrap gap-1">
-                <button v-for="[val] in [['FIFO'], ['LIFO'], ['HIFO'], ['AVCO']]"
-                        :key="val"
-                        :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                        @click="taxSettings.method = val">
-                  {{ val }}
-                </button>
-              </div>
-              <p class="text-xs text-gray-500 leading-snug">
-                {{ t(`tax.method_${taxSettings.method.toLowerCase()}_desc`) }}
-              </p>
-            </div>
-          </div>
+      <div class="flex items-start gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.country') }}</span>
+        <select v-model="taxSettings.country" class="input flex-1 text-sm">
+          <option v-for="(rules, code) in taxCountries" :key="code" :value="code">
+            {{ code }} <template v-if="rules.currency"> ({{ rules.currency }})</template>
+          </option>
+        </select>
+      </div>
 
-          <!-- Info box -->
-          <div class="rounded-lg border border-qubic-border/40 bg-qubic-bg/50 px-3 py-2.5 text-xs text-gray-500 leading-relaxed">
-            {{ t('tax.country_rules') }}
+      <div class="flex items-start gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0 pt-1">{{ t('tax.method') }}</span>
+        <div class="space-y-1.5">
+          <div class="flex flex-wrap gap-1">
+            <button v-for="[val] in [['FIFO'], ['LIFO'], ['HIFO'], ['AVCO']]"
+                    :key="val"
+                    :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                    @click="taxSettings.method = val">
+              {{ val }}
+            </button>
           </div>
+          <p class="text-xs text-gray-500 leading-snug">
+            {{ t(`tax.method_${taxSettings.method.toLowerCase()}_desc`) }}
+          </p>
         </div>
+      </div>
 
-        <!-- Private Data -->
-        <div class="space-y-3">
-          <p class="text-xs font-semibold text-gray-400 uppercase">{{ t('tax.private_data') }}</p>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.name') }}</label>
-            <input v-model="taxSettings.name" type="text" class="input w-full text-sm" />
-          </div>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.tax_id') }}</label>
-            <input v-model="taxSettings.tax_id" type="text" class="input w-full text-sm" />
-          </div>
-          <div>
-            <label class="text-xs text-gray-500 block mb-1">{{ t('tax.address') }}</label>
-            <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
-          </div>
+      <div class="rounded-lg border border-qubic-border/40 bg-qubic-bg/50 px-3 py-2.5 text-xs text-gray-500 leading-relaxed">
+        {{ t('tax.country_rules') }}
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
+          {{ taxSaving ? t('common.loading') : t('common.save') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Tax Panel 2: Persönliche Daten -->
+    <div class="card space-y-3" style="order:5">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.private_data') }}</h3>
+
+      <div>
+        <label class="text-xs text-gray-500 block mb-1">{{ t('tax.name') }}</label>
+        <input v-model="taxSettings.name" type="text" class="input w-full text-sm" />
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 block mb-1">{{ t('tax.tax_id') }}</label>
+        <input v-model="taxSettings.tax_id" type="text" class="input w-full text-sm" />
+      </div>
+      <div>
+        <label class="text-xs text-gray-500 block mb-1">{{ t('tax.address') }}</label>
+        <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
+          {{ taxSaving ? t('common.loading') : t('common.save') }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Tax Panel 3: Geschäftsdaten -->
+    <div class="card space-y-3 sm:col-span-2" style="order:6">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.business_data') }}</h3>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_name') }}</label>
+          <input v-model="taxSettings.company_name" type="text" class="input w-full text-sm" />
         </div>
-
-        <!-- Business Data -->
-        <div class="space-y-3 sm:col-span-2">
-          <p class="text-xs font-semibold text-gray-400 uppercase">{{ t('tax.business_data') }}</p>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_name') }}</label>
-              <input v-model="taxSettings.company_name" type="text" class="input w-full text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_tax_nr') }}</label>
-              <input v-model="taxSettings.company_tax_nr" type="text" class="input w-full text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_vat') }}</label>
-              <input v-model="taxSettings.company_vat" type="text" class="input w-full text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_reg') }}</label>
-              <input v-model="taxSettings.company_reg" type="text" class="input w-full text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_address') }}</label>
-              <input v-model="taxSettings.company_address" type="text" class="input w-full text-sm" />
-            </div>
-            <div>
-              <label class="text-xs text-gray-500 block mb-1">{{ t('tax.fiscal_year') }}</label>
-              <div class="flex gap-1">
-                <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'jan' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                        @click="taxSettings.fiscal_year = 'jan'">
-                  {{ t('tax.fiscal_jan') }}
-                </button>
-                <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'custom' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                        @click="taxSettings.fiscal_year = 'custom'">
-                  {{ t('tax.fiscal_custom') }}
-                </button>
-              </div>
-            </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_tax_nr') }}</label>
+          <input v-model="taxSettings.company_tax_nr" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_vat') }}</label>
+          <input v-model="taxSettings.company_vat" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_reg') }}</label>
+          <input v-model="taxSettings.company_reg" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.company_address') }}</label>
+          <input v-model="taxSettings.company_address" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('tax.fiscal_year') }}</label>
+          <div class="flex gap-1">
+            <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'jan' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                    @click="taxSettings.fiscal_year = 'jan'">
+              {{ t('tax.fiscal_jan') }}
+            </button>
+            <button :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.fiscal_year === 'custom' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                    @click="taxSettings.fiscal_year = 'custom'">
+              {{ t('tax.fiscal_custom') }}
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="flex justify-end mt-4">
+      <div class="flex justify-end pt-1">
         <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
           {{ taxSaving ? t('common.loading') : t('common.save') }}
         </button>
