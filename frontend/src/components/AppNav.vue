@@ -1,11 +1,17 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useTranslation } from 'i18next-vue'
 
 const { t } = useTranslation()
 const router = useRouter()
+const route = useRoute()
 const open = ref(false)
+
+function isActive(to) {
+  if (to === '/') return route.path === '/'
+  return route.path === to || route.path.startsWith(to + '/')
+}
 
 const items = [
   { to: '/',         key: 'dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -32,9 +38,12 @@ function navigate(to) {
         <li v-for="item in items" :key="item.to">
           <router-link
             :to="item.to"
-            class="inline-block px-4 py-2 text-sm border-b-2 border-transparent text-gray-500 hover:text-qubic-teal transition-colors"
-            active-class="text-qubic-teal border-qubic-teal font-semibold"
-            exact-active-class="text-qubic-teal border-qubic-teal font-semibold"
+            :class="[
+              'inline-block px-4 py-2 text-sm border-b-2 transition-colors',
+              isActive(item.to)
+                ? 'text-qubic-teal border-qubic-teal font-semibold'
+                : 'border-transparent text-gray-500 hover:text-qubic-teal'
+            ]"
           >
             {{ t(`nav.${item.key}`) }}
           </router-link>
@@ -44,7 +53,7 @@ function navigate(to) {
       <!-- Mobile: burger button -->
       <div class="sm:hidden flex items-center justify-between py-2">
         <router-link to="/" class="text-sm font-semibold text-qubic-teal">
-          {{ t(`nav.${items.find(i => i.to === $route?.path)?.key ?? 'dashboard'}`) }}
+          {{ t(`nav.${items.find(i => isActive(i.to))?.key ?? 'dashboard'}`) }}
         </router-link>
         <button @click="open = !open"
                 class="p-2 text-gray-400 hover:text-qubic-teal transition-colors"
@@ -67,7 +76,7 @@ function navigate(to) {
         <li v-for="item in items" :key="item.to">
           <button @click="navigate(item.to)"
                   class="w-full flex items-center gap-3 px-6 py-4 text-sm text-left hover:bg-qubic-teal/10 transition-colors"
-                  :class="$route?.path === item.to ? 'text-qubic-teal' : 'text-gray-400'">
+                  :class="isActive(item.to) ? 'text-qubic-teal' : 'text-gray-400'">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon"/>
             </svg>

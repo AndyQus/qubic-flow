@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import EventsTable from '../components/EventsTable.vue'
@@ -10,6 +11,12 @@ const props = defineProps({ id: String })
 const store = useAppStore()
 const { t } = useTranslation()
 const { explorerUrl, copyAddress, maskLabel } = useQubicUtils()
+const router = useRouter()
+
+function goBack() {
+  if (window.history.length > 1) router.back()
+  else router.push('/wallets')
+}
 
 const events  = ref([])
 const total   = ref(0)
@@ -162,7 +169,15 @@ async function resyncTx() {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-3">
+
+    <!-- Back button -->
+    <button class="btn-ghost text-sm flex items-center gap-1.5 w-fit" @click="goBack">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      {{ t('common.back') }}
+    </button>
 
     <!-- Wallet-Header -->
     <div v-if="wallet" class="card">

@@ -61,6 +61,105 @@ const previewAnimClass = computed(() => {
   return 'anim-beam-drop'
 })
 
+// DB Export
+const dbExporting = ref(false)
+
+async function exportDbJson() {
+  dbExporting.value = true
+  try {
+    const wallets = await api.wallets.list()
+    const json = JSON.stringify(wallets, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'qubicflow-backup.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error(err)
+  } finally {
+    dbExporting.value = false
+  }
+}
+
+// DB Restore
+const dbRestoring = ref(false)
+const dbRestoreResult = ref(null)
+const dbRestoreInput = ref(null)
+
+function triggerDbRestore() {
+  dbRestoreInput.value?.click()
+}
+
+async function handleDbRestore(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  dbRestoring.value = true
+  dbRestoreResult.value = null
+  try {
+    const text = await file.text()
+    const wallets = JSON.parse(text)
+    const existingIds = new Set(store.wallets.map(w => w.id))
+    let created = 0, skipped = 0, failed = 0
+    for (const w of wallets) {
+      if (existingIds.has(w.id)) { skipped++; continue }
+      try {
+        await api.wallets.create({ id: w.id, label: w.label, owner: w.owner ?? '', function: w.function ?? '', wallet_type: w.wallet_type, note: w.note ?? '' })
+        created++
+      } catch (err) {
+        if (err.message.startsWith('409')) skipped++
+        else failed++
+      }
+    }
+    dbRestoreResult.value = { created, skipped, failed }
+  } catch (err) {
+    dbRestoreResult.value = { error: err.message }
+  } finally {
+    dbRestoring.value = false
+    e.target.value = ''
+  }
+}
+
+// Import from Qubic Ledger
+const ledgerImporting = ref(false)
+const ledgerImportResult = ref(null)
+const ledgerFileInput = ref(null)
+
+function triggerLedgerImport() {
+  ledgerFileInput.value?.click()
+}
+
+async function handleLedgerFile(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  ledgerImporting.value = true
+  ledgerImportResult.value = null
+  try {
+    const text = await file.text()
+    const entries = JSON.parse(text)
+    const existingIds = new Set(store.wallets.map(w => w.id))
+    let created = 0, skipped = 0, failed = 0
+    for (const entry of entries) {
+      if (existingIds.has(entry.PublicId)) { skipped++; continue }
+      const walletType = (entry.Zielgruppe === 'Company' || entry.Zielgruppe === 1) ? 'BUSINESS' : 'PRIVATE'
+      try {
+        await api.wallets.create({ id: entry.PublicId, label: entry.Besitzer, owner: entry.Besitzer, wallet_type: walletType, note: '', function: '' })
+        created++
+      } catch (err) {
+        if (err.message.startsWith('409')) skipped++
+        else failed++
+      }
+    }
+    ledgerImportResult.value = { created, skipped, failed }
+  } catch (err) {
+    ledgerImportResult.value = { error: err.message }
+  } finally {
+    ledgerImporting.value = false
+    e.target.value = ''
+  }
+}
+
 function simulate() {
   const dir = Math.random() > 0.5 ? 'IN' : 'OUT'
   const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString(store.locale)
@@ -191,8 +290,69 @@ function simulate() {
     </div>
 
 
-    <!-- Tax Panel 1: Land & Methode -->
+    <!-- Export & Import Panel -->
+    <div class="card space-y-4" style="order:3">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.io_title') }}</h3>
+
+      <!-- QubicFlow Backup Export -->
+      <div class="space-y-2">
+        <p class="text-xs font-semibold text-gray-300">{{ t('settings.db_export_label') }}</p>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.db_export_desc') }}</p>
+        <button class="btn text-sm" :disabled="dbExporting" @click="exportDbJson">
+          {{ dbExporting ? t('common.loading') : t('settings.db_export_btn') }}
+        </button>
+      </div>
+
+      <div class="border-t border-qubic-border/40"></div>
+
+      <!-- QubicFlow Backup Restore -->
+      <div class="space-y-2">
+        <p class="text-xs font-semibold text-gray-300">{{ t('settings.db_restore_label') }}</p>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.db_restore_desc') }}</p>
+        <div class="flex items-center gap-3">
+          <button class="btn text-sm" :disabled="dbRestoring" @click="triggerDbRestore">
+            {{ dbRestoring ? t('common.loading') : t('settings.db_restore_btn') }}
+          </button>
+          <input ref="dbRestoreInput" type="file" accept=".json" class="hidden" @change="handleDbRestore" />
+        </div>
+        <p v-if="dbRestoreResult && !dbRestoreResult.error" class="text-xs text-green-400">
+          {{ dbRestoreResult.created }} {{ t('settings.ledger_import_created') }},
+          {{ dbRestoreResult.skipped }} {{ t('settings.ledger_import_skipped') }}<template v-if="dbRestoreResult.failed">, {{ dbRestoreResult.failed }} {{ t('settings.ledger_import_failed') }}</template>
+        </p>
+        <p v-if="dbRestoreResult?.error" class="text-xs text-red-400">
+          {{ t('common.error_prefix') }}{{ dbRestoreResult.error }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Import aus Qubic Ledger Panel -->
     <div class="card space-y-4" style="order:4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.ledger_section') }}</h3>
+
+      <div class="space-y-2">
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.ledger_import_desc') }}</p>
+        <a href="https://myledger.qubic.tools/" target="_blank" rel="noopener noreferrer"
+           class="text-xs text-qubic-teal hover:underline inline-block">
+          ↗ {{ t('settings.ledger_import_link') }}
+        </a>
+        <div class="flex items-center gap-3 pt-1">
+          <button class="btn text-sm" :disabled="ledgerImporting" @click="triggerLedgerImport">
+            {{ ledgerImporting ? t('common.loading') : t('settings.ledger_import_btn') }}
+          </button>
+          <input ref="ledgerFileInput" type="file" accept=".json" class="hidden" @change="handleLedgerFile" />
+        </div>
+        <p v-if="ledgerImportResult && !ledgerImportResult.error" class="text-xs text-green-400">
+          {{ ledgerImportResult.created }} {{ t('settings.ledger_import_created') }},
+          {{ ledgerImportResult.skipped }} {{ t('settings.ledger_import_skipped') }}<template v-if="ledgerImportResult.failed">, {{ ledgerImportResult.failed }} {{ t('settings.ledger_import_failed') }}</template>
+        </p>
+        <p v-if="ledgerImportResult?.error" class="text-xs text-red-400">
+          {{ t('common.error_prefix') }}{{ ledgerImportResult.error }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Tax Panel 1: Land & Methode -->
+    <div class="card space-y-4 sm:col-start-1" style="order:5">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.settings_title') }} — {{ t('tax.country') }} &amp; {{ t('tax.method') }}</h3>
 
       <div class="flex items-start gap-4">
@@ -233,7 +393,7 @@ function simulate() {
     </div>
 
     <!-- Tax Panel 2: Persönliche Daten -->
-    <div class="card space-y-3" style="order:5">
+    <div class="card space-y-3" style="order:6">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.private_data') }}</h3>
 
       <div>
@@ -257,7 +417,7 @@ function simulate() {
     </div>
 
     <!-- Tax Panel 3: Geschäftsdaten -->
-    <div class="card space-y-3 sm:col-span-2" style="order:6">
+    <div class="card space-y-3 sm:col-span-2" style="order:7">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.business_data') }}</h3>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
