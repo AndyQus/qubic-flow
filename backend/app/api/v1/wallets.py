@@ -35,6 +35,7 @@ async def create_wallet(payload: WalletCreate, background_tasks: BackgroundTasks
         label=payload.label,
         note=payload.note,
         owner=payload.owner,
+        function=payload.function,
         wallet_type=payload.wallet_type,
         active=1,
         created_at=now,

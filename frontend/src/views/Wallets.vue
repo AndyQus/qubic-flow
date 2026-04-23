@@ -15,11 +15,15 @@ const editingId     = ref(null)
 const error         = ref('')
 const editError     = ref('')
 const selectedOwner = ref(null)
-const form          = ref({ id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
-const editForm      = ref({ label: '', owner: '', note: '', wallet_type: 'PRIVATE' })
+const form          = ref({ id: '', label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
+const editForm      = ref({ label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
 
 const uniqueOwners = computed(() =>
   [...new Set(store.wallets.map(w => w.owner).filter(Boolean))].sort()
+)
+
+const uniqueFunctions = computed(() =>
+  [...new Set(store.wallets.map(w => w.function).filter(Boolean))].sort()
 )
 
 const displayedWallets = computed(() => {
@@ -38,7 +42,7 @@ async function submit() {
   error.value = ''
   try {
     await api.wallets.create(form.value)
-    form.value = { id: '', label: '', owner: '', note: '', wallet_type: 'PRIVATE' }
+    form.value = { id: '', label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' }
     showForm.value = false
     await reload()
   } catch (e) {
@@ -48,7 +52,7 @@ async function submit() {
 
 function startEdit(w) {
   editingId.value = w.id
-  editForm.value = { label: w.label, owner: w.owner || '', note: w.note || '', wallet_type: w.wallet_type }
+  editForm.value = { label: w.label, owner: w.owner || '', function: w.function || '', note: w.note || '', wallet_type: w.wallet_type }
 }
 
 async function saveEdit(id) {
@@ -141,8 +145,16 @@ onMounted(reload)
       <option value="PRIVATE">PRIVATE</option>
       <option value="BUSINESS">BUSINESS</option>
     </select>
+    <input v-model="form.function" :placeholder="t('wallet.function')" class="input w-full text-xs"
+           list="function-list-add" autocomplete="off" />
+    <datalist id="function-list-add">
+      <option v-for="f in uniqueFunctions" :key="f" :value="f" />
+    </datalist>
     <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
-    <button class="btn text-sm" @click="submit">{{ t('common.save') }}</button>
+    <div class="flex gap-2">
+      <button class="btn text-sm" @click="submit">{{ t('common.save') }}</button>
+      <button class="btn-ghost text-sm" @click="showForm = false; error = ''">{{ t('common.cancel') }}</button>
+    </div>
   </div>
 
   <!-- Mobile: card list -->
@@ -164,6 +176,11 @@ onMounted(reload)
           <option value="PRIVATE">PRIVATE</option>
           <option value="BUSINESS">BUSINESS</option>
         </select>
+        <input v-model="editForm.function" :placeholder="t('wallet.function')" class="input w-full text-xs"
+               list="function-list-mobile-edit" autocomplete="off" />
+        <datalist id="function-list-mobile-edit">
+          <option v-for="f in uniqueFunctions" :key="f" :value="f" />
+        </datalist>
         <p v-if="editError" class="text-red-400 text-xs">{{ editError }}</p>
         <div class="flex gap-2">
           <button class="btn text-sm" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
@@ -216,6 +233,7 @@ onMounted(reload)
           <th class="th hidden md:table-cell">{{ t('wallet.owner') }}</th>
           <th class="th">{{ t('wallet.address') }}</th>
           <th class="th">{{ t('wallet.type') }}</th>
+          <th class="th hidden md:table-cell">{{ t('wallet.function') }}</th>
           <th class="th hidden md:table-cell">{{ t('wallet.note') }}</th>
           <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
           <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.entries') }}</th>
@@ -224,7 +242,7 @@ onMounted(reload)
       </thead>
       <tbody>
         <tr v-if="!displayedWallets.length">
-          <td colspan="8" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
+          <td colspan="9" class="text-center p-8 text-gray-500">{{ t('wallet.none') }}</td>
         </tr>
         <template v-for="w in displayedWallets" :key="w.id">
           <!-- Edit-Row -->
@@ -249,8 +267,16 @@ onMounted(reload)
               </select>
             </td>
             <td class="p-2 hidden md:table-cell">
+              <input v-model="editForm.function" :placeholder="t('wallet.function')" class="input w-full text-xs"
+                     list="function-list-desktop-edit" autocomplete="off" />
+              <datalist id="function-list-desktop-edit">
+                <option v-for="f in uniqueFunctions" :key="f" :value="f" />
+              </datalist>
+            </td>
+            <td class="p-2 hidden md:table-cell">
               <input v-model="editForm.note" :placeholder="t('wallet.note')" class="input w-full text-xs" />
             </td>
+            <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 text-right">
@@ -299,6 +325,7 @@ onMounted(reload)
                 {{ w.wallet_type }}
               </span>
             </td>
+            <td class="td text-gray-400 hidden md:table-cell">{{ w.function || '—' }}</td>
             <td class="td text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
             <td class="td hidden lg:table-cell text-right">
               <div class="flex items-center justify-end gap-1.5">

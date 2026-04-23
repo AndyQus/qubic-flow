@@ -20,6 +20,7 @@ class Wallet(Base):
     balance_live_at = Column(Text, nullable=True)
     balance_since_tick = Column(Integer, nullable=True)
     owner = Column(Text, nullable=True)
+    function = Column(Text, nullable=True)
 
     sync_state = relationship(
         "SyncState",

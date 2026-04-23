@@ -202,6 +202,9 @@ async function resyncTx() {
             <span :class="['pill', wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
               {{ wallet.wallet_type }}
             </span>
+            <span v-if="wallet.function" class="pill bg-sky-500/20 text-sky-400 border-sky-500/30">
+              {{ wallet.function }}
+            </span>
           </div>
           <div class="text-right">
             <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QUBIC</div>
