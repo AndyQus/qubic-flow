@@ -67,8 +67,8 @@ const dbExporting = ref(false)
 async function exportDbJson() {
   dbExporting.value = true
   try {
-    const wallets = await api.wallets.list()
-    const json = JSON.stringify(wallets, null, 2)
+    const data = await api.backup.export()
+    const json = JSON.stringify(data, null, 2)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -99,20 +99,9 @@ async function handleDbRestore(e) {
   dbRestoreResult.value = null
   try {
     const text = await file.text()
-    const wallets = JSON.parse(text)
-    const existingIds = new Set(store.wallets.map(w => w.id))
-    let created = 0, skipped = 0, failed = 0
-    for (const w of wallets) {
-      if (existingIds.has(w.id)) { skipped++; continue }
-      try {
-        await api.wallets.create({ id: w.id, label: w.label, owner: w.owner ?? '', function: w.function ?? '', wallet_type: w.wallet_type, note: w.note ?? '' })
-        created++
-      } catch (err) {
-        if (err.message.startsWith('409')) skipped++
-        else failed++
-      }
-    }
-    dbRestoreResult.value = { created, skipped, failed }
+    const payload = JSON.parse(text)
+    const result = await api.backup.restore(payload)
+    dbRestoreResult.value = result
   } catch (err) {
     dbRestoreResult.value = { error: err.message }
   } finally {
@@ -315,10 +304,11 @@ function simulate() {
           </button>
           <input ref="dbRestoreInput" type="file" accept=".json" class="hidden" @change="handleDbRestore" />
         </div>
-        <p v-if="dbRestoreResult && !dbRestoreResult.error" class="text-xs text-green-400">
-          {{ dbRestoreResult.created }} {{ t('settings.ledger_import_created') }},
-          {{ dbRestoreResult.skipped }} {{ t('settings.ledger_import_skipped') }}<template v-if="dbRestoreResult.failed">, {{ dbRestoreResult.failed }} {{ t('settings.ledger_import_failed') }}</template>
-        </p>
+        <div v-if="dbRestoreResult && !dbRestoreResult.error" class="text-xs text-green-400 space-y-0.5">
+          <p v-for="[key, s] in Object.entries(dbRestoreResult).filter(([k,v]) => typeof v === 'object')" :key="key">
+            {{ key }}: {{ s.created }} {{ t('settings.ledger_import_created') }}, {{ s.skipped }} {{ t('settings.ledger_import_skipped') }}<template v-if="s.failed">, {{ s.failed }} {{ t('settings.ledger_import_failed') }}</template>
+          </p>
+        </div>
         <p v-if="dbRestoreResult?.error" class="text-xs text-red-400">
           {{ t('common.error_prefix') }}{{ dbRestoreResult.error }}
         </p>

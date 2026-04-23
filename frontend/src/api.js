@@ -63,6 +63,10 @@ export const api = {
       return req(`/labels${q ? '?' + q : ''}`)
     },
   },
+  backup: {
+    export: () => req('/backup'),
+    restore: (data) => req('/backup/restore', { method: 'POST', body: JSON.stringify(data) }),
+  },
   metrics: () => req('/metrics'),
   health: () => req('/health'),
   tax: {
