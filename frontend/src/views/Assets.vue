@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import PageLoader from '../components/PageLoader.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const { t } = useTranslation()
 
@@ -79,25 +80,25 @@ function categoryLabel(cat) {
 </script>
 
 <template>
-  <div class="space-y-2">
-    <!-- Filter Tabs -->
-    <div class="flex flex-wrap gap-2 items-center">
-      <button
-        v-for="cat in categories"
-        :key="cat"
-        :class="[
-          'btn-ghost text-sm',
-          cat === 'all'            && categoryFilter === cat ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal' : '',
-          cat === 'smart_contract' && categoryFilter === cat ? 'bg-purple-500/20 border-purple-500 text-purple-400'  : '',
-          cat === 'exchange'       && categoryFilter === cat ? 'bg-orange-500/20 border-orange-500 text-orange-400'  : '',
-          cat === 'liquid_staking' && categoryFilter === cat ? 'bg-blue-500/20 border-blue-500 text-blue-400'        : '',
-          cat === 'standard'       && categoryFilter === cat ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal' : '',
-        ]"
-        @click="categoryFilter = cat"
-      >
-        {{ cat === 'all' ? t('filter.all') : categoryLabel(cat) }}
-      </button>
-    </div>
+  <div class="space-y-3">
+    <PageHeader :title="t('nav.assets')" :hint="t('assets.hint')">
+      <div class="filter-row">
+        <button
+          v-for="cat in categories"
+          :key="cat"
+          :class="[
+            'filter-pill',
+            categoryFilter === cat && (cat === 'smart_contract' ? 'bg-purple-500/20 border-purple-500 text-purple-400' :
+                                       cat === 'exchange'       ? 'bg-orange-500/20 border-orange-500 text-orange-400' :
+                                       cat === 'liquid_staking' ? 'bg-blue-500/20 border-blue-500 text-blue-400'       :
+                                       'filter-pill-active'),
+          ]"
+          @click="categoryFilter = cat"
+        >
+          {{ cat === 'all' ? t('filter.all') : categoryLabel(cat) }}
+        </button>
+      </div>
+    </PageHeader>
 
     <!-- Stats & Search -->
     <div class="flex flex-wrap items-center justify-between gap-3">

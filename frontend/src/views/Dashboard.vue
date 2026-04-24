@@ -5,6 +5,7 @@ import { api } from '../api'
 import StatsPanel from '../components/StatsPanel.vue'
 import EventsTable from '../components/EventsTable.vue'
 import WalletFilter from '../components/WalletFilter.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useTranslation } from 'i18next-vue'
 
 const store = useAppStore()
@@ -38,6 +39,7 @@ onUnmounted(() => clearInterval(intervalId))
 
 <template>
   <div class="space-y-3">
+    <PageHeader :title="t('nav.dashboard')" :hint="t('page_hint.dashboard')" />
     <WalletFilter v-model="selectedWallets" />
     <StatsPanel :stats="stats" :loading="loadingStats" />
     <EventsTable :events="store.events" :loading="loadingEvents" :title="t('event.last10')" />

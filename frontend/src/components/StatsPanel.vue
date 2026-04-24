@@ -36,12 +36,12 @@ function fmt(n) {
 
 <template>
   <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-    <div v-for="k in keys" :key="k" class="card !p-3">
+    <div v-for="k in keys" :key="k" class="card !p-3 cq-panel">
       <div class="flex items-center gap-1 mb-1">
         <svg xmlns="http://www.w3.org/2000/svg" :class="['w-3 h-3 flex-shrink-0', colors[k]]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" :d="icons[k]"/>
         </svg>
-        <span :class="['text-sm uppercase tracking-wide', colors[k]]">{{ t(`stats.${k}`) }}</span>
+        <span :class="['text-sm uppercase tracking-wide', colors[k]]">{{ t(`stats.${k}`) }} QUBIC</span>
       </div>
       <div class="min-h-[3.5rem] flex flex-col justify-center">
         <template v-if="loading">
@@ -53,7 +53,7 @@ function fmt(n) {
           </div>
         </template>
         <template v-else>
-          <div class="text-lg font-bold text-qubic-teal leading-tight">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }} QU</div>
+          <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }}</div>
           <div class="flex items-center gap-2 mt-0.5">
             <span class="text-xs font-semibold text-violet-400">{{ stats ? fmt(stats[k].current.event_count) : '—' }} Events</span>
             <span class="text-xs font-semibold text-amber-400">{{ stats ? fmt(stats[k].current.tx_count) : '—' }} TX</span>

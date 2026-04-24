@@ -1,11 +1,16 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '../stores/app'
+import { useQubicUtils } from '../composables/useQubicUtils'
 import { Line, Bar } from 'vue-chartjs'
 import WalletFilter from '../components/WalletFilter.vue'
 import PageLoader from '../components/PageLoader.vue'
+import PageHeader from '../components/PageHeader.vue'
+import OwnerIcon from '../components/OwnerIcon.vue'
+import InfoLabel from '../components/InfoLabel.vue'
 import {
   Chart as ChartJS, Title, Tooltip, Legend, LineElement, BarElement,
   CategoryScale, LinearScale, PointElement, Filler,
@@ -15,6 +20,9 @@ ChartJS.register(Title, Tooltip, Legend, LineElement, BarElement, CategoryScale,
 
 const { t } = useTranslation()
 const store = useAppStore()
+const router = useRouter()
+const route = useRoute()
+const { maskLabel } = useQubicUtils()
 
 const periodIcons = {
   hour:  'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -34,21 +42,47 @@ const periodColors = {
 
 const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
 const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
+const inFiatKey      = computed(() => store.currency === 'USD' ? 'in_usd' : 'in_eur')
 const stats          = ref(null)
 const snaps          = ref([])
 const history        = ref([])
+const epochsData     = ref([])
 const mode           = ref('count')
 const selectedWallets = ref([])
+const selectedEpochWallets = ref([])
 const loading = ref(true)
+
+// Tabs + epoch selection, URL-synced (?tab=epochs|overview&epoch=168)
+const activeTab = ref(route.query.tab === 'overview' ? 'overview' : 'epochs')
+const selectedEpoch = ref(route.query.epoch != null ? Number(route.query.epoch) : null)
+
+watch(() => route.query, (q) => {
+  activeTab.value = q.tab === 'overview' ? 'overview' : 'epochs'
+  selectedEpoch.value = q.epoch != null ? Number(q.epoch) : null
+})
+
+function setActiveTab(tab) {
+  const q = {}
+  if (tab === 'overview') q.tab = 'overview'
+  router.push({ path: '/stats', query: q })
+}
+
+function setSelectedEpoch(epoch) {
+  const q = { ...route.query }
+  if (epoch != null) q.epoch = String(epoch)
+  else delete q.epoch
+  router.push({ path: '/stats', query: q })
+}
 
 async function loadStats() {
   loading.value = true
   try {
     const ids = selectedWallets.value
-    ;[stats.value, snaps.value, history.value] = await Promise.all([
+    ;[stats.value, snaps.value, history.value, epochsData.value] = await Promise.all([
       api.stats.current(ids),
       ids.length ? Promise.resolve([]) : api.stats.snapshots(),
       api.stats.history('week', ids),
+      api.stats.epochs(),
     ])
   } finally { loading.value = false }
 }
@@ -81,18 +115,13 @@ const periods = computed(() => {
 })
 
 // ── Merge Snapshots + Live-History ──────────────────────────────
-// Snapshots liefern historische Wochen (Mittwoch-Marker).
-// History liefert alle Wochen direkt aus der events-Tabelle.
-// Regel: Snapshot hat Vorrang (genauer); Live-Wochen ohne Snapshot werden ergänzt.
 const mergedData = computed(() => {
-  // Snapshots in Map: key = "YYYY-WW"
   const snapMap = new Map()
   for (const s of snaps.value) {
     const key = `${s.year}-${String(s.week).padStart(2, '0')}`
     snapMap.set(key, { ...s, source: 'snapshot' })
   }
 
-  // History-Einträge die noch kein Snapshot haben → als "live" markieren
   const merged = new Map(snapMap)
   for (const h of history.value) {
     const key = `${h.year}-${String(h.week).padStart(2, '0')}`
@@ -107,7 +136,6 @@ const mergedData = computed(() => {
   })
 })
 
-// ── Gesamt-KPIs ─────────────────────────────────────────────────
 const totals = computed(() => {
   if (!mergedData.value.length) return null
   return mergedData.value.reduce((acc, s) => ({
@@ -120,7 +148,6 @@ const totals = computed(() => {
 
 const hasData = computed(() => mergedData.value.length > 0)
 
-// ── Liniendiagramm ───────────────────────────────────────────────
 const lineData = computed(() => {
   const items  = mergedData.value
   const labels = items.map(s => {
@@ -159,7 +186,6 @@ const lineData = computed(() => {
   }
 })
 
-// ── Balkendiagramm letzte 12 Wochen ─────────────────────────────
 const barData = computed(() => {
   const items = mergedData.value.slice(-12)
   return {
@@ -191,33 +217,351 @@ const chartOptions = computed(() => {
     },
   }
 })
+
+// ── Epochen-Tab ─────────────────────────────────────────────────
+const walletMap = computed(() => {
+  const m = new Map()
+  for (const w of store.wallets) m.set(w.id, w)
+  return m
+})
+
+const availableEpochs = computed(() => epochsData.value.map(e => e.epoch))
+
+const activeEpoch = computed(() => {
+  if (!epochsData.value.length) return null
+  if (selectedEpoch.value != null && availableEpochs.value.includes(selectedEpoch.value)) {
+    return selectedEpoch.value
+  }
+  return epochsData.value[0].epoch
+})
+
+const currentEpochGroup = computed(() => {
+  if (activeEpoch.value == null) return null
+  return epochsData.value.find(e => e.epoch === activeEpoch.value) || null
+})
+
+// Wallets with activity (in or out) in the selected epoch — feed this list to WalletFilter
+const epochActiveWallets = computed(() => {
+  const g = currentEpochGroup.value
+  if (!g) return []
+  return g.wallets
+    .filter(r => r.in_qubic > 0 || r.out_qubic > 0)
+    .map(r => walletMap.value.get(r.wallet_id))
+    .filter(w => w && w.deleted_at == null)
+})
+
+// Reset epoch-specific wallet selection when the epoch changes
+watch(activeEpoch, () => { selectedEpochWallets.value = [] })
+
+const currentEpochRows = computed(() => {
+  const g = currentEpochGroup.value
+  if (!g) return []
+  const picked = selectedEpochWallets.value
+  return g.wallets
+    .map(r => {
+      const w = walletMap.value.get(r.wallet_id)
+      return { ...r, wallet: w }
+    })
+    .filter(r => r.wallet && r.wallet.deleted_at == null && (r.in_qubic > 0 || r.out_qubic > 0))
+    .filter(r => !picked.length || picked.includes(r.wallet_id))
+    .sort((a, b) => b.in_qubic - a.in_qubic)
+})
+
+// Totals derived from the visible rows so header reflects wallet-filter selection
+const currentEpochFilteredTotals = computed(() => {
+  const rows = currentEpochRows.value
+  const acc = {
+    in_qubic: 0, in_qubic_tx: 0, in_qubic_event: 0,
+    in_tx_count: 0, in_event_count: 0,
+    out_qubic: 0, out_qubic_tx: 0, out_qubic_event: 0,
+    out_tx_count: 0, out_event_count: 0,
+    in_eur: 0, in_usd: 0,
+    wallet_count: rows.length,
+  }
+  for (const r of rows) {
+    acc.in_qubic += r.in_qubic
+    acc.in_qubic_tx += r.in_qubic_tx
+    acc.in_qubic_event += r.in_qubic_event
+    acc.in_tx_count += r.in_tx_count
+    acc.in_event_count += r.in_event_count
+    acc.out_qubic += r.out_qubic
+    acc.out_qubic_tx += r.out_qubic_tx
+    acc.out_qubic_event += r.out_qubic_event
+    acc.out_tx_count += r.out_tx_count
+    acc.out_event_count += r.out_event_count
+    acc.in_eur += r.in_eur
+    acc.in_usd += r.in_usd
+  }
+  return acc
+})
 </script>
 
 <template>
   <div class="space-y-3">
 
-    <WalletFilter v-model="selectedWallets" />
+    <PageHeader :title="t('nav.stats')"
+                :hint="activeTab === 'epochs' ? t('stats.title_epochs') : t('stats.title_overview')">
+      <div v-if="activeTab === 'epochs' && availableEpochs.length" class="flex items-center gap-2">
+        <label class="page-label">{{ t('stats.epoch_number') }}</label>
+        <select :value="activeEpoch"
+                class="input font-mono text-sm py-1 pl-2 pr-8 cursor-pointer hover:border-qubic-teal/60 transition-colors"
+                @change="setSelectedEpoch(Number($event.target.value))">
+          <option v-for="ep in availableEpochs" :key="ep" :value="ep">
+            {{ ep }}{{ ep === availableEpochs[0] ? ' · ' + t('stats.current') : '' }}
+          </option>
+        </select>
+      </div>
+      <div class="tab-group">
+        <button :class="['tab-btn', activeTab === 'epochs' && 'tab-btn-active']"
+                @click="setActiveTab('epochs')">{{ t('stats.tab_epochs') }}</button>
+        <button :class="['tab-btn', activeTab === 'overview' && 'tab-btn-active']"
+                @click="setActiveTab('overview')">{{ t('stats.tab_overview') }}</button>
+      </div>
+    </PageHeader>
 
     <PageLoader v-if="loading" />
     <template v-else>
 
-    <!-- Gesamt-KPIs -->
+    <!-- =================== EPOCHEN TAB =================== -->
+    <div v-if="activeTab === 'epochs'" class="space-y-3">
+      <div v-if="!currentEpochGroup" class="card p-6 text-center text-gray-500 text-xs">
+        {{ t('stats.no_epochs') }}
+      </div>
+
+      <template v-else>
+        <!-- Wallet filter: only wallets with in/out activity in selected epoch -->
+        <WalletFilter v-if="epochActiveWallets.length"
+                      v-model="selectedEpochWallets"
+                      :wallets="epochActiveWallets" />
+
+        <!-- Header: epoch + aggregated totals (6 cols, icon + colored label per cell) -->
+        <div class="card p-4 bg-gradient-to-r from-qubic-teal/5 to-qubic-teal/[0.02] border-qubic-teal/20">
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-qubic-border/50">
+            <!-- 1: Epoche -->
+            <div class="sm:pl-0 pb-3 sm:pb-0 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" :d="periodIcons.epoch"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('stats.epoch_number') }}</span>
+              </div>
+              <div class="font-mono text-xl text-violet-400 whitespace-nowrap">{{ currentEpochGroup.epoch }}</div>
+            </div>
+
+            <!-- 2: Incoming QUBIC -->
+            <div class="sm:pl-4 pb-3 sm:pb-0 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.incoming_qubic') }}</span>
+              </div>
+              <div class="font-mono text-xl text-green-400 whitespace-nowrap">▲ {{ fmt(currentEpochFilteredTotals.in_qubic) }}</div>
+            </div>
+
+            <!-- 3: Incoming breakdown TX / EV -->
+            <div class="sm:pl-4 pb-3 sm:pb-0 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055zM20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-gray-400">{{ t('stats.label_breakdown_in') }}</span>
+              </div>
+              <div class="text-xs font-mono leading-tight">
+                <div class="text-amber-400/90 whitespace-nowrap">TX {{ fmt(currentEpochFilteredTotals.in_qubic_tx) }}</div>
+                <div class="text-violet-400/90 whitespace-nowrap">EV {{ fmt(currentEpochFilteredTotals.in_qubic_event) }}</div>
+              </div>
+            </div>
+
+            <!-- 4: Outgoing QUBIC -->
+            <div class="sm:pl-4 pb-3 sm:pb-0 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-red-400">{{ t('stats.outgoing_qubic') }}</span>
+              </div>
+              <div class="font-mono text-xl text-red-400 whitespace-nowrap">▼ {{ fmt(currentEpochFilteredTotals.out_qubic) }}</div>
+            </div>
+
+            <!-- 5: Outgoing breakdown TX / EV -->
+            <div class="sm:pl-4 pb-3 sm:pb-0 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055zM20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-gray-400">{{ t('stats.label_breakdown_out') }}</span>
+              </div>
+              <div class="text-xs font-mono leading-tight">
+                <div class="text-amber-400/90 whitespace-nowrap">TX {{ fmt(currentEpochFilteredTotals.out_qubic_tx) }}</div>
+                <div class="text-violet-400/90 whitespace-nowrap">EV {{ fmt(currentEpochFilteredTotals.out_qubic_event) }}</div>
+              </div>
+            </div>
+
+            <!-- 6: Incoming EUR/USD -->
+            <div class="sm:pl-4 min-w-0">
+              <div class="flex items-center gap-1 mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('stats.incoming') }} {{ store.currency }}</span>
+              </div>
+              <div class="font-mono text-xl text-emerald-400 whitespace-nowrap">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wallet panel grid -->
+        <div v-if="currentEpochRows.length"
+             class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <router-link v-for="r in currentEpochRows" :key="r.wallet_id" :to="`/wallets/${r.wallet_id}`"
+                       class="card !p-3 text-left transition-all hover:border-qubic-teal/50 hover:shadow-lg hover:shadow-qubic-teal/10 group cq-panel">
+            <!-- Header: wallet label + owner -->
+            <div class="flex items-start justify-between gap-2 mb-1">
+              <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-qubic-teal flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v5zM3 10h18M7 15h4"/>
+                </svg>
+                <span class="font-medium text-sm truncate group-hover:text-qubic-teal transition-colors">
+                  {{ maskLabel(r.wallet.label, r.wallet.id) }}
+                </span>
+              </div>
+              <div class="flex items-center gap-1 text-xs text-gray-400 shrink-0 min-w-0">
+                <OwnerIcon :type="r.wallet.wallet_type" size="w-3 h-3" />
+                <span class="truncate">{{ store.hideAddresses ? '••••••' : (r.wallet.owner || '—') }}</span>
+              </div>
+            </div>
+
+            <!-- Function (left) + type pill (right), wraps on narrow widths -->
+            <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+              <span v-if="r.wallet.function" class="text-xs text-gray-500 truncate min-w-0">
+                {{ r.wallet.function }}
+              </span>
+              <span v-else></span>
+              <span :class="['pill text-xs py-0.5 px-2 shrink-0', r.wallet.wallet_type === 'BUSINESS' && 'bg-orange-500/20 text-orange-400 border-orange-500/30']">
+                {{ r.wallet.wallet_type }}
+              </span>
+            </div>
+
+            <!-- Two-column grid: Incoming (left) vs Outgoing (right) -->
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Incoming column -->
+              <div class="space-y-0.5 cq-panel min-w-0 overflow-hidden">
+                <InfoLabel :label="`${t('stats.label_incoming')} QUBIC`" :tooltip="t('stats.tt_incoming')" />
+                <div class="font-mono value-fit-lg whitespace-nowrap"
+                     :class="r.in_qubic > 0 ? 'text-green-400' : 'text-gray-600'">
+                  <template v-if="r.in_qubic > 0">▲ {{ fmt(r.in_qubic) }}</template>
+                  <template v-else>—</template>
+                </div>
+                <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')" />
+                <div class="font-mono text-xs whitespace-nowrap"
+                     :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
+                  <template v-if="r.in_qubic > 0">{{ fmtCurrency(r[inFiatKey]) }}</template>
+                  <template v-else>—</template>
+                </div>
+                <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')" />
+                <div class="font-mono text-xs whitespace-nowrap"
+                     :class="r.in_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
+                  <template v-if="r.in_qubic_tx > 0">
+                    {{ fmt(r.in_qubic_tx) }}
+                    <span class="text-amber-400/60">({{ r.in_tx_count }})</span>
+                  </template>
+                  <template v-else>—</template>
+                </div>
+                <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')" />
+                <div class="font-mono text-xs whitespace-nowrap"
+                     :class="r.in_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
+                  <template v-if="r.in_qubic_event > 0">
+                    {{ fmt(r.in_qubic_event) }}
+                    <span class="text-violet-400/60">({{ r.in_event_count }})</span>
+                  </template>
+                  <template v-else>—</template>
+                </div>
+              </div>
+
+              <!-- Outgoing column (right-aligned) -->
+              <div class="space-y-0.5 text-right cq-panel min-w-0 overflow-hidden">
+                <InfoLabel :label="`${t('stats.label_outgoing')} QUBIC`" :tooltip="t('stats.tt_outgoing')" class="justify-end" />
+                <div class="font-mono value-fit-lg whitespace-nowrap"
+                     :class="r.out_qubic > 0 ? 'text-red-400' : 'text-gray-600'">
+                  <template v-if="r.out_qubic > 0">▼ {{ fmt(r.out_qubic) }}</template>
+                  <template v-else>—</template>
+                </div>
+                <!-- spacer matching incoming Fiat row -->
+                <div class="invisible">
+                  <InfoLabel label="." />
+                  <div class="font-mono text-xs">—</div>
+                </div>
+                <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')" class="justify-end" />
+                <div class="font-mono text-xs whitespace-nowrap"
+                     :class="r.out_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
+                  <template v-if="r.out_qubic_tx > 0">
+                    {{ fmt(r.out_qubic_tx) }}
+                    <span class="text-amber-400/60">({{ r.out_tx_count }})</span>
+                  </template>
+                  <template v-else>—</template>
+                </div>
+                <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')" class="justify-end" />
+                <div class="font-mono text-xs whitespace-nowrap"
+                     :class="r.out_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
+                  <template v-if="r.out_qubic_event > 0">
+                    {{ fmt(r.out_qubic_event) }}
+                    <span class="text-violet-400/60">({{ r.out_event_count }})</span>
+                  </template>
+                  <template v-else>—</template>
+                </div>
+              </div>
+            </div>
+          </router-link>
+        </div>
+        <div v-else class="card p-6 text-center text-gray-500 text-xs">
+          {{ t('stats.no_events') }}
+        </div>
+      </template>
+    </div>
+
+    <!-- =================== ÜBERSICHT TAB =================== -->
+    <div v-else class="space-y-3">
+
+    <WalletFilter v-model="selectedWallets" />
+
+    <!-- Gesamt-KPIs (icon + colored label + bold value, like Dashboard panels) -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.events_total') }}</div>
-        <div class="text-2xl font-bold text-qubic-teal">{{ fmt(totals.events) }}</div>
+      <div class="card !p-3">
+        <div class="flex items-center gap-1 mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('stats.events_total') }}</span>
+        </div>
+        <div class="text-xl font-bold text-violet-400 whitespace-nowrap">{{ fmt(totals.events) }}</div>
       </div>
-      <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.tx_total') }}</div>
-        <div class="text-2xl font-bold text-amber-400">{{ fmt(totals.tx) }}</div>
+      <div class="card !p-3">
+        <div class="flex items-center gap-1 mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          <span class="text-xs uppercase tracking-wide text-amber-400">{{ t('stats.tx_total') }}</span>
+        </div>
+        <div class="text-xl font-bold text-amber-400 whitespace-nowrap">{{ fmt(totals.tx) }}</div>
       </div>
-      <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.volume_qubic') }}</div>
-        <div class="text-2xl font-bold">{{ fmt(totals.qubic) }}</div>
+      <div class="card !p-3">
+        <div class="flex items-center gap-1 mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-qubic-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span class="text-xs uppercase tracking-wide text-qubic-teal">{{ t('stats.volume_qubic') }}</span>
+        </div>
+        <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(totals.qubic) }}</div>
       </div>
-      <div class="card text-center">
-        <div class="text-sm uppercase text-gray-400 mb-1">{{ t('stats.volume') }} {{ store.currency }}</div>
-        <div class="text-2xl font-bold text-green-400">{{ fmtCurrency(totals.eur) }}</div>
+      <div class="card !p-3">
+        <div class="flex items-center gap-1 mb-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+          <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.volume') }} {{ store.currency }}</span>
+        </div>
+        <div class="text-xl font-bold text-green-400 whitespace-nowrap">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
 
@@ -229,21 +573,21 @@ const chartOptions = computed(() => {
             <svg xmlns="http://www.w3.org/2000/svg" :class="['w-3 h-3 flex-shrink-0', periodColors[p.key]]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" :d="periodIcons[p.key]"/>
             </svg>
-            <span :class="['text-sm uppercase tracking-wide', periodColors[p.key]]">{{ p.label }}</span>
+            <span :class="['text-sm uppercase tracking-wide', periodColors[p.key]]">{{ p.label }} QUBIC</span>
           </div>
           <span v-if="p.trend" :class="p.trend.up ? 'text-green-400' : 'text-red-400'" class="text-xs font-medium">
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
-        <div class="text-lg font-bold text-qubic-teal leading-tight">{{ fmt(p.cur.volume_qubic) }} QU</div>
-        <div class="text-xs text-gray-400 mb-0.5">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(p.cur.volume_qubic) }}</div>
+        <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-violet-400">{{ fmt(p.cur.event_count) }} Events</span>
           <span class="text-xs font-semibold text-amber-400">{{ fmt(p.cur.tx_count) }} TX</span>
         </div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
-          <div class="text-sm font-semibold text-gray-400">{{ fmt(p.prev.volume_qubic) }} QU</div>
-          <div class="text-xs text-gray-400 mb-0.5">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="text-sm font-semibold text-gray-400 whitespace-nowrap">{{ fmt(p.prev.volume_qubic) }}</div>
+          <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-violet-400/70">{{ fmt(p.prev.event_count) }} Events</span>
             <span class="text-xs text-amber-400/70">{{ fmt(p.prev.tx_count) }} TX</span>
@@ -265,7 +609,7 @@ const chartOptions = computed(() => {
 
         <!-- Toggle -->
         <div class="flex gap-2 ml-auto">
-          <button v-for="[val, lbl] in [['count', t('stats.count')],['volume_qubic','Vol. QU'],['volume_fiat',`Vol. ${store.currency}`]]"
+          <button v-for="[val, lbl] in [['count', t('stats.count')],['volume_qubic','Vol. QUBIC'],['volume_fiat',`Vol. ${store.currency}`]]"
                   :key="val"
                   :class="['btn-ghost text-sm py-1', mode === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
                   @click="mode = val">
@@ -290,6 +634,8 @@ const chartOptions = computed(() => {
 
     <div v-else-if="stats" class="card text-center py-12 text-gray-500">
       {{ t('stats.no_events') }}
+    </div>
+
     </div>
 
     </template>

@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { api, exportUrl } from '../api'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import WalletFilter from '../components/WalletFilter.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -20,8 +21,70 @@ const modeWallets = computed(() =>
   store.wallets.filter(w => w.wallet_type === mode.value.toUpperCase())
 )
 
+const firstOwner = computed(() => {
+  const owners = [...new Set(modeWallets.value.map(w => w.owner).filter(Boolean))].sort()
+  return owners[0] || ''
+})
+
+// Effective owner of the current selection (falls back to firstOwner)
+const selectedOwnerName = computed(() => {
+  if (!selectedWallets.value.length) return firstOwner.value
+  const first = store.wallets.find(w => w.id === selectedWallets.value[0])
+  return first?.owner || firstOwner.value
+})
+
 watch(mode, () => { selectedWallets.value = []; report.value = null })
 watch(year, () => { report.value = null })
+
+// Auto-run the report once a selection exists (on mount, mode change, filter change)
+watch([selectedWallets, year, mode], () => {
+  if (!selectedWallets.value.length) return
+  generateReport()
+}, { deep: true })
+
+// ── Runtime-only tax settings (loaded on mount, not persisted here) ─
+// Used for PDF/CSV export headers; the report API itself only needs year/mode/wallets.
+const taxSettings = ref({
+  country: 'DE', method: 'FIFO',
+  name: '', tax_id: '', address: '',
+  company_name: '', company_tax_nr: '', company_vat: '', company_reg: '', company_address: '',
+  fiscal_year: 'jan',
+})
+const taxSettingsLoaded = ref(false)
+const taxBaseline = ref('')
+
+function snapshotTaxSettings() {
+  taxBaseline.value = JSON.stringify(taxSettings.value)
+}
+
+const taxDirty = computed(() => {
+  if (!taxBaseline.value) return false
+  return JSON.stringify(taxSettings.value) !== taxBaseline.value
+})
+
+onMounted(async () => {
+  try {
+    const s = await api.tax.getSettings()
+    if (s) Object.assign(taxSettings.value, s)
+  } catch (e) { console.error(e) }
+  finally {
+    taxSettingsLoaded.value = true
+    snapshotTaxSettings()
+  }
+})
+
+// After settings load, auto-fill the "name"/"company_name" field from the selected owner
+watch([selectedOwnerName, mode, taxSettingsLoaded], ([owner, m, loaded]) => {
+  if (!loaded || !owner) return
+  if (m === 'private') taxSettings.value.name = owner
+  else taxSettings.value.company_name = owner
+  snapshotTaxSettings()
+})
+
+async function refreshReport() {
+  await generateReport()
+  snapshotTaxSettings()
+}
 
 function fmtNum(val, dec = 2) {
   if (val === undefined || val === null) return '—'
@@ -265,44 +328,89 @@ function exportPDF() {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3">
+    <PageHeader :title="t('nav.tax')" :hint="t('tax.title')">
+      <!-- Year picker -->
+      <div class="flex items-center gap-2">
+        <label class="page-label">{{ t('tax.year') }}</label>
+        <input v-model.number="year" type="number"
+               class="input text-sm py-1 w-20 text-center"
+               min="2024" :max="new Date().getFullYear()" />
+      </div>
+      <!-- Mode filter pills -->
+      <div class="filter-row">
+        <button :class="['filter-pill', mode === 'private'  && 'filter-pill-active']"
+                @click="mode = 'private'">{{ t('tax.mode_private') }}</button>
+        <button :class="['filter-pill', mode === 'business' && 'filter-pill-active']"
+                @click="mode = 'business'">{{ t('tax.mode_business') }}</button>
+      </div>
+    </PageHeader>
 
-    <!-- Controls -->
-    <div class="card space-y-4">
-      <h2 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.title') }}</h2>
+    <!-- Data warning directly under heading (matches collapsed WalletFilter height) -->
+    <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-300 text-center">
+      {{ t('tax.data_warning') }}
+    </div>
 
-      <div class="flex flex-wrap items-center gap-4">
-        <!-- Year -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-400 whitespace-nowrap">{{ t('tax.year') }}</span>
-          <input v-model.number="year" type="number" class="input w-24 text-center" min="2024" :max="new Date().getFullYear()" />
+    <!-- Wallet Filter: stays open on tax page, first owner preselected -->
+    <WalletFilter v-model="selectedWallets"
+                  :wallets="modeWallets"
+                  :default-open="true"
+                  :initial-owner="firstOwner" />
+
+    <!-- Editable tax data (mirrors settings page, pre-filled from owner) -->
+    <div class="card space-y-3">
+      <h3 class="text-sm font-bold uppercase text-gray-400">
+        {{ mode === 'private' ? t('tax.private_data') : t('tax.business_data') }}
+      </h3>
+
+      <!-- Private fields -->
+      <div v-if="mode === 'private'" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.name') }}</label>
+          <input v-model="taxSettings.name" type="text" class="input w-full text-sm" />
         </div>
-
-        <!-- Mode -->
-        <div class="flex items-center gap-2">
-          <span class="text-sm text-gray-400 whitespace-nowrap">{{ t('tax.mode') }}</span>
-          <div class="flex gap-1">
-            <button
-              :class="['btn-ghost text-sm py-1.5 px-3', mode === 'private' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-              @click="mode = 'private'">
-              {{ t('tax.mode_private') }}
-            </button>
-            <button
-              :class="['btn-ghost text-sm py-1.5 px-3', mode === 'business' && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-              @click="mode = 'business'">
-              {{ t('tax.mode_business') }}
-            </button>
-          </div>
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.tax_id') }}</label>
+          <input v-model="taxSettings.tax_id" type="text" class="input w-full text-sm" />
         </div>
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.address') }}</label>
+          <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
+        </div>
+      </div>
 
-        <button class="btn ml-auto" :disabled="loadingReport" @click="generateReport">
-          {{ t('tax.generate') }}
+      <!-- Business fields -->
+      <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.company_name') }}</label>
+          <input v-model="taxSettings.company_name" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.company_tax_nr') }}</label>
+          <input v-model="taxSettings.company_tax_nr" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.company_vat') }}</label>
+          <input v-model="taxSettings.company_vat" type="text" class="input w-full text-sm" />
+        </div>
+        <div>
+          <label class="page-label block mb-1">{{ t('tax.company_reg') }}</label>
+          <input v-model="taxSettings.company_reg" type="text" class="input w-full text-sm" />
+        </div>
+        <div class="md:col-span-2">
+          <label class="page-label block mb-1">{{ t('tax.company_address') }}</label>
+          <input v-model="taxSettings.company_address" type="text" class="input w-full text-sm" />
+        </div>
+      </div>
+
+      <!-- Refresh only visible when the tax data was edited -->
+      <div v-if="taxDirty" class="flex justify-end">
+        <button class="btn" :disabled="loadingReport" @click="refreshReport">
+          <span v-if="loadingReport">{{ t('common.loading') }}</span>
+          <span v-else>↻ {{ t('tax.refresh') }}</span>
         </button>
       </div>
     </div>
-
-    <!-- Wallet Filter -->
-    <WalletFilter v-model="selectedWallets" :wallets="modeWallets" />
 
 
     <!-- Loading -->
@@ -315,11 +423,6 @@ function exportPDF() {
 
     <!-- Report -->
     <template v-if="report && !loadingReport">
-
-      <!-- Data warning -->
-      <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-        {{ t('tax.data_warning') }}
-      </div>
 
       <!-- Export buttons -->
       <div class="flex flex-wrap gap-2 justify-end">

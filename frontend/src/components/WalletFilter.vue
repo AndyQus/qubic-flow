@@ -1,17 +1,49 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
+import OwnerIcon from './OwnerIcon.vue'
 
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] },
-  wallets:    { type: Array, default: null },
+  modelValue:   { type: Array,   default: () => [] },
+  wallets:      { type: Array,   default: null },
+  defaultOpen:  { type: Boolean, default: false },
+  initialOwner: { type: String,  default: '' },
 })
 const emit  = defineEmits(['update:modelValue'])
 const store = useAppStore()
 const { t } = useTranslation()
-const open  = ref(false)
+const open  = ref(props.defaultOpen)
 const selectedOwners = ref([])
+const rootRef = ref(null)
+
+function onDocClick(e) {
+  if (!open.value || props.defaultOpen) return
+  if (rootRef.value && !rootRef.value.contains(e.target)) open.value = false
+}
+
+watch(open, (v) => {
+  if (v) document.addEventListener('mousedown', onDocClick)
+  else document.removeEventListener('mousedown', onDocClick)
+})
+
+onBeforeUnmount(() => document.removeEventListener('mousedown', onDocClick))
+
+// Auto-select an initial owner: fires when the prop changes (e.g. mode switch)
+// or when wallets become available for the first time after mount.
+function applyInitialOwner() {
+  if (!props.initialOwner) return
+  const all = props.wallets ?? store.wallets
+  const owned = all.filter(w => w.owner === props.initialOwner)
+  if (!owned.length) return
+  selectedOwners.value = [props.initialOwner]
+  emit('update:modelValue', owned.map(w => w.id))
+}
+
+watch(() => props.initialOwner, applyInitialOwner, { immediate: true })
+watch(() => (props.wallets ?? store.wallets).length, (n, prev) => {
+  if (!prev && n && !props.modelValue.length) applyInitialOwner()
+})
 
 const allWallets = computed(() => props.wallets ?? store.wallets)
 
@@ -78,16 +110,23 @@ function btnClass(id) {
 function ownerBtnClass(owner) {
   const selected = selectedOwners.value.includes(owner)
   return [
-    'btn-ghost text-xs py-1 px-3 transition-colors',
+    'btn-ghost text-xs py-1 px-3 transition-colors flex items-center gap-1.5',
     selected
       ? 'bg-violet-500/20 border-violet-400 text-violet-300 hover:bg-violet-500/30'
       : 'text-gray-400 hover:bg-violet-500/10 hover:border-violet-400/60 hover:text-violet-300',
   ]
 }
+
+function ownerType(owner) {
+  const types = new Set(allWallets.value.filter(w => w.owner === owner).map(w => w.wallet_type))
+  return types.size === 1 ? [...types][0] : ''
+}
 </script>
 
 <template>
-  <div v-if="allWallets.length >= 1" class="card border-teal">
+  <div v-if="allWallets.length >= 1"
+       ref="rootRef"
+       :class="['card border-teal transition-all', open ? 'p-4' : '!py-1.5 !px-3']">
     <!-- Header -->
     <div class="flex items-center justify-between cursor-pointer select-none" @click="open = !open">
       <div class="flex items-center gap-1.5">
@@ -122,6 +161,7 @@ function ownerBtnClass(owner) {
           :class="ownerBtnClass(owner)"
           @click="toggleOwner(owner)"
         >
+          <OwnerIcon :type="ownerType(owner)" size="w-3 h-3" />
           {{ store.hideAddresses ? '••••••' : owner }}
         </button>
       </div>

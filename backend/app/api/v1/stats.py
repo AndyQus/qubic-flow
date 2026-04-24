@@ -81,6 +81,112 @@ def snapshots(limit: int = 100, db: Session = Depends(get_db)):
     return db.query(WeeklySnapshot).order_by(desc(WeeklySnapshot.snapshot_at)).limit(limit).all()
 
 
+@router.get("/stats/epochs")
+def epochs_breakdown(db: Session = Depends(get_db)):
+    """Per-epoch breakdown, aggregated per wallet.
+
+    Returns a list of epochs (desc) with per-wallet rows containing total events,
+    incoming events/volume (destination == wallet) and outgoing volume.
+    """
+    from ...models.wallet import Wallet
+
+    in_match = Event.destination_addr == Event.wallet_id
+    out_match = Event.source_address == Event.wallet_id
+    in_tx = func.iif((Event.source_type == "TX") & in_match, Event.amount_qubic, 0)
+    in_ev = func.iif((Event.source_type == "EVENT") & in_match, Event.amount_qubic, 0)
+    out_tx = func.iif((Event.source_type == "TX") & out_match, Event.amount_qubic, 0)
+    out_ev = func.iif((Event.source_type == "EVENT") & out_match, Event.amount_qubic, 0)
+    rows = (
+        db.query(
+            Event.epoch.label("epoch"),
+            Event.wallet_id.label("wallet_id"),
+            func.count(Event.id).label("events"),
+            func.sum(func.iif(in_match, 1, 0)).label("in_events"),
+            func.sum(func.iif((Event.source_type == "TX") & in_match, 1, 0)).label("in_tx_count"),
+            func.sum(func.iif((Event.source_type == "EVENT") & in_match, 1, 0)).label("in_event_count"),
+            func.coalesce(
+                func.sum(func.iif(in_match, Event.amount_qubic, 0)), 0
+            ).label("in_qubic"),
+            func.coalesce(func.sum(in_tx), 0).label("in_qubic_tx"),
+            func.coalesce(func.sum(in_ev), 0).label("in_qubic_event"),
+            func.sum(func.iif((Event.source_type == "TX") & out_match, 1, 0)).label("out_tx_count"),
+            func.sum(func.iif((Event.source_type == "EVENT") & out_match, 1, 0)).label("out_event_count"),
+            func.coalesce(
+                func.sum(func.iif(out_match, Event.amount_qubic, 0)), 0
+            ).label("out_qubic"),
+            func.coalesce(func.sum(out_tx), 0).label("out_qubic_tx"),
+            func.coalesce(func.sum(out_ev), 0).label("out_qubic_event"),
+            func.coalesce(
+                func.sum(func.iif(in_match, Event.amount_qubic * Event.qubic_eur_rate, 0.0)), 0.0
+            ).label("in_eur"),
+            func.coalesce(
+                func.sum(func.iif(in_match, Event.amount_qubic * Event.qubic_usd_rate, 0.0)), 0.0
+            ).label("in_usd"),
+        )
+        .join(Wallet, Wallet.id == Event.wallet_id)
+        .filter(Event.epoch.isnot(None), Wallet.deleted_at.is_(None))
+        .group_by(Event.epoch, Event.wallet_id)
+        .order_by(desc(Event.epoch), Event.wallet_id)
+        .all()
+    )
+
+    by_epoch: dict[int, dict] = {}
+    for r in rows:
+        bucket = by_epoch.setdefault(r.epoch, {
+            "epoch": int(r.epoch),
+            "totals": {"events": 0, "in_events": 0,
+                       "in_tx_count": 0, "in_event_count": 0,
+                       "in_qubic": 0, "in_qubic_tx": 0, "in_qubic_event": 0,
+                       "out_tx_count": 0, "out_event_count": 0,
+                       "out_qubic": 0, "out_qubic_tx": 0, "out_qubic_event": 0,
+                       "in_eur": 0.0, "in_usd": 0.0,
+                       "wallet_count": 0, "wallets_with_in": 0},
+            "wallets": [],
+        })
+        in_q = int(r.in_qubic or 0)
+        in_q_tx = int(r.in_qubic_tx or 0)
+        in_q_ev = int(r.in_qubic_event or 0)
+        out_q = int(r.out_qubic or 0)
+        out_q_tx = int(r.out_qubic_tx or 0)
+        out_q_ev = int(r.out_qubic_event or 0)
+        bucket["wallets"].append({
+            "wallet_id": r.wallet_id,
+            "events": int(r.events or 0),
+            "in_events": int(r.in_events or 0),
+            "in_tx_count": int(r.in_tx_count or 0),
+            "in_event_count": int(r.in_event_count or 0),
+            "in_qubic": in_q,
+            "in_qubic_tx": in_q_tx,
+            "in_qubic_event": in_q_ev,
+            "out_tx_count": int(r.out_tx_count or 0),
+            "out_event_count": int(r.out_event_count or 0),
+            "out_qubic": out_q,
+            "out_qubic_tx": out_q_tx,
+            "out_qubic_event": out_q_ev,
+            "in_eur": float(r.in_eur or 0.0),
+            "in_usd": float(r.in_usd or 0.0),
+        })
+        bucket["totals"]["events"] += int(r.events or 0)
+        bucket["totals"]["in_events"] += int(r.in_events or 0)
+        bucket["totals"]["in_tx_count"] += int(r.in_tx_count or 0)
+        bucket["totals"]["in_event_count"] += int(r.in_event_count or 0)
+        bucket["totals"]["in_qubic"] += in_q
+        bucket["totals"]["in_qubic_tx"] += in_q_tx
+        bucket["totals"]["in_qubic_event"] += in_q_ev
+        bucket["totals"]["out_tx_count"] += int(r.out_tx_count or 0)
+        bucket["totals"]["out_event_count"] += int(r.out_event_count or 0)
+        bucket["totals"]["out_qubic"] += out_q
+        bucket["totals"]["out_qubic_tx"] += out_q_tx
+        bucket["totals"]["out_qubic_event"] += out_q_ev
+        bucket["totals"]["in_eur"] += float(r.in_eur or 0.0)
+        bucket["totals"]["in_usd"] += float(r.in_usd or 0.0)
+        bucket["totals"]["wallet_count"] += 1
+        if in_q > 0:
+            bucket["totals"]["wallets_with_in"] += 1
+
+    return sorted(by_epoch.values(), key=lambda b: b["epoch"], reverse=True)
+
+
 @router.get("/stats/history")
 def history(
     group_by: str = "week",

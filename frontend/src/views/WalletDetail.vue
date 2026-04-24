@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import EventsTable from '../components/EventsTable.vue'
+import PageHeader from '../components/PageHeader.vue'
+import BackButton from '../components/BackButton.vue'
 import { useTranslation } from 'i18next-vue'
 import { useQubicUtils } from '../composables/useQubicUtils'
 
@@ -171,13 +173,10 @@ async function resyncTx() {
 <template>
   <div class="space-y-3">
 
-    <!-- Back button -->
-    <button class="btn-ghost text-sm flex items-center gap-1.5 w-fit" @click="goBack">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-      {{ t('common.back') }}
-    </button>
+    <PageHeader :title="t('nav.wallets')" :hint="wallet ? maskLabel(wallet.label, wallet.id) : ''" />
+    <div class="!mt-1">
+      <BackButton :label="t('common.back')" @click="goBack" />
+    </div>
 
     <!-- Wallet-Header -->
     <div v-if="wallet" class="card">
@@ -222,7 +221,7 @@ async function resyncTx() {
             </span>
           </div>
           <div class="text-right">
-            <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QUBIC</div>
+            <div class="text-xs text-gray-400 uppercase tracking-wide">{{ t('wallet.balance') }} QU</div>
             <div class="flex items-center justify-end gap-1.5 mt-0.5">
               <span class="font-mono text-sm" :class="wallet.balance == null ? 'text-gray-600 italic' : 'text-gray-200'">
                 {{ wallet.balance == null ? t('wallet.balance_pending') : (store.hideAddresses ? '••••••' : wallet.balance.toLocaleString(store.locale)) }}

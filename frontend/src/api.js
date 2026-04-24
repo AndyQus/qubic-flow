@@ -56,6 +56,7 @@ export const api = {
       const q = buildQuery({ group_by: groupBy, wallet_ids: walletIds })
       return req(`/stats/history${q ? '?' + q : ''}`)
     },
+    epochs:   () => req('/stats/epochs'),
   },
   labels: {
     list: (params = {}) => {

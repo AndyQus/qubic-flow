@@ -35,6 +35,7 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 - **Wallet-Balances** — aktueller Kontostand je Wallet wird automatisch nachgeführt
 - **EUR/USD-Kurse** — täglich von CoinGecko abgerufen, in DB gecacht
 - **Statistik-Panels** — Stunden / Tag / Epoch / Monat / Jahr, je mit aktueller und vorheriger Periode
+- **Epochen-Ansicht** — aktuelle Epoche als Wallet-Panel-Grid (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Split, ausgehende Qubics); Filter „Alle“ / „Nur mit Eingang“
 - **Wöchentliche Snapshots** — jeden Mittwoch 12:00 UTC
 - **3 Animations-Varianten** für neue Events: Push Down, Slide In, Beam Drop (einstellbar)
 - **Live-Updates** per WebSocket (Events + Node-Status)
@@ -330,7 +331,10 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Doku: `http://localhost:8000/docs`
 | POST    | `/nodes`                              | Node anlegen                             |
 | PUT     | `/nodes/{id}`                         | Node bearbeiten                          |
 | DELETE  | `/nodes/{id}`                         | Node löschen                             |
-| GET     | `/stats`                              | Statistik-Panels (current + previous)    |
+| GET     | `/stats/current`                      | Statistik-Panels (current + previous)    |
+| GET     | `/stats/history`                      | Wöchentliche/monatliche Zeitreihe        |
+| GET     | `/stats/snapshots`                    | Gespeicherte Weekly-Snapshots            |
+| GET     | `/stats/epochs`                       | Epochen-Breakdown je Wallet (Ein-/Ausgang, TX/Event-Split) |
 | GET     | `/export/cointracking`                | CoinTracking CSV (`?year=2024`)          |
 | GET     | `/export/steuerberater`               | Steuerberater CSV (`?year=2024`)         |
 | GET     | `/tax/settings`                       | Steuer-Einstellungen lesen               |

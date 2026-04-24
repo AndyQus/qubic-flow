@@ -4,6 +4,7 @@ import { useTranslation } from 'i18next-vue'
 import i18next from 'i18next'
 import { api } from '../api'
 import { ref, computed, onMounted } from 'vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
@@ -172,6 +173,8 @@ function simulate() {
 </script>
 
 <template>
+  <div class="space-y-3">
+  <PageHeader :title="t('nav.settings')" :hint="t('page_hint.settings')" />
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
     <!-- Eingangsanimation (nach Darstellung) -->
     <div class="card" style="order:2">
@@ -452,5 +455,6 @@ function simulate() {
         </button>
       </div>
     </div>
+  </div>
   </div>
 </template>

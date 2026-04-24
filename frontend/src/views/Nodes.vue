@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import PageLoader from '../components/PageLoader.vue'
+import PageHeader from '../components/PageHeader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
@@ -85,10 +86,10 @@ onMounted(reload)
 </script>
 
 <template>
-  <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-bold">Nodes</h2>
+  <div class="space-y-3">
+  <PageHeader :title="t('nav.nodes')" :hint="t('page_hint.nodes')">
     <button class="btn" @click="editId = null; showForm = !showForm">+ {{ t('node.add') }}</button>
-  </div>
+  </PageHeader>
 
   <PageLoader v-if="loading" />
 
@@ -154,4 +155,5 @@ onMounted(reload)
     </table>
   </div>
   </template>
+  </div>
 </template>

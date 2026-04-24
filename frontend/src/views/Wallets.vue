@@ -5,7 +5,18 @@ import { useAppStore } from '../stores/app'
 import { api } from '../api'
 import { useTranslation } from 'i18next-vue'
 import PageLoader from '../components/PageLoader.vue'
+import PageHeader from '../components/PageHeader.vue'
+import OwnerIcon from '../components/OwnerIcon.vue'
+import BackButton from '../components/BackButton.vue'
 import { useQubicUtils } from '../composables/useQubicUtils'
+
+function groupIconType(group) {
+  return group.types.size === 1 ? [...group.types][0] : ''
+}
+function ownerIconType(ownerName) {
+  const types = new Set(store.wallets.filter(w => w.owner === ownerName).map(w => w.wallet_type))
+  return types.size === 1 ? [...types][0] : ''
+}
 
 const store = useAppStore()
 const { t } = useTranslation()
@@ -247,22 +258,28 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- Top bar: type filter + tab switcher -->
-  <div class="flex items-center justify-between mb-4 gap-2 flex-wrap">
-    <div class="flex gap-2 flex-wrap">
-      <button :class="['btn-ghost text-sm', store.walletFilter === 'all'      && 'bg-qubic-teal/20 border-qubic-teal']"
+  <div class="space-y-3">
+  <PageHeader :title="t('nav.wallets')"
+              :hint="activeTab === 'portfolio' ? t('wallet.tab_portfolio') : t('wallet.tab_config')">
+    <div class="filter-row">
+      <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
-      <button :class="['btn-ghost text-sm', store.walletFilter === 'private'  && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
               @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
-      <button :class="['btn-ghost text-sm', store.walletFilter === 'business' && 'bg-qubic-teal/20 border-qubic-teal']"
+      <button :class="['filter-pill', store.walletFilter === 'business' && 'filter-pill-active']"
               @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
     </div>
-    <div class="flex gap-0.5 bg-qubic-surface border border-qubic-border rounded-lg p-0.5">
-      <button :class="['btn-ghost text-sm py-1 px-3 border-0 rounded-md transition-all', activeTab === 'portfolio' && 'bg-qubic-teal/20 text-qubic-teal']"
+    <div class="tab-group">
+      <button :class="['tab-btn', activeTab === 'portfolio' && 'tab-btn-active']"
               @click="setActiveTab('portfolio')">{{ t('wallet.tab_portfolio') }}</button>
-      <button :class="['btn-ghost text-sm py-1 px-3 border-0 rounded-md transition-all', activeTab === 'config' && 'bg-qubic-teal/20 text-qubic-teal']"
+      <button :class="['tab-btn', activeTab === 'config' && 'tab-btn-active']"
               @click="setActiveTab('config')">{{ t('wallet.tab_config') }}</button>
     </div>
+  </PageHeader>
+
+  <!-- Back button directly under the heading (only in portfolio drilldown) -->
+  <div v-if="activeTab === 'portfolio' && selectedPortfolioOwner && selectedGroup" class="!mt-1">
+    <BackButton :label="t('common.back')" @click="backToOwners" />
   </div>
 
   <PageLoader v-if="loading" />
@@ -273,29 +290,64 @@ onMounted(async () => {
     <div v-if="activeTab === 'portfolio'" class="space-y-3">
       <div v-if="!ownerGroups.length" class="card p-6 text-center text-gray-500 text-xs">{{ t('wallet.none') }}</div>
 
-      <!-- Grand total summary bar -->
+      <!-- Grand total summary bar (icon + colored label per column, like Dashboard panels) -->
       <div v-if="ownerGroups.length" class="card p-4 bg-gradient-to-r from-qubic-teal/5 to-qubic-teal/[0.02] border-qubic-teal/20">
-        <div class="flex items-center flex-wrap gap-6">
-          <div class="flex-1 min-w-[140px]">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500">{{ t('wallet.portfolio_total') }}</div>
-            <div class="font-mono text-lg" :class="store.hideAddresses ? 'text-gray-500' : 'text-gray-200'">
-              {{ store.hideAddresses ? '••••••' : grandTotal.balance.toLocaleString(store.locale) }} QU
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-qubic-border/50">
+          <!-- Portfolio Total QUBIC -->
+          <div class="md:pl-0 pb-3 md:pb-0 min-w-0">
+            <div class="flex items-center gap-1 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-qubic-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+              </svg>
+              <span class="text-xs uppercase tracking-wide text-qubic-teal">{{ t('wallet.portfolio_total') }} QUBIC</span>
+            </div>
+            <div class="font-mono text-xl whitespace-nowrap" :class="store.hideAddresses ? 'text-gray-500' : 'text-qubic-teal'">
+              {{ store.hideAddresses ? '••••••' : grandTotal.balance.toLocaleString(store.locale) }}
             </div>
           </div>
-          <div v-if="grandTotal.hasValue" class="min-w-[120px]">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500">{{ t('wallet.value') }}</div>
-            <div class="font-mono text-lg">{{ fmtFiat(grandTotal.value) }}</div>
+
+          <!-- Current value -->
+          <div v-if="grandTotal.hasValue" class="md:pl-4 pb-3 md:pb-0 min-w-0">
+            <div class="flex items-center gap-1 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('wallet.value') }}</span>
+            </div>
+            <div class="font-mono text-xl text-emerald-400 whitespace-nowrap">{{ fmtFiat(grandTotal.value) }}</div>
           </div>
-          <div v-if="grandTotal.hasCost" class="min-w-[140px]">
-            <div class="text-[10px] uppercase tracking-wide text-gray-500">{{ t('wallet.pnl_unrealized') }}</div>
-            <div class="font-mono text-lg" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
+
+          <!-- Unrealized P&L -->
+          <div v-if="grandTotal.hasCost" class="md:pl-4 pb-3 md:pb-0 min-w-0">
+            <div class="flex items-center gap-1 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg"
+                   :class="['w-3 h-3 flex-shrink-0', (grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400']"
+                   fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+              </svg>
+              <span class="text-xs uppercase tracking-wide"
+                    :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
+                {{ t('wallet.pnl_unrealized') }}
+              </span>
+            </div>
+            <div class="font-mono text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
               {{ (grandTotal.value - grandTotal.cost) >= 0 ? '+' : '' }}{{ fmtFiat(grandTotal.value - grandTotal.cost) }}
-              <span class="text-xs">{{ fmtPct((grandTotal.value - grandTotal.cost) / grandTotal.cost * 100) }}</span>
+              <span class="text-xs font-normal"
+                    :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
+                {{ fmtPct((grandTotal.value - grandTotal.cost) / grandTotal.cost * 100) }}
+              </span>
             </div>
           </div>
-          <div v-if="unitPrice != null" class="text-xs text-gray-500 leading-tight">
-            <div>{{ t('wallet.current_price') }}</div>
-            <div class="font-mono text-gray-400">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
+
+          <!-- Current price -->
+          <div v-if="unitPrice != null" class="md:pl-4 min-w-0">
+            <div class="flex items-center gap-1 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+              </svg>
+              <span class="text-xs uppercase tracking-wide text-sky-400">{{ t('wallet.current_price') }}</span>
+            </div>
+            <div class="font-mono text-xl text-sky-400 whitespace-nowrap">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
           </div>
         </div>
       </div>
@@ -304,14 +356,12 @@ onMounted(async () => {
       <div v-if="!selectedPortfolioOwner && ownerGroups.length"
            class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <button v-for="group in ownerGroups" :key="group.owner"
-                class="card !p-3 text-left transition-all hover:border-qubic-teal/50 hover:shadow-lg hover:shadow-qubic-teal/10 group"
+                class="card !p-3 text-left transition-all hover:border-qubic-teal/50 hover:shadow-lg hover:shadow-qubic-teal/10 group cq-panel"
                 @click="selectPortfolioOwner(group.owner)">
           <!-- Header: owner + wallet count badge -->
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="flex items-center gap-1.5 min-w-0 flex-1">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-qubic-teal flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-              </svg>
+              <OwnerIcon :type="groupIconType(group)" />
               <span class="font-medium text-sm truncate group-hover:text-qubic-teal transition-colors">
                 {{ store.hideAddresses ? '••••••' : group.owner }}
               </span>
@@ -322,24 +372,24 @@ onMounted(async () => {
           </div>
 
           <!-- Balance (hero value) -->
-          <div class="font-mono text-base leading-tight mb-1" :class="group.hasNullBalance ? 'text-gray-500 italic' : 'text-gray-200'">
+          <div class="font-mono text-lg mb-1 whitespace-nowrap" :class="group.hasNullBalance ? 'text-gray-500 italic' : 'text-gray-200'">
             {{ store.hideAddresses ? '••••••' : group.totalBalance.toLocaleString(store.locale) }}
-            <span class="text-sm text-gray-500">QU</span>
+            <span class="text-sm text-gray-500 ml-0.5">QUBIC</span>
           </div>
 
           <!-- Fiat value -->
-          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5">
+          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5 whitespace-nowrap">
             {{ fmtFiat(group.totalValue) }}
           </div>
 
           <!-- P&L row -->
           <div v-if="group.hasCost" class="flex items-baseline gap-2 mt-1 flex-wrap">
-            <span class="font-mono text-sm font-semibold"
+            <span class="font-mono text-sm font-semibold whitespace-nowrap"
                   :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'">
               {{ (group.totalValue - group.totalCost) >= 0 ? '▲' : '▼' }}
               {{ fmtPct((group.totalValue - group.totalCost) / group.totalCost * 100) }}
             </span>
-            <span class="font-mono text-xs"
+            <span class="font-mono text-xs whitespace-nowrap"
                   :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
               {{ (group.totalValue - group.totalCost) >= 0 ? '+' : '' }}{{ fmtFiat(group.totalValue - group.totalCost) }}
             </span>
@@ -362,23 +412,20 @@ onMounted(async () => {
 
       <!-- View B: Wallet list for selected owner -->
       <div v-if="selectedPortfolioOwner && selectedGroup">
-        <!-- Back nav + owner summary -->
-        <div class="flex items-center justify-between gap-3 mb-3 flex-wrap">
-          <button class="btn-ghost text-sm flex items-center gap-1.5" @click="backToOwners">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            {{ t('wallet.back_to_owners') }}
-          </button>
+        <!-- Owner summary -->
+        <div class="flex items-center justify-end gap-3 mb-3 flex-wrap">
           <div class="flex items-center gap-4 flex-wrap">
             <div>
               <div class="text-xs text-gray-500">{{ t('filter.owner') }}</div>
-              <div class="font-medium">{{ store.hideAddresses ? '••••••' : selectedGroup.owner }}</div>
+              <div class="font-medium flex items-center gap-1.5">
+                <OwnerIcon :type="groupIconType(selectedGroup)" />
+                {{ store.hideAddresses ? '••••••' : selectedGroup.owner }}
+              </div>
             </div>
             <div class="text-right">
               <div class="text-xs text-gray-500">{{ t('wallet.balance') }}</div>
               <div class="font-mono text-sm">
-                {{ store.hideAddresses ? '••••••' : selectedGroup.totalBalance.toLocaleString(store.locale) }} QU
+                {{ store.hideAddresses ? '••••••' : selectedGroup.totalBalance.toLocaleString(store.locale) }}<span class="ml-0.5 text-gray-500">QUBIC</span>
               </div>
             </div>
             <div v-if="selectedGroup.hasValue" class="text-right">
@@ -405,7 +452,7 @@ onMounted(async () => {
                 <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</div>
                 <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }} QU</span>
+                  <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}<span class="ml-0.5 text-gray-500">QUBIC</span></span>
                   <span v-if="walletValue(w) != null" class="text-xs font-mono text-gray-400">· {{ fmtFiat(walletValue(w)) }}</span>
                   <span v-if="walletPnl(w) != null" class="text-xs font-mono"
                         :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'">
@@ -427,7 +474,7 @@ onMounted(async () => {
                 <th class="th">{{ t('wallet.label') }}</th>
                 <th class="th hidden md:table-cell">{{ t('wallet.address') }}</th>
                 <th class="th">{{ t('wallet.type') }}</th>
-                <th class="th-right whitespace-nowrap">{{ t('wallet.balance') }} QU</th>
+                <th class="th-right whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.value') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.pnl') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.entries') }}</th>
@@ -501,10 +548,11 @@ onMounted(async () => {
       <div v-if="uniqueOwners.length" class="flex flex-wrap items-center gap-2">
         <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('filter.owner') }}:</span>
         <button v-for="owner in uniqueOwners" :key="owner"
-                :class="['btn-ghost text-xs py-1 px-3 transition-colors', selectedOwner === owner
+                :class="['btn-ghost text-xs py-1 px-3 transition-colors flex items-center gap-1.5', selectedOwner === owner
                   ? 'bg-violet-500/20 border-violet-400 text-violet-300'
                   : 'text-gray-400 hover:bg-violet-500/10 hover:border-violet-400/60 hover:text-violet-300']"
                 @click="selectedOwner = selectedOwner === owner ? null : owner">
+          <OwnerIcon :type="ownerIconType(owner)" size="w-3 h-3" />
           {{ store.hideAddresses ? '••••••' : owner }}
         </button>
       </div>
@@ -678,7 +726,13 @@ onMounted(async () => {
                 </svg>
               </div>
             </td>
-            <td class="td text-gray-400 hidden md:table-cell">{{ store.hideAddresses ? '••••••' : (w.owner || '—') }}</td>
+            <td class="td text-gray-400 hidden md:table-cell">
+              <div v-if="w.owner" class="flex items-center gap-1.5">
+                <OwnerIcon :type="w.wallet_type" size="w-3 h-3" />
+                <span>{{ store.hideAddresses ? '••••••' : w.owner }}</span>
+              </div>
+              <span v-else>—</span>
+            </td>
             <td class="td">
               <div class="flex items-center gap-2 font-mono text-gray-400">
                 <span :title="store.hideAddresses ? '' : w.id">
@@ -731,4 +785,5 @@ onMounted(async () => {
   </div>
     </template><!-- end config tab -->
   </template>
+  </div>
 </template>
