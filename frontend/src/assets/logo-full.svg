@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 150" width="480" height="150">
+  <title>QubicFlow</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#07111F"/>
+      <stop offset="100%" stop-color="#0D1A2E"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#23FFFF"/>
+      <stop offset="100%" stop-color="#00CCCC"/>
+    </linearGradient>
+    <linearGradient id="left-split" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#23FFFF"/>
+      <stop offset="50%" stop-color="#00CCCC"/>
+      <stop offset="50%" stop-color="#ef4444"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+    <linearGradient id="text-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="58%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#23FFFF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="16%" cy="50%" r="28%">
+      <stop offset="0%" stop-color="#23FFFF" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#23FFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="480" height="150" rx="14" fill="url(#bg)"/>
+  <rect width="480" height="150" rx="14" fill="url(#glow)"/>
+  <rect width="480" height="150" rx="14" fill="none" stroke="#23FFFF" stroke-width="0.8" stroke-opacity="0.22"/>
+
+  <!-- Mark: Qubic bars centered in the mark area (x=0..160) -->
+  <!-- Bars natural 30.154 x 51.692, scale 1.75 = 52.77 x 90.46 -->
+  <!-- Translate x = (160 - 52.77)/2 = 53.6; y = (150 - 90.46)/2 = 29.77 -->
+  <g transform="translate(53.6, 29.77) scale(1.75)">
+    <path fill="url(#left-split)"
+          d="M11.308 0H1.615C.723 0 0 .724 0 1.616v35.538c0 .892.723 1.616 1.615 1.616h9.693c.892 0 1.615-.724 1.615-1.616V1.616C12.923.724 12.2 0 11.308 0Z"/>
+    <path fill="url(#accent)"
+          d="M28.538 0h-9.692c-.892 0-1.616.723-1.616 1.615v48.462c0 .892.724 1.615 1.616 1.615h9.692c.892 0 1.616-.723 1.616-1.615V1.615C30.154.723 29.43 0 28.538 0Z"/>
+  </g>
+
+  <!-- Separator -->
+  <rect x="160" y="24" width="1" height="102" fill="#23FFFF" fill-opacity="0.22"/>
+
+  <!-- Wordmark -->
+  <text x="182" y="78" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="46" font-weight="900" letter-spacing="-1.5" fill="url(#text-grad)">QubicFlow</text>
+
+  <!-- Tagline (50% larger) -->
+  <circle cx="185" cy="110" r="2.5" fill="#23FFFF" fill-opacity="0.6"/>
+  <text x="196" y="115" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600" letter-spacing="4" fill="#23FFFF" fill-opacity="0.75">WALLET TRACKER</text>
+</svg>

@@ -345,7 +345,7 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('stats.epoch_number') }}</span>
               </div>
-              <div class="font-mono text-xl text-violet-400 whitespace-nowrap">{{ currentEpochGroup.epoch }}</div>
+              <div class="font-mono text-base sm:text-xl text-violet-400 whitespace-nowrap">{{ currentEpochGroup.epoch }}</div>
             </div>
 
             <!-- 2: Incoming QUBIC -->
@@ -356,7 +356,7 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.incoming_qubic') }}</span>
               </div>
-              <div class="font-mono text-xl text-green-400 whitespace-nowrap">▲ {{ fmt(currentEpochFilteredTotals.in_qubic) }}</div>
+              <div class="font-mono text-base sm:text-xl text-green-400 whitespace-nowrap">▲ {{ fmt(currentEpochFilteredTotals.in_qubic) }}</div>
             </div>
 
             <!-- 3: Incoming breakdown TX / EV -->
@@ -381,7 +381,7 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-red-400">{{ t('stats.outgoing_qubic') }}</span>
               </div>
-              <div class="font-mono text-xl text-red-400 whitespace-nowrap">▼ {{ fmt(currentEpochFilteredTotals.out_qubic) }}</div>
+              <div class="font-mono text-base sm:text-xl text-red-400 whitespace-nowrap">▼ {{ fmt(currentEpochFilteredTotals.out_qubic) }}</div>
             </div>
 
             <!-- 5: Outgoing breakdown TX / EV -->
@@ -406,7 +406,7 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('stats.incoming') }} {{ store.currency }}</span>
               </div>
-              <div class="font-mono text-xl text-emerald-400 whitespace-nowrap">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
+              <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
             </div>
           </div>
         </div>
@@ -534,7 +534,7 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('stats.events_total') }}</span>
         </div>
-        <div class="text-xl font-bold text-violet-400 whitespace-nowrap">{{ fmt(totals.events) }}</div>
+        <div class="text-base sm:text-xl font-bold text-violet-400 whitespace-nowrap">{{ fmt(totals.events) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -543,7 +543,7 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-amber-400">{{ t('stats.tx_total') }}</span>
         </div>
-        <div class="text-xl font-bold text-amber-400 whitespace-nowrap">{{ fmt(totals.tx) }}</div>
+        <div class="text-base sm:text-xl font-bold text-amber-400 whitespace-nowrap">{{ fmt(totals.tx) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -552,7 +552,7 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-qubic-teal">{{ t('stats.volume_qubic') }}</span>
         </div>
-        <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(totals.qubic) }}</div>
+        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -561,7 +561,7 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.volume') }} {{ store.currency }}</span>
         </div>
-        <div class="text-xl font-bold text-green-400 whitespace-nowrap">{{ fmtCurrency(totals.eur) }}</div>
+        <div class="text-base sm:text-xl font-bold text-green-400 whitespace-nowrap">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
 
@@ -579,7 +579,7 @@ const currentEpochFilteredTotals = computed(() => {
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
-        <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(p.cur.volume_qubic) }}</div>
+        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(p.cur.volume_qubic) }}</div>
         <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-violet-400">{{ fmt(p.cur.event_count) }} Events</span>

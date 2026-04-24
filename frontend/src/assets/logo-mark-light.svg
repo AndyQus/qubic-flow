@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>QubicFlow</title>
+  <defs>
+    <linearGradient id="qfg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00A0A0"/>
+      <stop offset="100%" stop-color="#006666"/>
+    </linearGradient>
+    <linearGradient id="qfg-split" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00A0A0"/>
+      <stop offset="50%" stop-color="#006666"/>
+      <stop offset="50%" stop-color="#dc2626"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Qubic bars, centered in the 64x64 viewBox -->
+  <g transform="translate(18.43, 8.74) scale(0.9)">
+    <path fill="url(#qfg-split)"
+          d="M11.308 0H1.615C.723 0 0 .724 0 1.616v35.538c0 .892.723 1.616 1.615 1.616h9.693c.892 0 1.615-.724 1.615-1.616V1.616C12.923.724 12.2 0 11.308 0Z"/>
+    <path fill="url(#qfg)"
+          d="M28.538 0h-9.692c-.892 0-1.616.723-1.616 1.615v48.462c0 .892.724 1.615 1.616 1.615h9.692c.892 0 1.616-.723 1.616-1.615V1.615C30.154.723 29.43 0 28.538 0Z"/>
+  </g>
+</svg>

@@ -53,7 +53,7 @@ function fmt(n) {
           </div>
         </template>
         <template v-else>
-          <div class="text-xl font-bold text-qubic-teal whitespace-nowrap">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }}</div>
+          <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ stats ? fmt(stats[k].current.volume_qubic) : '—' }}</div>
           <div class="flex items-center gap-2 mt-0.5">
             <span class="text-xs font-semibold text-violet-400">{{ stats ? fmt(stats[k].current.event_count) : '—' }} Events</span>
             <span class="text-xs font-semibold text-amber-400">{{ stats ? fmt(stats[k].current.tx_count) : '—' }} TX</span>

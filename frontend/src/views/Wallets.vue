@@ -301,7 +301,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-qubic-teal">{{ t('wallet.portfolio_total') }} QUBIC</span>
             </div>
-            <div class="font-mono text-xl whitespace-nowrap" :class="store.hideAddresses ? 'text-gray-500' : 'text-qubic-teal'">
+            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="store.hideAddresses ? 'text-gray-500' : 'text-qubic-teal'">
               {{ store.hideAddresses ? '••••••' : grandTotal.balance.toLocaleString(store.locale) }}
             </div>
           </div>
@@ -314,7 +314,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('wallet.value') }}</span>
             </div>
-            <div class="font-mono text-xl text-emerald-400 whitespace-nowrap">{{ fmtFiat(grandTotal.value) }}</div>
+            <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap">{{ fmtFiat(grandTotal.value) }}</div>
           </div>
 
           <!-- Unrealized P&L -->
@@ -330,7 +330,7 @@ onMounted(async () => {
                 {{ t('wallet.pnl_unrealized') }}
               </span>
             </div>
-            <div class="font-mono text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
+            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
               {{ (grandTotal.value - grandTotal.cost) >= 0 ? '+' : '' }}{{ fmtFiat(grandTotal.value - grandTotal.cost) }}
               <span class="text-xs font-normal"
                     :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
@@ -347,7 +347,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-sky-400">{{ t('wallet.current_price') }}</span>
             </div>
-            <div class="font-mono text-xl text-sky-400 whitespace-nowrap">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
+            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
           </div>
         </div>
       </div>

@@ -1,11 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <title>QubicFlow</title>
   <defs>
-    <linearGradient id="fav-grad" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="qfg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#23FFFF"/>
       <stop offset="100%" stop-color="#00CCCC"/>
     </linearGradient>
-    <linearGradient id="fav-split" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="qfg-split" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#23FFFF"/>
       <stop offset="50%" stop-color="#00CCCC"/>
       <stop offset="50%" stop-color="#ef4444"/>
@@ -13,16 +13,13 @@
     </linearGradient>
   </defs>
 
-  <!-- Rounded square background -->
-  <rect width="32" height="32" rx="7" fill="#0C1628"/>
-
-  <!-- Qubic bars, centered in the 32x32 viewBox -->
-  <!-- Bars natural size 30.154 x 51.692, scale 0.4 = 12.06 x 20.68 -->
-  <!-- Translate: x=(32-12.06)/2=9.97, y=(32-20.68)/2=5.66 -->
-  <g transform="translate(9.97, 5.66) scale(0.4)">
-    <path fill="url(#fav-split)"
+  <!-- Qubic bars, centered in the 64x64 viewBox -->
+  <!-- Bars natural 30.154 x 51.692, scale 0.9 = 27.14 x 46.52 -->
+  <!-- Translate: x=(64-27.14)/2=18.43, y=(64-46.52)/2=8.74 -->
+  <g transform="translate(18.43, 8.74) scale(0.9)">
+    <path fill="url(#qfg-split)"
           d="M11.308 0H1.615C.723 0 0 .724 0 1.616v35.538c0 .892.723 1.616 1.615 1.616h9.693c.892 0 1.615-.724 1.615-1.616V1.616C12.923.724 12.2 0 11.308 0Z"/>
-    <path fill="url(#fav-grad)"
+    <path fill="url(#qfg)"
           d="M28.538 0h-9.692c-.892 0-1.616.723-1.616 1.615v48.462c0 .892.724 1.615 1.616 1.615h9.692c.892 0 1.616-.723 1.616-1.615V1.615C30.154.723 29.43 0 28.538 0Z"/>
   </g>
 </svg>

@@ -1,10 +1,14 @@
 <script setup>
+import { computed } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
-import logoUrl from '../assets/logo-v1.svg'
+import logoDark from '../assets/logo-full.svg'
+import logoLight from '../assets/logo-full-light.svg'
 
 const store = useAppStore()
 const { t } = useTranslation()
+
+const logoUrl = computed(() => store.theme === 'light' ? logoLight : logoDark)
 </script>
 
 <template>
