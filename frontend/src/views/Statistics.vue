@@ -51,7 +51,27 @@ const epochsData     = ref([])
 const mode           = ref('count')
 const selectedWallets = ref([])
 const selectedEpochWallets = ref([])
+const selectedFunction = ref(null)
 const loading = ref(true)
+
+const FUNCTION_COLORS = [
+  { active: 'bg-sky-500/20 border-sky-400 text-sky-300',       idle: 'text-gray-400 hover:bg-sky-500/10 hover:border-sky-400/60 hover:text-sky-300'      },
+  { active: 'bg-amber-500/20 border-amber-400 text-amber-300',  idle: 'text-gray-400 hover:bg-amber-500/10 hover:border-amber-400/60 hover:text-amber-300'  },
+  { active: 'bg-violet-500/20 border-violet-400 text-violet-300', idle: 'text-gray-400 hover:bg-violet-500/10 hover:border-violet-400/60 hover:text-violet-300' },
+  { active: 'bg-rose-500/20 border-rose-400 text-rose-300',     idle: 'text-gray-400 hover:bg-rose-500/10 hover:border-rose-400/60 hover:text-rose-300'     },
+  { active: 'bg-emerald-500/20 border-emerald-400 text-emerald-300', idle: 'text-gray-400 hover:bg-emerald-500/10 hover:border-emerald-400/60 hover:text-emerald-300' },
+  { active: 'bg-orange-500/20 border-orange-400 text-orange-300', idle: 'text-gray-400 hover:bg-orange-500/10 hover:border-orange-400/60 hover:text-orange-300' },
+  { active: 'bg-pink-500/20 border-pink-400 text-pink-300',     idle: 'text-gray-400 hover:bg-pink-500/10 hover:border-pink-400/60 hover:text-pink-300'     },
+]
+
+function functionBtnClass(fn, i) {
+  const c = FUNCTION_COLORS[i % FUNCTION_COLORS.length]
+  return ['btn-ghost text-xs py-1 px-3 transition-colors', selectedFunction.value === fn ? c.active : c.idle]
+}
+
+function toggleFunction(fn) {
+  selectedFunction.value = selectedFunction.value === fn ? null : fn
+}
 
 // Tabs + epoch selection, URL-synced (?tab=epochs|overview&epoch=168&ext=1)
 const activeTab = ref(route.query.tab === 'overview' ? 'overview' : 'epochs')
@@ -87,7 +107,11 @@ function toggleExtended() {
 async function loadStats() {
   loading.value = true
   try {
-    const ids = selectedWallets.value
+    let ids = selectedWallets.value
+    if (selectedFunction.value) {
+      const fnIds = new Set(store.wallets.filter(w => w.function === selectedFunction.value).map(w => w.id))
+      ids = ids.length ? ids.filter(id => fnIds.has(id)) : [...fnIds]
+    }
     ;[stats.value, snaps.value, history.value, epochsData.value] = await Promise.all([
       api.stats.current(ids),
       ids.length ? Promise.resolve([]) : api.stats.snapshots(),
@@ -98,6 +122,7 @@ async function loadStats() {
 }
 
 watch(selectedWallets, loadStats, { deep: true })
+watch(selectedFunction, loadStats)
 onMounted(loadStats)
 
 // ── Formatierung ────────────────────────────────────────────────
@@ -260,8 +285,14 @@ const epochActiveWallets = computed(() => {
     .filter(w => w && w.deleted_at == null)
 })
 
-// Reset epoch-specific wallet selection when the epoch changes
-watch(activeEpoch, () => { selectedEpochWallets.value = [] })
+// Reset epoch-specific wallet selection + function when the epoch or tab changes
+watch(activeEpoch, () => { selectedEpochWallets.value = []; selectedFunction.value = null })
+watch(activeTab,   () => { selectedFunction.value = null })
+
+const availableFunctions = computed(() => {
+  const walletList = activeTab.value === 'epochs' ? epochActiveWallets.value : store.wallets
+  return [...new Set(walletList.map(w => w?.function).filter(Boolean))].sort()
+})
 
 const currentEpochRows = computed(() => {
   const g = currentEpochGroup.value
@@ -274,6 +305,7 @@ const currentEpochRows = computed(() => {
     })
     .filter(r => r.wallet && r.wallet.deleted_at == null && (r.in_qubic > 0 || r.out_qubic > 0))
     .filter(r => !picked.length || picked.includes(r.wallet_id))
+    .filter(r => !selectedFunction.value || r.wallet?.function === selectedFunction.value)
     .sort((a, b) => b.in_qubic - a.in_qubic)
 })
 
@@ -357,6 +389,27 @@ const currentEpochFilteredTotals = computed(() => {
         <WalletFilter v-if="epochActiveWallets.length"
                       v-model="selectedEpochWallets"
                       :wallets="epochActiveWallets" />
+
+        <!-- Funktions-Filter -->
+        <div v-if="availableFunctions.length"
+             class="card !py-2 !px-3 flex items-center flex-wrap gap-2">
+          <div class="flex items-center gap-1.5 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-qubic-teal/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+            <span class="text-xs text-gray-400 uppercase tracking-wide">{{ t('filter.function_filter') }}</span>
+          </div>
+          <button v-for="(fn, i) in availableFunctions" :key="fn"
+                  :class="functionBtnClass(fn, i)"
+                  @click="toggleFunction(fn)">
+            {{ fn }}
+          </button>
+          <button v-if="selectedFunction"
+                  class="btn-ghost text-xs py-0.5 px-2 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors ml-1"
+                  @click="selectedFunction = null">
+            {{ t('filter.clear_all') }}
+          </button>
+        </div>
 
         <!-- Header: epoch + aggregated totals (6 cols, icon + colored label per cell) -->
         <div class="card p-4 bg-gradient-to-r from-qubic-teal/5 to-qubic-teal/[0.02] border-qubic-teal/20">
@@ -567,6 +620,27 @@ const currentEpochFilteredTotals = computed(() => {
     <div v-else class="space-y-3">
 
     <WalletFilter v-model="selectedWallets" />
+
+    <!-- Funktions-Filter -->
+    <div v-if="availableFunctions.length"
+         class="card !py-2 !px-3 flex items-center flex-wrap gap-2">
+      <div class="flex items-center gap-1.5 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-qubic-teal/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+        <span class="text-xs text-gray-400 uppercase tracking-wide">{{ t('filter.function_filter') }}</span>
+      </div>
+      <button v-for="(fn, i) in availableFunctions" :key="fn"
+              :class="functionBtnClass(fn, i)"
+              @click="toggleFunction(fn)">
+        {{ fn }}
+      </button>
+      <button v-if="selectedFunction"
+              class="btn-ghost text-xs py-0.5 px-2 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors ml-1"
+              @click="selectedFunction = null">
+        {{ t('filter.clear_all') }}
+      </button>
+    </div>
 
     <!-- Gesamt-KPIs (icon + colored label + bold value, like Dashboard panels) -->
     <div v-if="totals" class="grid grid-cols-2 md:grid-cols-4 gap-3">
