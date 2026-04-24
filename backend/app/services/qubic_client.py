@@ -150,19 +150,31 @@ class BOBClient:
             return self._tick_ts_cache[tick]
         try:
             data = await self._request("GET", f"/tick/{tick}")
-            # Handle both flat and nested response shapes
-            ts_raw = (
-                data.get("timestamp") or
-                data.get("tick", {}).get("timestamp") or
-                data.get("time") or
-                data.get("tickTimestamp") or
-                0
-            )
-            ts = int(ts_raw)
-            # BOB may return Unix seconds; normalize to milliseconds
-            if 0 < ts < 1_000_000_000_000:
-                ts *= 1000
-            result = str(ts) if ts else "0"
+            # New BOB format: {"tick": N, "tickdata": {day, month, hour, minute, second, ...}}
+            td = data.get("tickdata") if isinstance(data, dict) else None
+            if td and isinstance(td, dict) and td.get("month") and td.get("day"):
+                from datetime import datetime, timezone
+                year = datetime.now(timezone.utc).year
+                try:
+                    dt = datetime(year, int(td["month"]), int(td["day"]),
+                                  int(td.get("hour", 0)), int(td.get("minute", 0)),
+                                  int(td.get("second", 0)), tzinfo=timezone.utc)
+                    result = str(int(dt.timestamp() * 1000))
+                except (ValueError, TypeError):
+                    result = "0"
+            else:
+                # Legacy flat response shapes
+                ts_raw = (
+                    data.get("timestamp") or
+                    data.get("tick", {}).get("timestamp") or
+                    data.get("time") or
+                    data.get("tickTimestamp") or
+                    0
+                ) if isinstance(data, dict) else 0
+                ts = int(ts_raw)
+                if 0 < ts < 1_000_000_000_000:
+                    ts *= 1000
+                result = str(ts) if ts else "0"
         except Exception as e:
             logger.debug(f"BOB tick {tick} timestamp lookup failed: {e}")
             result = "0"
@@ -173,12 +185,24 @@ class BOBClient:
         info = await self.get_tick_info()
         return int(info.get("tickInfo", {}).get("tick", 0))
 
+    _BOB_CHUNK = 999  # BOB API: toTick - fromTick must be < 1000
+
+    async def _fetch_transfers_chunked(self, wallet_id: str, from_tick: int, to_tick: int) -> list:
+        """Fetch all transfers, splitting the range into BOB-compatible chunks."""
+        raw: list = []
+        chunk_start = from_tick
+        while chunk_start <= to_tick:
+            chunk_end = min(chunk_start + self._BOB_CHUNK - 1, to_tick)
+            payload = {"fromTick": chunk_start, "toTick": chunk_end, "identity": wallet_id}
+            data = await self._request("POST", "/getQuTransfersForIdentity", json=payload)
+            raw.extend(data.get("transfers") or [])
+            chunk_start = chunk_end + 1
+        return raw
+
     async def get_event_logs(self, wallet_id: str, from_tick: int, to_tick: int, offset: int = 0, size: int = 1000) -> dict:
         key = (wallet_id, from_tick, to_tick)
         if key not in self._cache:
-            payload = {"fromTick": from_tick, "toTick": to_tick, "identity": wallet_id}
-            data = await self._request("POST", "/getQuTransferForIdentity", json=payload)
-            raw = data.get("transfers") or []
+            raw = await self._fetch_transfers_chunked(wallet_id, from_tick, to_tick)
 
             # Fetch timestamps for all unique ticks (BOB transfers have no timestamp field)
             unique_ticks = {t.get("tick") for t in raw if t.get("tick")}

@@ -119,6 +119,7 @@ onMounted(reload)
       <thead class="thead-std">
         <tr>
           <th class="th">{{ t('node.priority') }}</th>
+          <th class="th w-8"></th>
           <th class="th">{{ t('node.url') }}</th>
           <th class="th">{{ t('node.type') }}</th>
           <th class="th">{{ t('node.label') }}</th>
@@ -132,12 +133,26 @@ onMounted(reload)
       <tbody>
         <tr v-for="n in store.nodes" :key="n.id" :class="['border-b border-qubic-border/50 transition-opacity', !n.is_active && 'opacity-40']">
           <td class="td">{{ n.priority }}</td>
+          <td class="td text-center">
+            <span v-if="n.is_sync_active"
+                  class="relative flex h-2.5 w-2.5 mx-auto"
+                  :title="t('node.sync_active_hint')">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-qubic-teal opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-qubic-teal"></span>
+            </span>
+          </td>
           <td class="td font-mono">{{ n.url }}</td>
           <td class="td"><span class="pill">{{ n.node_type }}</span></td>
           <td class="td text-gray-300">{{ n.label || '—' }}</td>
           <td class="td font-mono">{{ n.tick || '—' }}</td>
           <td class="td">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
-          <td class="td"><span :class="healthColor(n.health_status)">● {{ n.health_status }}</span></td>
+          <td class="td">
+            <span :class="healthColor(n.health_status)" :title="n.last_checked ? 'Zuletzt geprüft: ' + n.last_checked : ''">● {{ n.health_status }}</span>
+            <span v-if="n.fail_count" class="ml-1.5 text-xs text-gray-500">({{ n.fail_count }}×)</span>
+            <div v-if="n.last_error" class="text-xs text-red-400/70 mt-0.5 max-w-xs truncate" :title="n.last_error">
+              {{ n.last_error }}
+            </div>
+          </td>
           <td class="td text-center">
             <button @click="toggle(n.id)"
                     :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',

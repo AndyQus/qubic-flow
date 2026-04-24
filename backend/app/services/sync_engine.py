@@ -21,32 +21,115 @@ logger = logging.getLogger(__name__)
 MAX_WINDOW_RECORDS = 10000
 PAGE_SIZE = 1000
 
+_active_sync_node_id: int | None = None
+
+
+def get_active_sync_node_id() -> int | None:
+    return _active_sync_node_id
+
 
 def _get_active_client(db):
-    """Return the best-available client based on node priority and health."""
-    node = (
+    """Compatibility wrapper — returns the first available client."""
+    candidates = _get_ordered_clients(db)
+    return candidates[0][1] if candidates else RPCClient()
+
+
+def _get_ordered_clients(db):
+    """Return list of (node, client) sorted by health then priority."""
+    nodes = (
         db.query(Node)
         .filter(Node.is_active == 1, Node.health_status.in_(["ONLINE", "DEGRADED"]))
         .order_by(Node.health_status != "ONLINE", Node.priority)
+        .all()
+    )
+    result = []
+    for n in nodes:
+        client = BOBClient(n.url) if n.node_type == "BOB_NODE" else RPCClient(n.url)
+        result.append((n, client))
+    if not result:
+        result.append((None, RPCClient()))
+    return result
+
+
+def _get_rpc_event_client(db):
+    """Return the first active RPC node for event log fetching.
+
+    BOB nodes only index direct QU transfers — SC-generated events (Qearn,
+    QX, etc.) are missing.  Event syncing must always go through an RPC node
+    so no events are silently skipped.
+    """
+    node = (
+        db.query(Node)
+        .filter(
+            Node.is_active == 1,
+            Node.node_type == "RPC",
+            Node.health_status.in_(["ONLINE", "DEGRADED"]),
+        )
+        .order_by(Node.health_status != "ONLINE", Node.priority)
         .first()
     )
-    if node is None:
-        return RPCClient()
-    if node.node_type == "BOB_NODE":
-        return BOBClient(node.url)
-    return RPCClient(node.url)
+    if node:
+        return RPCClient(node.url)
+    return RPCClient()
+
+
+def elect_active_sync_node(db) -> int | None:
+    """Pick the best available node, update _active_sync_node_id, and return it."""
+    global _active_sync_node_id
+    for node, _ in _get_ordered_clients(db):
+        if node is not None:
+            _active_sync_node_id = node.id
+            return node.id
+    _active_sync_node_id = None
+    return None
 
 
 async def sync_all_wallets():
     """Entry point — called by scheduler every 60s."""
     db = SessionLocal()
     try:
-        client = _get_active_client(db)
-        current_tick = await client.get_current_tick()
+        client = None
+        current_tick = None
+
+        for node, c in _get_ordered_clients(db):
+            try:
+                current_tick = await c.get_current_tick()
+                client = c
+                if node is not None:
+                    node.fail_count = 0
+                    node.last_error = None
+                    db.commit()
+                    global _active_sync_node_id
+                    _active_sync_node_id = node.id
+                break
+            except Exception as e:
+                logger.warning(f"Node {getattr(node, 'url', 'fallback')} get_tick failed: {e}, trying next")
+                if node is not None:
+                    node.fail_count = (node.fail_count or 0) + 1
+                    node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"
+                    node.last_error = str(e)[:500]
+                    db.commit()
+
+        # All configured nodes failed → try default RPC as silent last resort.
+        # BOB-Nodes bleiben DEGRADED und werden im nächsten Zyklus erneut versucht.
+        if client is None:
+            try:
+                rpc_fallback = RPCClient()
+                current_tick = await rpc_fallback.get_current_tick()
+                client = rpc_fallback
+                logger.info("All configured nodes failed — using default RPC as fallback")
+            except Exception as e:
+                logger.error(f"Default RPC fallback also failed: {e} — sync skipped")
+                return
+
+        # BOB nodes only carry direct QU transfers — always use an RPC node
+        # for full event log coverage (SC rewards, QX trades, etc.).
+        event_client = _get_rpc_event_client(db)
+
         wallets = db.query(Wallet).filter(Wallet.active == 1, Wallet.deleted_at.is_(None)).all()
         for wallet in wallets:
             try:
-                await sync_wallet(db, wallet.id, current_tick, client)
+                await sync_wallet(db, wallet.id, current_tick, event_client)
             except Exception as e:
                 logger.error(f"Event sync failed for wallet {wallet.id}: {e}", exc_info=True)
                 _set_sync_failed(db, wallet.id, str(e))

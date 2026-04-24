@@ -16,3 +16,4 @@ class Node(Base):
     is_active = Column(Integer, default=1)
     fail_count = Column(Integer, default=0)
     last_checked = Column(Text)
+    last_error = Column(Text, nullable=True)

@@ -6,6 +6,7 @@ from ...database import get_db
 from ...models.node import Node
 from ...schemas.node import NodeCreate, NodeOut
 from ...utils.time import now_utc_iso
+from ...services.sync_engine import get_active_sync_node_id, elect_active_sync_node
 
 router = APIRouter()
 
@@ -16,7 +17,14 @@ class NodeReorder(BaseModel):
 
 @router.get("/nodes", response_model=list[NodeOut])
 def list_nodes(db: Session = Depends(get_db)):
-    return db.query(Node).order_by(Node.priority).all()
+    active_id = get_active_sync_node_id()
+    nodes = db.query(Node).order_by(Node.priority).all()
+    result = []
+    for n in nodes:
+        out = NodeOut.model_validate(n)
+        out.is_sync_active = (n.id == active_id)
+        result.append(out)
+    return result
 
 
 @router.post("/nodes", response_model=NodeOut, status_code=201)
@@ -70,6 +78,9 @@ def toggle_node(node_id: int, db: Session = Depends(get_db)):
     node.is_active = 0 if node.is_active else 1
     db.commit()
     db.refresh(node)
+    # Re-elect active sync node immediately so the pulsing indicator updates
+    # on the next /nodes request without waiting for the next sync cycle.
+    elect_active_sync_node(db)
     return node
 
 

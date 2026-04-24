@@ -19,6 +19,10 @@ class NodeOut(BaseModel):
     response_time_ms: Optional[int]
     health_status: str
     is_active: int
+    fail_count: Optional[int]
+    last_checked: Optional[str]
+    last_error: Optional[str]
+    is_sync_active: bool = False
 
     class Config:
         from_attributes = True

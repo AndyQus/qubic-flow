@@ -45,9 +45,11 @@ async def _check_node(db, node: Node):
             node.response_time_ms = elapsed
             node.health_status = "ONLINE" if elapsed < 3000 else "DEGRADED"
             node.fail_count = 0
+            node.last_error = None
     except Exception as e:
         node.fail_count = (node.fail_count or 0) + 1
         node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"
+        node.last_error = str(e)[:500]
         logger.warning(f"Node {node.url} health check failed: {e}")
 
     node.last_checked = now_utc_iso()
@@ -59,4 +61,6 @@ async def _check_node(db, node: Node):
         "health_status": node.health_status,
         "tick": node.tick,
         "response_time_ms": node.response_time_ms,
+        "fail_count": node.fail_count,
+        "last_error": node.last_error,
     })
