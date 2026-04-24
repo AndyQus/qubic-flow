@@ -283,7 +283,7 @@ qubic-flow/
 │   │   ├── config.py        # Pydantic-Settings
 │   │   ├── database.py      # SQLAlchemy Engine + Session
 │   │   └── main.py          # FastAPI App + Lifespan
-│   ├── tests/               # pytest-Suite
+│   ├── tests/               # pytest-Suite (test_tax_engine.py, test_coingecko.py)
 │   ├── alembic/
 │   │   └── versions/        # DB-Migrationen
 │   │       ├── 001_composite_pk_events.py
@@ -303,6 +303,10 @@ qubic-flow/
 │   │   ├── i18n/            # DE / EN Übersetzungen
 │   │   ├── router/          # vue-router Routen
 │   │   └── api.js           # Backend-HTTP-Client
+│   ├── src/tests/unit/      # Vitest Unit-Tests
+│   ├── tests/e2e/           # Playwright E2E-Tests
+│   ├── vitest.config.js     # Vitest-Konfiguration
+│   ├── playwright.config.js # Playwright-Konfiguration
 │   ├── Dockerfile           # Multi-Stage: node build → nginx
 │   ├── nginx.conf           # SPA-Routing + /api Proxy
 │   ├── vite.config.js       # Dev-Proxy zu Backend
@@ -447,11 +451,47 @@ Wenn der RPC für einen Tick-Bereich weniger Daten liefert als erwartet (`validF
 
 ## Tests ausführen
 
+### Backend (pytest)
+
 ```bash
 cd backend
 pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
+
+| Datei                      | Tests | Beschreibung                                         |
+|----------------------------|-------|------------------------------------------------------|
+| `tests/test_tax_engine.py` | 27    | Lot-Matching (FIFO/LIFO/HIFO/AVCO), Haltedauer, Steuerregeln, Datumsparser |
+| `tests/test_coingecko.py`  | 6     | Preis-Cache Hit/Miss, Netzwerkfehler, Seiteneffektfreiheit |
+
+### Frontend — Unit-Tests (Vitest)
+
+```bash
+cd frontend
+npm test          # einmalig ausführen
+npm run test:watch  # im Watch-Mode
+```
+
+| Datei                               | Tests | Beschreibung                                      |
+|-------------------------------------|-------|---------------------------------------------------|
+| `src/tests/unit/useQubicUtils.test.js` | 12 | `explorerUrl`, `txUrl`, `tickUrl`, `shortAddr`, `maskLabel` |
+| `src/tests/unit/store.test.js`      | 17    | Pinia-Store: `locale`, `filteredWallets`, `activeNode`, `prependEvent`, localStorage |
+
+### Frontend — E2E-Tests (Playwright)
+
+```bash
+cd frontend
+npx playwright install   # einmalig: Browser herunterladen
+npm run test:e2e         # alle E2E-Tests ausführen
+```
+
+Setzt einen laufenden Backend-Server voraus. Der Vite-Dev-Server wird von Playwright automatisch gestartet.
+
+| Datei                          | Specs | Beschreibung                                   |
+|--------------------------------|-------|------------------------------------------------|
+| `tests/e2e/dashboard.spec.js`  | 4     | Titel, Navigation, Event-Tabelle, Header       |
+| `tests/e2e/navigation.spec.js` | 8     | Seitenwechsel, Settings-Tabs, URL-Persistenz   |
+| `tests/e2e/wallets.spec.js`    | 6     | Wallet-Liste, Add-Dialog, Filterbuttons        |
 
 ---
 
@@ -481,6 +521,8 @@ python -m pytest tests/ -v
 | Chart.js      | 4.4      | Snapshot-Liniendiagramm        |
 | i18next       | 24.1     | DE/EN-Übersetzungen            |
 | jsPDF         | 2.x      | PDF-Export (Steuerbericht)     |
+| Vitest        | 2.1      | Unit-Tests (happy-dom)         |
+| Playwright    | 1.49     | E2E-Tests                      |
 
 ### Infrastruktur
 
