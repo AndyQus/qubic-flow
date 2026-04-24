@@ -122,6 +122,12 @@ def epochs_breakdown(db: Session = Depends(get_db)):
             func.coalesce(
                 func.sum(func.iif(in_match, Event.amount_qubic * Event.qubic_usd_rate, 0.0)), 0.0
             ).label("in_usd"),
+            func.coalesce(
+                func.sum(func.iif(out_match, Event.amount_qubic * Event.qubic_eur_rate, 0.0)), 0.0
+            ).label("out_eur"),
+            func.coalesce(
+                func.sum(func.iif(out_match, Event.amount_qubic * Event.qubic_usd_rate, 0.0)), 0.0
+            ).label("out_usd"),
         )
         .join(Wallet, Wallet.id == Event.wallet_id)
         .filter(Event.epoch.isnot(None), Wallet.deleted_at.is_(None))
@@ -140,6 +146,7 @@ def epochs_breakdown(db: Session = Depends(get_db)):
                        "out_tx_count": 0, "out_event_count": 0,
                        "out_qubic": 0, "out_qubic_tx": 0, "out_qubic_event": 0,
                        "in_eur": 0.0, "in_usd": 0.0,
+                       "out_eur": 0.0, "out_usd": 0.0,
                        "wallet_count": 0, "wallets_with_in": 0},
             "wallets": [],
         })
@@ -165,6 +172,8 @@ def epochs_breakdown(db: Session = Depends(get_db)):
             "out_qubic_event": out_q_ev,
             "in_eur": float(r.in_eur or 0.0),
             "in_usd": float(r.in_usd or 0.0),
+            "out_eur": float(r.out_eur or 0.0),
+            "out_usd": float(r.out_usd or 0.0),
         })
         bucket["totals"]["events"] += int(r.events or 0)
         bucket["totals"]["in_events"] += int(r.in_events or 0)
@@ -180,6 +189,8 @@ def epochs_breakdown(db: Session = Depends(get_db)):
         bucket["totals"]["out_qubic_event"] += out_q_ev
         bucket["totals"]["in_eur"] += float(r.in_eur or 0.0)
         bucket["totals"]["in_usd"] += float(r.in_usd or 0.0)
+        bucket["totals"]["out_eur"] += float(r.out_eur or 0.0)
+        bucket["totals"]["out_usd"] += float(r.out_usd or 0.0)
         bucket["totals"]["wallet_count"] += 1
         if in_q > 0:
             bucket["totals"]["wallets_with_in"] += 1

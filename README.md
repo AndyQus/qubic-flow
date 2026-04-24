@@ -28,14 +28,17 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 - **Unbegrenzte Wallets** — PRIVATE und BUSINESS, verwaltbar über die Oberfläche
 - **Dual-Node-Unterstützung** — Standard-RPC (`rpc.qubic.org`) **und** BOB-Node (`bobnet.qubic.li`) werden unterstützt; der beste verfügbare Node wird automatisch gewählt
 - **Event-Sync** — automatisch alle 60 Sekunden; RPC-Nodes via `getEventLogs`, BOB-Nodes via `POST /getQuTransferForIdentity`
-- **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events
+- **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events; probiert mehrere Feldnamen (`transactionId`, `txId`, `id`, `digest`, `hash`) und bevorzugt die echte 60-Zeichen-Qubic-TxID
+- **Smart-Contract-aware Klassifikation** — `logType=0` Transfers werden über Adress-Labels als `TX` (normaler Transfer) oder `EVENT` (Smart Contract / Token Issuer, z. B. QX, Qearn) eingeordnet
+- **Manueller Resync** — Button „Daten neu abrufen" in den Einstellungen (`POST /wallets/resync-all`) setzt Sync-Zähler zurück und importiert insert-only (bestehende Records bleiben unverändert, nur fehlende werden ergänzt)
 - **Tick-Range-Windowing** — überwindet das 10.000-Records-Limit der RPC-API durch rekursives Halbieren
 - **Adress-Namen-Auflösung** — automatische Auflösung von Qubic-Adressen zu Tokens/Labels (Assets-Seite + CSV)
 - **Assets-Seite** — Übersicht aller Smart Contracts und Tokens mit Ticker, Kategorie, Dezimalstellen, Website
 - **Wallet-Balances** — aktueller Kontostand je Wallet wird automatisch nachgeführt
 - **EUR/USD-Kurse** — täglich von CoinGecko abgerufen, in DB gecacht
 - **Statistik-Panels** — Stunden / Tag / Epoch / Monat / Jahr, je mit aktueller und vorheriger Periode
-- **Epochen-Ansicht** — aktuelle Epoche als Wallet-Panel-Grid (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Split, ausgehende Qubics); Filter „Alle“ / „Nur mit Eingang“
+- **Epochen-Ansicht** — aktuelle Epoche als Wallet-Panel-Grid (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Split, ausgehende Qubics inkl. EUR-Wert); Filter „Alle“ / „Nur mit Eingang“ plus „Alles anzeigen"-Toggle (`?ext=1`) zum Ein-/Ausblenden leerer Sub-Zeilen
+- **Events-Tabelle** — getrennte Spalten für TxId und Tick, je mit Copy-Button und Explorer-Link (`/network/tx/{id}` bzw. `/network/tick/{tick}`); Kurzanzeige 5 Zeichen mit Tooltip, voller Wert beim Kopieren/Öffnen
 - **Wöchentliche Snapshots** — jeden Mittwoch 12:00 UTC
 - **3 Animations-Varianten** für neue Events: Push Down, Slide In, Beam Drop (einstellbar)
 - **Live-Updates** per WebSocket (Events + Node-Status)
@@ -325,6 +328,7 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Doku: `http://localhost:8000/docs`
 | PUT     | `/wallets/{id}`                       | Wallet bearbeiten                        |
 | DELETE  | `/wallets/{id}`                       | Wallet soft-löschen                      |
 | POST    | `/wallets/{id}/resync-tx`             | TX-Sync für ein Wallet neu starten       |
+| POST    | `/wallets/resync-all`                 | Alle Wallets neu synchronisieren (insert-only) |
 | GET     | `/events`                             | Events (filter: wallet_id, pagination)   |
 | GET     | `/labels`                             | Adress-Labels (optional `?address=`)     |
 | GET     | `/nodes`                              | Nodes                                    |

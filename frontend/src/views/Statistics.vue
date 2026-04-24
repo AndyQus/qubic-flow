@@ -43,6 +43,7 @@ const periodColors = {
 const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
 const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
 const inFiatKey      = computed(() => store.currency === 'USD' ? 'in_usd' : 'in_eur')
+const outFiatKey     = computed(() => store.currency === 'USD' ? 'out_usd' : 'out_eur')
 const stats          = ref(null)
 const snaps          = ref([])
 const history        = ref([])
@@ -52,9 +53,11 @@ const selectedWallets = ref([])
 const selectedEpochWallets = ref([])
 const loading = ref(true)
 
-// Tabs + epoch selection, URL-synced (?tab=epochs|overview&epoch=168)
+// Tabs + epoch selection, URL-synced (?tab=epochs|overview&epoch=168&ext=1)
 const activeTab = ref(route.query.tab === 'overview' ? 'overview' : 'epochs')
 const selectedEpoch = ref(route.query.epoch != null ? Number(route.query.epoch) : null)
+// `extended` is a computed directly from the route — avoids stale ref-watch timing
+const extended = computed(() => route.query.ext === '1')
 
 watch(() => route.query, (q) => {
   activeTab.value = q.tab === 'overview' ? 'overview' : 'epochs'
@@ -71,6 +74,13 @@ function setSelectedEpoch(epoch) {
   const q = { ...route.query }
   if (epoch != null) q.epoch = String(epoch)
   else delete q.epoch
+  router.push({ path: '/stats', query: q })
+}
+
+function toggleExtended() {
+  const q = { ...route.query }
+  if (!extended.value) q.ext = '1'
+  else delete q.ext
   router.push({ path: '/stats', query: q })
 }
 
@@ -276,6 +286,7 @@ const currentEpochFilteredTotals = computed(() => {
     out_qubic: 0, out_qubic_tx: 0, out_qubic_event: 0,
     out_tx_count: 0, out_event_count: 0,
     in_eur: 0, in_usd: 0,
+    out_eur: 0, out_usd: 0,
     wallet_count: rows.length,
   }
   for (const r of rows) {
@@ -291,6 +302,8 @@ const currentEpochFilteredTotals = computed(() => {
     acc.out_event_count += r.out_event_count
     acc.in_eur += r.in_eur
     acc.in_usd += r.in_usd
+    acc.out_eur += r.out_eur
+    acc.out_usd += r.out_usd
   }
   return acc
 })
@@ -301,6 +314,17 @@ const currentEpochFilteredTotals = computed(() => {
 
     <PageHeader :title="t('nav.stats')"
                 :hint="activeTab === 'epochs' ? t('stats.title_epochs') : t('stats.title_overview')">
+      <button v-if="activeTab === 'epochs'"
+              :class="['filter-pill inline-flex items-center gap-1.5', extended && 'filter-pill-active']"
+              :title="t('stats.tt_extended')"
+              @click="toggleExtended">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             :class="['w-3.5 h-3.5 transition-transform', extended && 'rotate-180']"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        {{ t('stats.filter_extended') }}
+      </button>
       <div v-if="activeTab === 'epochs' && availableEpochs.length" class="flex items-center gap-2">
         <label class="page-label">{{ t('stats.epoch_number') }}</label>
         <select :value="activeEpoch"
@@ -441,73 +465,94 @@ const currentEpochFilteredTotals = computed(() => {
               </span>
             </div>
 
-            <!-- Two-column grid: Incoming (left) vs Outgoing (right) -->
-            <div class="grid grid-cols-2 gap-3">
-              <!-- Incoming column -->
-              <div class="space-y-0.5 cq-panel min-w-0 overflow-hidden">
+            <!-- Two-column grid: Incoming (left) vs Outgoing (right).
+                 With "Alles anzeigen" OFF (default), only rows with data render,
+                 so panels stay compact. Empty columns collapse to 1 column. -->
+            <div :class="[(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-2']">
+              <!-- Incoming column (hidden only when outgoing-only and not extended) -->
+              <div v-if="extended || r.in_qubic > 0" class="space-y-0.5 cq-panel min-w-0 overflow-hidden">
                 <InfoLabel :label="`${t('stats.label_incoming')} QUBIC`" :tooltip="t('stats.tt_incoming')" />
                 <div class="font-mono value-fit-lg whitespace-nowrap"
                      :class="r.in_qubic > 0 ? 'text-green-400' : 'text-gray-600'">
                   <template v-if="r.in_qubic > 0">▲ {{ fmt(r.in_qubic) }}</template>
                   <template v-else>—</template>
                 </div>
-                <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')" />
-                <div class="font-mono text-xs whitespace-nowrap"
-                     :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
-                  <template v-if="r.in_qubic > 0">{{ fmtCurrency(r[inFiatKey]) }}</template>
-                  <template v-else>—</template>
-                </div>
-                <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')" />
-                <div class="font-mono text-xs whitespace-nowrap"
-                     :class="r.in_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
-                  <template v-if="r.in_qubic_tx > 0">
-                    {{ fmt(r.in_qubic_tx) }}
-                    <span class="text-amber-400/60">({{ r.in_tx_count }})</span>
-                  </template>
-                  <template v-else>—</template>
-                </div>
-                <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')" />
-                <div class="font-mono text-xs whitespace-nowrap"
-                     :class="r.in_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
-                  <template v-if="r.in_qubic_event > 0">
-                    {{ fmt(r.in_qubic_event) }}
-                    <span class="text-violet-400/60">({{ r.in_event_count }})</span>
-                  </template>
-                  <template v-else>—</template>
-                </div>
+                <template v-if="extended || r.in_qubic > 0">
+                  <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
+                    <template v-if="r.in_qubic > 0">{{ fmtCurrency(r[inFiatKey]) }}</template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
+                <template v-if="extended || r.in_qubic_tx > 0">
+                  <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.in_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
+                    <template v-if="r.in_qubic_tx > 0">
+                      {{ fmt(r.in_qubic_tx) }}
+                      <span class="text-amber-400/60">({{ r.in_tx_count }})</span>
+                    </template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
+                <template v-if="extended || r.in_qubic_event > 0">
+                  <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.in_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
+                    <template v-if="r.in_qubic_event > 0">
+                      {{ fmt(r.in_qubic_event) }}
+                      <span class="text-violet-400/60">({{ r.in_event_count }})</span>
+                    </template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
               </div>
 
-              <!-- Outgoing column (right-aligned) -->
-              <div class="space-y-0.5 text-right cq-panel min-w-0 overflow-hidden">
-                <InfoLabel :label="`${t('stats.label_outgoing')} QUBIC`" :tooltip="t('stats.tt_outgoing')" class="justify-end" />
+              <!-- Outgoing column (hidden when no outgoing data and not extended) -->
+              <div v-if="extended || r.out_qubic > 0"
+                   :class="['space-y-0.5 cq-panel min-w-0 overflow-hidden',
+                            (extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'text-right' : '']">
+                <InfoLabel :label="`${t('stats.label_outgoing')} QUBIC`" :tooltip="t('stats.tt_outgoing')"
+                           :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
                 <div class="font-mono value-fit-lg whitespace-nowrap"
                      :class="r.out_qubic > 0 ? 'text-red-400' : 'text-gray-600'">
                   <template v-if="r.out_qubic > 0">▼ {{ fmt(r.out_qubic) }}</template>
                   <template v-else>—</template>
                 </div>
-                <!-- spacer matching incoming Fiat row -->
-                <div class="invisible">
-                  <InfoLabel label="." />
-                  <div class="font-mono text-xs">—</div>
-                </div>
-                <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')" class="justify-end" />
-                <div class="font-mono text-xs whitespace-nowrap"
-                     :class="r.out_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
-                  <template v-if="r.out_qubic_tx > 0">
-                    {{ fmt(r.out_qubic_tx) }}
-                    <span class="text-amber-400/60">({{ r.out_tx_count }})</span>
-                  </template>
-                  <template v-else>—</template>
-                </div>
-                <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')" class="justify-end" />
-                <div class="font-mono text-xs whitespace-nowrap"
-                     :class="r.out_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
-                  <template v-if="r.out_qubic_event > 0">
-                    {{ fmt(r.out_qubic_event) }}
-                    <span class="text-violet-400/60">({{ r.out_event_count }})</span>
-                  </template>
-                  <template v-else>—</template>
-                </div>
+                <template v-if="extended || r.out_qubic > 0">
+                  <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')"
+                             :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.out_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
+                    <template v-if="r.out_qubic > 0">{{ fmtCurrency(r[outFiatKey]) }}</template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
+                <template v-if="extended || r.out_qubic_tx > 0">
+                  <InfoLabel :label="t('stats.label_via_tx')" :tooltip="t('stats.tt_via_tx')"
+                             :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.out_qubic_tx > 0 ? 'text-amber-400' : 'text-gray-600'">
+                    <template v-if="r.out_qubic_tx > 0">
+                      {{ fmt(r.out_qubic_tx) }}
+                      <span class="text-amber-400/60">({{ r.out_tx_count }})</span>
+                    </template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
+                <template v-if="extended || r.out_qubic_event > 0">
+                  <InfoLabel :label="t('stats.label_via_events')" :tooltip="t('stats.tt_via_events')"
+                             :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
+                  <div class="font-mono text-xs whitespace-nowrap"
+                       :class="r.out_qubic_event > 0 ? 'text-violet-400' : 'text-gray-600'">
+                    <template v-if="r.out_qubic_event > 0">
+                      {{ fmt(r.out_qubic_event) }}
+                      <span class="text-violet-400/60">({{ r.out_event_count }})</span>
+                    </template>
+                    <template v-else>—</template>
+                  </div>
+                </template>
               </div>
             </div>
           </router-link>

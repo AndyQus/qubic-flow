@@ -11,6 +11,10 @@ export function useQubicUtils() {
     return `https://explorer.qubic.org/network/tx/${id}`
   }
 
+  function tickUrl(tick) {
+    return `https://explorer.qubic.org/network/tick/${tick}`
+  }
+
   async function copyAddress(addr) {
     if (addr) await navigator.clipboard.writeText(addr)
   }
@@ -27,5 +31,5 @@ export function useQubicUtils() {
     return `Wallet ${n}`
   }
 
-  return { explorerUrl, txUrl, copyAddress, shortAddr, maskLabel }
+  return { explorerUrl, txUrl, tickUrl, copyAddress, shortAddr, maskLabel }
 }

@@ -26,6 +26,7 @@ export const api = {
     update: (id, data) => req(`/wallets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => req(`/wallets/${id}`, { method: 'DELETE' }),
     resyncTx: (id) => req(`/wallets/${id}/resync-tx`, { method: 'POST' }),
+    resyncAll: () => req('/wallets/resync-all', { method: 'POST' }),
   },
   events: {
     list: (params = {}) => {

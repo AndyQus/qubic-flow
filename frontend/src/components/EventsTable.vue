@@ -11,7 +11,7 @@ const props = defineProps({
 })
 const store = useAppStore()
 const { t } = useTranslation()
-const { explorerUrl, txUrl, copyAddress, shortAddr } = useQubicUtils()
+const { explorerUrl, txUrl, tickUrl, copyAddress, shortAddr } = useQubicUtils()
 
 const ownedIds = computed(() => new Set(store.wallets.map(w => w.id)))
 
@@ -75,8 +75,28 @@ function fmtRate(ev) {
 
 function shortTx(id) {
   if (!id) return '—'
-  if (store.hideAddresses) return '••••••••••••'
-  return id.length > 10 ? `${id.slice(0, 5)}…${id.slice(-5)}` : id
+  if (store.hideAddresses) return '••••••'
+  return id.length > 5 ? `${id.slice(0, 5)}…` : id
+}
+function shortTick(tick) {
+  if (tick == null) return '—'
+  const s = String(tick)
+  return s.length > 5 ? `${s.slice(0, 5)}…` : s
+}
+
+// Prefer the real TX digest (explorer id) over the internal log id.
+// For archiver-sourced records, log_digest === id; for event-log-sourced
+// records, log_digest holds the explorer-visible txId while id is a short logId.
+function txId(ev) {
+  return ev.log_digest || ev.id
+}
+
+// Qubic txIds are exactly 60 lowercase letters a–z. The explorer's
+// /network/tx/... route only works with those — for shorter ids
+// (e.g. the 16-hex logDigest from getEventLogs) we hide the tx-icon
+// and keep the separate tick-explorer link as the reliable fallback.
+function isRealTxId(id) {
+  return typeof id === 'string' && /^[a-z]{60}$/.test(id)
 }
 
 function walletLabel(addr) {
@@ -165,15 +185,31 @@ function counterpart(ev) {
               </a>
             </div>
             <!-- TxId -->
-            <div class="flex items-center gap-1 mt-1">
-              <span class="text-xs text-gray-500 font-mono" :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
-              <button v-if="!store.hideAddresses" @click="copyAddress(ev.id)"
+            <div class="flex items-start gap-1 mt-1 min-w-0">
+              <span class="text-xs text-gray-500 font-mono break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
+              <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
                       class="icon-btn" :title="t('event.copy_txid')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
               </button>
-              <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
+              <a :href="txUrl(txId(ev))" target="_blank" rel="noopener"
+                 class="icon-btn" :title="t('assets.explorer')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+            </div>
+            <!-- Tick -->
+            <div v-if="ev.tick_number" class="flex items-center gap-1 mt-0.5">
+              <span class="text-xs text-gray-500 font-mono" :title="ev.tick_number">{{ t('event.tick') }}: {{ shortTick(ev.tick_number) }}</span>
+              <button @click="copyAddress(String(ev.tick_number))"
+                      class="icon-btn" :title="t('event.copy_tick')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </button>
+              <a :href="tickUrl(ev.tick_number)" target="_blank" rel="noopener"
                  class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
@@ -198,11 +234,12 @@ function counterpart(ev) {
               <th class="text-right px-3 py-2.5">{{ t('event.source') }}</th>
               <th class="text-right px-3 py-2.5">{{ t('event.destination') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.txid') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.tick') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!events.length">
-              <td colspan="8" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
+              <td colspan="9" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
             </tr>
             <tr v-for="ev in events" :key="ev.id"
                 :class="[
@@ -267,21 +304,40 @@ function counterpart(ev) {
               </td>
               <!-- TxId -->
               <td class="px-3 py-2.5">
-                <div class="flex items-center gap-2 font-mono text-xs text-gray-400">
-                  <span :title="store.hideAddresses ? '' : ev.id">{{ shortTx(ev.id) }}</span>
-                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.id)"
+                <div class="flex items-start gap-2 font-mono text-xs text-gray-400 min-w-0">
+                  <span class="break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
+                  <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
                           class="icon-btn" :title="t('event.copy_txid')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
                   </button>
-                  <a :href="txUrl(ev.id)" target="_blank" rel="noopener"
+                  <a :href="txUrl(txId(ev))" target="_blank" rel="noopener"
                      class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
                   </a>
                 </div>
+              </td>
+              <!-- Tick -->
+              <td class="px-3 py-2.5">
+                <div v-if="ev.tick_number" class="flex items-center gap-2 font-mono text-xs text-gray-400">
+                  <span :title="ev.tick_number">{{ shortTick(ev.tick_number) }}</span>
+                  <button @click="copyAddress(String(ev.tick_number))"
+                          class="icon-btn" :title="t('event.copy_tick')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                  </button>
+                  <a :href="tickUrl(ev.tick_number)" target="_blank" rel="noopener"
+                     class="icon-btn" :title="t('assets.explorer')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                </div>
+                <span v-else class="text-gray-500">—</span>
               </td>
             </tr>
           </tbody>

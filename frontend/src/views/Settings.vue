@@ -150,6 +150,24 @@ async function handleLedgerFile(e) {
   }
 }
 
+// Re-fetch all events + TX for all wallets
+const resyncing = ref(false)
+const resyncResult = ref(null)
+
+async function resyncAllData() {
+  if (!confirm(t('settings.resync_confirm'))) return
+  resyncing.value = true
+  resyncResult.value = null
+  try {
+    const res = await api.wallets.resyncAll()
+    resyncResult.value = { count: res?.wallets_queued ?? 0 }
+  } catch (err) {
+    resyncResult.value = { error: err.message }
+  } finally {
+    resyncing.value = false
+  }
+}
+
 function simulate() {
   const dir = Math.random() > 0.5 ? 'IN' : 'OUT'
   const amount = (Math.floor(Math.random() * 9000) + 500).toLocaleString(store.locale)
@@ -340,6 +358,24 @@ function simulate() {
         </p>
         <p v-if="ledgerImportResult?.error" class="text-xs text-red-400">
           {{ t('common.error_prefix') }}{{ ledgerImportResult.error }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Resync / Re-fetch Panel -->
+    <div class="card space-y-4" style="order:5">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.resync_section') }}</h3>
+      <div class="space-y-2">
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.resync_desc') }}</p>
+        <button class="btn text-sm" :disabled="resyncing" @click="resyncAllData">
+          <span v-if="resyncing">↻ {{ t('common.loading') }}</span>
+          <span v-else>↻ {{ t('settings.resync_btn') }}</span>
+        </button>
+        <p v-if="resyncResult && !resyncResult.error" class="text-xs text-green-400">
+          {{ t('settings.resync_queued').replace('{count}', resyncResult.count) }}
+        </p>
+        <p v-if="resyncResult?.error" class="text-xs text-red-400">
+          {{ t('common.error_prefix') }}{{ resyncResult.error }}
         </p>
       </div>
     </div>

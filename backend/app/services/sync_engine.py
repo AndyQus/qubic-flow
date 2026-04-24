@@ -157,7 +157,19 @@ def _apply_balance_delta(db: Session, wallet_id: str, events: list):
 
 
 async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses: set, broadcast: bool = True):
+    from ..models.address_label import AddressLabel
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    # Addresses listed as smart contracts / token issuers (assets) — transfers
+    # to/from these count as EVENTs, not user TXs. Covers SCs (QX, Qearn, …)
+    # and all token issuer addresses from the Qubic assets registry.
+    sc_addresses = {
+        row[0] for row in db.query(AddressLabel.address)
+        .filter(
+            (AddressLabel.category == "smart_contract")
+            | (AddressLabel.source.in_(["smart_contract", "issuance", "token"]))
+        )
+        .all()
+    }
     inserted = 0
     new_events = []
 
@@ -167,6 +179,15 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
             continue
         if db.query(Event.id).filter(Event.id == log_id, Event.wallet_id == wallet_id).first():
             continue
+        # Try to find a 60-char Qubic TxID in the log payload — some RPC
+        # variants include it under transactionId / txId. If found, store
+        # it as log_digest so explorer links work.
+        real_tx_id = None
+        for c in (log.get("transactionId"), log.get("txId"),
+                  log.get("logDigest"), log.get("digest")):
+            if isinstance(c, str) and len(c) == 60 and c.isalpha() and c.islower():
+                real_tx_id = c
+                break
 
         qu = log.get("quTransfer", {})
         source = qu.get("source")
@@ -179,14 +200,26 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
 
         is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
+        # Skip if we already stored this event — never overwrite existing data
+        exists = db.query(Event.id).filter(Event.id == log_id, Event.wallet_id == wallet_id).first()
+        if exists is not None:
+            continue
+        # Classification:
+        #   - logType == 0 (QuTransfer) AND neither side is a known smart contract → TX
+        #   - logType == 0 but source or destination IS a smart contract → EVENT
+        #     (SC-triggered transfer, no user-initiated archiver TX)
+        #   - logType != 0 (asset events, burns, etc.) → EVENT
+        log_type = log.get("logType")
+        touches_sc = (source in sc_addresses) or (dest in sc_addresses)
+        src_type = "TX" if (log_type == 0 and not touches_sc) else "EVENT"
         event = Event(
             id=log_id,
             epoch=log.get("epoch"),
             tick_number=log.get("tickNumber"),
             timestamp_raw=log.get("timestamp"),
             timestamp=ts_iso,
-            log_type=log.get("logType"),
-            log_digest=log.get("logDigest"),
+            log_type=log_type,
+            log_digest=real_tx_id or log.get("logDigest"),
             categories=json.dumps(log.get("categories", [])),
             source_address=source,
             destination_addr=dest,
@@ -195,11 +228,11 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
             amount_qubic=amount,
             qubic_eur_rate=price.get("eur"),
             qubic_usd_rate=price.get("usd"),
-            source_type="EVENT",
+            source_type=src_type,
             verified=0,
             created_at=now_utc_iso(),
         )
-        db.merge(event)
+        db.add(event)
         inserted += 1
         new_events.append({
             "id": log_id,
@@ -332,7 +365,27 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                     continue
 
                 tx = tx_data.get("transaction", {})
-                tx_id = tx.get("txId")
+                # Prefer the 60-char lowercase Qubic TxID format that matches
+                # explorer.qubic.org. Different RPC / archiver variants expose
+                # it under different keys, so try the common ones and pick the
+                # first 60-char lowercase value, falling back to whatever we
+                # have if none match.
+                candidates = [
+                    tx_data.get("transactionId"), tx_data.get("txId"), tx_data.get("id"),
+                    tx_data.get("digest"), tx_data.get("hash"),
+                    tx.get("transactionId"), tx.get("txId"), tx.get("id"),
+                    tx.get("digest"), tx.get("hash"),
+                ]
+                tx_id = None
+                for c in candidates:
+                    if isinstance(c, str) and len(c) == 60 and c.isalpha() and c.islower():
+                        tx_id = c
+                        break
+                if tx_id is None:
+                    for c in candidates:
+                        if c:
+                            tx_id = str(c)
+                            break
                 if not tx_id:
                     continue
 
@@ -352,6 +405,10 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                 price = await get_price_for_date(db, date_str)
                 is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
+                # Skip if we already stored this TX — never overwrite existing data
+                exists = db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first()
+                if exists is not None:
+                    continue
                 event = Event(
                     id=tx_id,
                     wallet_id=wallet_id,
@@ -371,7 +428,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                     verified=0,
                     created_at=now_utc_iso(),
                 )
-                db.merge(event)
+                db.add(event)
                 inserted += 1
 
         if inserted > 0:

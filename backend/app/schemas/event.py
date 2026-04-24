@@ -4,6 +4,7 @@ from typing import Optional
 
 class EventOut(BaseModel):
     id: str
+    log_digest: Optional[str] = None
     epoch: Optional[int]
     tick_number: Optional[int]
     timestamp: Optional[str]
