@@ -13,7 +13,7 @@ const loading  = ref(true)
 const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
-const DEFAULT_BOB = 'https://bobnet.qubic.li/'
+const DEFAULT_BOB = 'https://bobnet.qubic.li'
 const form = ref({ url: DEFAULT_BOB, node_type: 'BOB_NODE', label: '', priority: 1 })
 
 watch(() => form.value.node_type, (type) => {

@@ -25,21 +25,9 @@ function fmtDate(iso) {
   try { return new Date(iso).toLocaleString(store.locale) } catch { return iso }
 }
 
-function fmtDateShort(iso) {
-  try { return new Date(iso).toLocaleDateString(store.locale) } catch { return iso }
-}
-
-function direction(ev) {
-  if (ev.is_internal) return 'INTERNAL'
-  if (ownedIds.value.has(ev.destination_addr)) return 'IN'
-  if (ownedIds.value.has(ev.source_address)) return 'OUT'
-  return '—'
-}
-
 function flashClass(ev) {
-  const d = direction(ev)
-  if (d === 'IN') return 'flash-in'
-  if (d === 'OUT') return 'flash-out'
+  if (ev._dir === 'IN') return 'flash-in'
+  if (ev._dir === 'OUT') return 'flash-out'
   return ''
 }
 
@@ -49,9 +37,21 @@ function maskName(name, addr) {
   return shortAddr(addr)
 }
 
+function getWallet(addr) {
+  return store.wallets.find(w => w.id === addr) ?? null
+}
+
+function walletLabel(addr) {
+  return getWallet(addr)?.label ?? null
+}
+
+function isOwnWallet(addr) {
+  return ownedIds.value.has(addr)
+}
+
 function walletDisplay(name, addr) {
   if (store.hideAddresses) return '••••••••••••'
-  const w = store.wallets.find(ww => ww.id === addr)
+  const w = getWallet(addr)
   const owner = w?.owner
   const base = name || shortAddr(addr)
   const full = owner ? `${base} - ${owner}` : base
@@ -72,12 +72,12 @@ function fmtRate(ev) {
   return rate.toFixed(8).replace(/\.?0+$/, '') + (isUsd ? ' $' : ' €')
 }
 
-
 function shortTx(id) {
   if (!id) return '—'
   if (store.hideAddresses) return '••••••'
   return id.length > 5 ? `${id.slice(0, 5)}…` : id
 }
+
 function shortTick(tick) {
   if (tick == null) return '—'
   const s = String(tick)
@@ -92,40 +92,34 @@ function txId(ev) {
   return (typeof id === 'string' && /^[a-z]{60}$/.test(id)) ? id : null
 }
 
-function walletLabel(addr) {
-  const w = store.wallets.find(wallet => wallet.id === addr)
-  return w ? w.label : null
-}
-
-function isOwnWallet(addr) {
-  return !!store.wallets.find(w => w.id === addr)
-}
-
-function sign(ev) {
-  const dir = direction(ev)
-  if (dir === 'IN') return '+'
-  if (dir === 'OUT') return '−'
-  if (dir === 'INTERNAL') return ev.wallet_id === ev.source_address ? '−' : '+'
-  return ''
-}
-
 function signClass(ev) {
-  const s = sign(ev)
-  if (s === '+') return 'text-green-400'
-  if (s === '−') return 'text-red-400'
+  if (ev._sign === '+') return 'text-green-400'
+  if (ev._sign === '−') return 'text-red-400'
   return 'text-gray-400'
 }
 
 function counterpart(ev) {
-  const dir = direction(ev)
-  if (dir === 'IN')  return { addr: ev.source_address,  name: ev.source_name || walletLabel(ev.source_address) }
-  if (dir === 'OUT') return { addr: ev.destination_addr, name: ev.destination_name || walletLabel(ev.destination_addr) }
-  if (dir === 'INTERNAL') {
+  if (ev._dir === 'IN')  return { addr: ev.source_address,  name: ev.source_name || walletLabel(ev.source_address) }
+  if (ev._dir === 'OUT') return { addr: ev.destination_addr, name: ev.destination_name || walletLabel(ev.destination_addr) }
+  if (ev._dir === 'INTERNAL') {
     const otherAddr = ev.wallet_id === ev.source_address ? ev.destination_addr : ev.source_address
     return { addr: otherAddr, name: walletLabel(otherAddr) }
   }
   return { addr: ev.source_address, name: ev.source_name }
 }
+
+// Pre-compute direction and sign once per event to avoid repeated calls in template.
+const processedEvents = computed(() => props.events.map(ev => {
+  const _dir = ev.is_internal ? 'INTERNAL'
+    : ownedIds.value.has(ev.destination_addr) ? 'IN'
+    : ownedIds.value.has(ev.source_address) ? 'OUT'
+    : '—'
+  const _sign = _dir === 'IN' ? '+'
+    : _dir === 'OUT' ? '−'
+    : _dir === 'INTERNAL' ? (ev.wallet_id === ev.source_address ? '−' : '+')
+    : ''
+  return { ...ev, _dir, _sign }
+}))
 </script>
 
 <template>
@@ -137,7 +131,7 @@ function counterpart(ev) {
       <!-- Mobile: card list -->
       <div class="sm:hidden divide-y divide-qubic-border/40">
         <div v-if="!events.length" class="p-6 text-center text-gray-500 text-xs">{{ t('event.none') }}</div>
-        <div v-for="ev in events" :key="ev.id"
+        <div v-for="ev in processedEvents" :key="ev.id"
              :class="[
                store.newEventIds.includes(ev.id) ? animClass : '',
                store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
@@ -145,17 +139,17 @@ function counterpart(ev) {
              ]">
           <!-- Direction badge -->
           <div class="flex-shrink-0 mt-0.5">
-            <span v-if="direction(ev) === 'IN'"       class="text-green-400 text-xs font-bold">▲ IN</span>
-            <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 text-xs font-bold">▼ OUT</span>
-            <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '−'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
-            <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '+'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
-            <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400 text-xs font-bold">⇄ INT</span>
+            <span v-if="ev._dir === 'IN'"       class="text-green-400 text-xs font-bold">▲ IN</span>
+            <span v-else-if="ev._dir === 'OUT'" class="text-red-400 text-xs font-bold">▼ OUT</span>
+            <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
+            <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
+            <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400 text-xs font-bold">⇄ INT</span>
             <span v-else class="text-gray-500 text-xs">—</span>
           </div>
           <!-- Main info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
-              <span :class="['font-mono text-xs font-medium', signClass(ev)]"><span class="mr-0.5">{{ sign(ev) }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</span>
+              <span :class="['font-mono text-xs font-medium', signClass(ev)]"><span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU</span>
               <span class="text-xs text-gray-400">{{ fmtValue(ev) }}</span>
             </div>
             <div class="text-xs text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
@@ -232,9 +226,9 @@ function counterpart(ev) {
           </thead>
           <tbody>
             <tr v-if="!events.length">
-              <td colspan="9" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
+              <td colspan="10" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
             </tr>
-            <tr v-for="ev in events" :key="ev.id"
+            <tr v-for="ev in processedEvents" :key="ev.id"
                 :class="[
                   store.newEventIds.includes(ev.id) ? animClass : '',
                   store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
@@ -243,14 +237,14 @@ function counterpart(ev) {
               <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
               <td class="px-3 py-2.5 text-gray-400 font-mono">{{ ev.epoch ?? '—' }}</td>
               <td class="px-3 py-2.5">
-                <span v-if="direction(ev) === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
-                <span v-else-if="direction(ev) === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
-                <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
-                <span v-else-if="direction(ev) === 'INTERNAL' && sign(ev) === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
-                <span v-else-if="direction(ev) === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
+                <span v-if="ev._dir === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
+                <span v-else-if="ev._dir === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
+                <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
+                <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
+                <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
                 <span v-else class="text-gray-500">—</span>
               </td>
-              <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]"><span class="mr-0.5">{{ sign(ev) }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString('de-DE') }} QU</td>
+              <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]"><span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU</td>
               <td class="px-3 py-2.5 font-mono text-gray-400 text-right hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
               <td class="px-3 py-2.5 font-mono text-right whitespace-nowrap">{{ fmtValue(ev) }}</td>
               <!-- Source -->

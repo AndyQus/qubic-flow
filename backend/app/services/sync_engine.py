@@ -14,6 +14,8 @@ from .coingecko import get_price_for_date
 from ..websocket.manager import manager
 from ..models.node import Node
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 MAX_WINDOW_RECORDS = 10000
@@ -172,6 +174,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
     }
     inserted = 0
     new_events = []
+    price_cache: dict = {}
 
     for log in logs:
         log_id = log.get("logId")
@@ -205,7 +208,9 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
 
         ts_iso = unix_ms_to_iso(log.get("timestamp", "0"))
         date_str = iso_to_date(ts_iso)
-        price = await get_price_for_date(db, date_str)
+        if date_str not in price_cache:
+            price_cache[date_str] = await get_price_for_date(db, date_str)
+        price = price_cache[date_str]
 
         is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
@@ -280,20 +285,26 @@ def _epoch_for_tick(db: Session, tick_number: int | None) -> int | None:
     return row[0] if row else None
 
 
-async def _epoch_from_api(tick_number: int, cache: dict) -> int | None:
+async def _epoch_from_api(tick_number: int, cache: dict, http_client=None) -> int | None:
     """Fetch epoch for a tick from the Qubic API, with in-memory cache."""
     if tick_number in cache:
         return cache[tick_number]
     try:
-        async with __import__("httpx").AsyncClient() as client:
-            r = await client.get(
+        if http_client is not None:
+            r = await http_client.get(
                 f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
                 timeout=10,
             )
-            if r.status_code == 200:
-                epoch = r.json().get("tickData", {}).get("epoch")
-                cache[tick_number] = epoch
-                return epoch
+        else:
+            async with httpx.AsyncClient() as c:
+                r = await c.get(
+                    f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
+                    timeout=10,
+                )
+        if r.status_code == 200:
+            epoch = r.json().get("tickData", {}).get("epoch")
+            cache[tick_number] = epoch
+            return epoch
     except Exception:
         pass
     cache[tick_number] = None
@@ -309,13 +320,14 @@ async def backfill_tx_epochs(db: Session) -> int:
     ).all()
     updated = 0
     api_cache: dict = {}
-    for ev in rows:
-        epoch = _epoch_for_tick(db, ev.tick_number)
-        if epoch is None:
-            epoch = await _epoch_from_api(ev.tick_number, api_cache)
-        if epoch is not None:
-            ev.epoch = epoch
-            updated += 1
+    async with httpx.AsyncClient() as http_client:
+        for ev in rows:
+            epoch = _epoch_for_tick(db, ev.tick_number)
+            if epoch is None:
+                epoch = await _epoch_from_api(ev.tick_number, api_cache, http_client)
+            if epoch is not None:
+                ev.epoch = epoch
+                updated += 1
     if updated:
         db.commit()
         logger.info(f"backfill_tx_epochs: updated {updated} TX records")
@@ -374,117 +386,124 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=
 async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tick: int, owned_addresses: set, client) -> int:
     page = 1
     total_inserted = 0
+    epoch_cache: dict = {}
+    price_cache: dict = {}
 
-    while True:
-        resp = await client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
-        tick_groups = resp.get("transactions", [])
-        inserted = 0
+    async with httpx.AsyncClient() as http_client:
+        while True:
+            resp = await client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
+            tick_groups = resp.get("transactions", [])
+            inserted = 0
 
-        epoch_cache: dict = {}
-        for tick_group in tick_groups:
-            tick_number = tick_group.get("tickNumber")
-            epoch = _epoch_for_tick(db, tick_number)
-            if epoch is None:
-                epoch = await _epoch_from_api(tick_number, epoch_cache)
-            for tx_data in tick_group.get("transactions", []):
-                if not tx_data.get("moneyFlew", False):
-                    continue
+            for tick_group in tick_groups:
+                tick_number = tick_group.get("tickNumber")
+                epoch = _epoch_for_tick(db, tick_number)
+                if epoch is None:
+                    epoch = await _epoch_from_api(tick_number, epoch_cache, http_client)
+                for tx_data in tick_group.get("transactions", []):
+                    if not tx_data.get("moneyFlew", False):
+                        continue
 
-                tx = tx_data.get("transaction", {})
-                # Prefer the 60-char lowercase Qubic TxID format that matches
-                # explorer.qubic.org. Different RPC / archiver variants expose
-                # it under different keys, so try the common ones and pick the
-                # first 60-char lowercase value, falling back to whatever we
-                # have if none match.
-                candidates = [
-                    tx_data.get("transactionId"), tx_data.get("txId"), tx_data.get("id"),
-                    tx_data.get("digest"), tx_data.get("hash"),
-                    tx.get("transactionId"), tx.get("txId"), tx.get("id"),
-                    tx.get("digest"), tx.get("hash"),
-                ]
-                tx_id = None
-                for c in candidates:
-                    if isinstance(c, str) and len(c) == 60 and c.isalpha() and c.islower():
-                        tx_id = c
-                        break
-                if tx_id is None:
+                    tx = tx_data.get("transaction", {})
+                    # Prefer the 60-char lowercase Qubic TxID format that matches
+                    # explorer.qubic.org. Different RPC / archiver variants expose
+                    # it under different keys, so try the common ones and pick the
+                    # first 60-char lowercase value, falling back to whatever we
+                    # have if none match.
+                    candidates = [
+                        tx_data.get("transactionId"), tx_data.get("txId"), tx_data.get("id"),
+                        tx_data.get("digest"), tx_data.get("hash"),
+                        tx.get("transactionId"), tx.get("txId"), tx.get("id"),
+                        tx.get("digest"), tx.get("hash"),
+                    ]
+                    tx_id = None
                     for c in candidates:
-                        if c:
-                            tx_id = str(c)
+                        if isinstance(c, str) and len(c) == 60 and c.isalpha() and c.islower():
+                            tx_id = c
                             break
-                if not tx_id:
-                    continue
+                    if tx_id is None:
+                        for c in candidates:
+                            if c:
+                                tx_id = str(c)
+                                break
+                    if not tx_id:
+                        continue
 
-                # Skip if already stored as TX
-                if db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first():
-                    continue
-                # Skip if already covered by an Event (logDigest == txId)
-                if db.query(Event.id).filter(Event.log_digest == tx_id, Event.wallet_id == wallet_id).first():
-                    continue
+                    # Skip if already stored as TX
+                    if db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first():
+                        continue
+                    # Skip if already covered by an Event (logDigest == txId)
+                    if db.query(Event.id).filter(Event.log_digest == tx_id, Event.wallet_id == wallet_id).first():
+                        continue
 
-                source = tx.get("sourceId")
-                dest = tx.get("destId")
-                amount = int(tx.get("amount") or "0")
-                ts_unix_s = tx_data.get("timestamp", 0)
-                ts_iso = unix_ms_to_iso(int(ts_unix_s))
-                date_str = iso_to_date(ts_iso)
-                price = await get_price_for_date(db, date_str)
-                is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
+                    source = tx.get("sourceId")
+                    dest = tx.get("destId")
+                    amount = int(tx.get("amount") or "0")
+                    # TX API returns Unix seconds; unix_ms_to_iso expects milliseconds.
+                    ts_unix_s = tx_data.get("timestamp", 0)
+                    ts_iso = unix_ms_to_iso(int(ts_unix_s) * 1000)
+                    date_str = iso_to_date(ts_iso)
+                    if date_str not in price_cache:
+                        price_cache[date_str] = await get_price_for_date(db, date_str)
+                    price = price_cache[date_str]
+                    is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
-                # Reconcile with an event-log stub for the same transaction.
-                # getEventLogs only gives us a numeric logId + 16-char hex
-                # logDigest, not the explorer's 60-char txId. Match by
-                # (tick, source, dest, amount) and upgrade the id/log_digest
-                # in place, preserving any user-entered columns (comment,
-                # item tags, verified). length(id) != 60 filters out rows
-                # that were already reconciled on a previous pass.
-                stub = db.query(Event).filter(
-                    Event.wallet_id == wallet_id,
-                    Event.tick_number == tick_number,
-                    Event.source_address == source,
-                    Event.destination_addr == dest,
-                    Event.amount_qubic == amount,
-                    func.length(Event.id) != 60,
-                ).first()
-                if stub is not None:
-                    db.execute(
-                        update(Event)
-                        .where(Event.id == stub.id, Event.wallet_id == wallet_id)
-                        .values(id=tx_id, log_digest=tx_id, epoch=epoch or stub.epoch)
+                    # Reconcile with an event-log stub for the same transaction.
+                    # getEventLogs only gives us a numeric logId + 16-char hex
+                    # logDigest, not the explorer's 60-char txId. Match by
+                    # (tick, source, dest, amount) and upgrade the id/log_digest
+                    # in place, preserving any user-entered columns (comment,
+                    # item tags, verified). length(id) != 60 filters out rows
+                    # that were already reconciled on a previous pass.
+                    # ORDER BY id makes the match deterministic when duplicate
+                    # stubs exist (e.g. two identical transfers in the same tick).
+                    stub = db.query(Event).filter(
+                        Event.wallet_id == wallet_id,
+                        Event.tick_number == tick_number,
+                        Event.source_address == source,
+                        Event.destination_addr == dest,
+                        Event.amount_qubic == amount,
+                        func.length(Event.id) != 60,
+                    ).order_by(Event.id).first()
+                    if stub is not None:
+                        db.execute(
+                            update(Event)
+                            .where(Event.id == stub.id, Event.wallet_id == wallet_id)
+                            .values(id=tx_id, log_digest=tx_id, epoch=epoch or stub.epoch)
+                        )
+                        inserted += 1
+                        continue
+                    event = Event(
+                        id=tx_id,
+                        wallet_id=wallet_id,
+                        epoch=epoch,
+                        tick_number=tick_number,
+                        timestamp_raw=str(ts_unix_s),
+                        timestamp=ts_iso,
+                        log_type=tx.get("inputType"),
+                        log_digest=tx_id,
+                        source_address=source,
+                        destination_addr=dest,
+                        is_internal=is_internal,
+                        amount_qubic=amount,
+                        qubic_eur_rate=price.get("eur"),
+                        qubic_usd_rate=price.get("usd"),
+                        source_type="TX",
+                        verified=0,
+                        created_at=now_utc_iso(),
                     )
+                    db.add(event)
                     inserted += 1
-                    continue
-                event = Event(
-                    id=tx_id,
-                    wallet_id=wallet_id,
-                    epoch=epoch,
-                    tick_number=tick_number,
-                    timestamp_raw=str(ts_unix_s),
-                    timestamp=ts_iso,
-                    log_type=tx.get("inputType"),
-                    log_digest=tx_id,
-                    source_address=source,
-                    destination_addr=dest,
-                    is_internal=is_internal,
-                    amount_qubic=amount,
-                    qubic_eur_rate=price.get("eur"),
-                    qubic_usd_rate=price.get("usd"),
-                    source_type="TX",
-                    verified=0,
-                    created_at=now_utc_iso(),
-                )
-                db.add(event)
-                inserted += 1
 
-        if inserted > 0:
-            db.commit()
-            total_inserted += inserted
-            logger.info(f"Wallet {wallet_id}: TX page {page} — {inserted} new records")
+            if inserted > 0:
+                db.commit()
+                total_inserted += inserted
+                logger.info(f"Wallet {wallet_id}: TX page {page} — {inserted} new records")
 
-        pagination = resp.get("pagination", {})
-        if page >= pagination.get("totalPages", 1) or not tick_groups:
-            break
-        page += 1
+            pagination = resp.get("pagination", {})
+            if page >= pagination.get("totalPages", 1) or not tick_groups:
+                break
+            page += 1
 
     return total_inserted
 

@@ -38,6 +38,8 @@ const taxSettings = ref({
 })
 const taxCountries = ref({})
 const taxSaving = ref(false)
+const taxSaved = ref(false)
+const loadError = ref(null)
 
 onMounted(async () => {
   try {
@@ -45,14 +47,17 @@ onMounted(async () => {
     if (s) Object.assign(taxSettings.value, s)
     if (c) taxCountries.value = c
   } catch (e) {
-    console.error(e)
+    loadError.value = e.message
   }
 })
 
 async function saveTaxSettings() {
   taxSaving.value = true
+  taxSaved.value = false
   try {
     await api.tax.saveSettings(taxSettings.value)
+    taxSaved.value = true
+    setTimeout(() => { taxSaved.value = false }, 3000)
   } finally {
     taxSaving.value = false
   }
@@ -77,9 +82,11 @@ const previewAnimClass = computed(() => {
 
 // DB Export
 const dbExporting = ref(false)
+const dbExportError = ref(null)
 
 async function exportDbJson() {
   dbExporting.value = true
+  dbExportError.value = null
   try {
     const data = await api.backup.export()
     const json = JSON.stringify(data, null, 2)
@@ -91,7 +98,7 @@ async function exportDbJson() {
     a.click()
     URL.revokeObjectURL(url)
   } catch (err) {
-    console.error(err)
+    dbExportError.value = err.message
   } finally {
     dbExporting.value = false
   }
@@ -337,6 +344,7 @@ function simulate() {
         <button class="btn text-sm" :disabled="dbExporting" @click="exportDbJson">
           {{ dbExporting ? t('common.loading') : t('settings.db_export_btn') }}
         </button>
+        <p v-if="dbExportError" class="text-xs text-red-400">{{ t('common.error_prefix') }}{{ dbExportError }}</p>
       </div>
 
       <div class="border-t border-qubic-border/40"></div>
@@ -409,6 +417,8 @@ function simulate() {
 
   <!-- Tab: Steuern -->
   <div v-if="activeTab === 'tax'" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+    <p v-if="loadError" class="sm:col-span-2 text-xs text-red-400">{{ t('common.error_prefix') }}{{ loadError }}</p>
+
     <!-- Tax Panel 1: Land & Methode -->
     <div class="card space-y-4 sm:col-start-1">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.settings_title') }} — {{ t('tax.country') }} &amp; {{ t('tax.method') }}</h3>
@@ -443,7 +453,8 @@ function simulate() {
         {{ t('tax.country_rules') }}
       </div>
 
-      <div class="flex justify-end pt-1">
+      <div class="flex items-center justify-end gap-3 pt-1">
+        <span v-if="taxSaved" class="text-xs text-green-400">✓ {{ t('common.save') }}</span>
         <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
           {{ taxSaving ? t('common.loading') : t('common.save') }}
         </button>
@@ -467,7 +478,8 @@ function simulate() {
         <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
       </div>
 
-      <div class="flex justify-end pt-1">
+      <div class="flex items-center justify-end gap-3 pt-1">
+        <span v-if="taxSaved" class="text-xs text-green-400">✓ {{ t('common.save') }}</span>
         <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
           {{ taxSaving ? t('common.loading') : t('common.save') }}
         </button>
@@ -514,7 +526,8 @@ function simulate() {
         </div>
       </div>
 
-      <div class="flex justify-end pt-1">
+      <div class="flex items-center justify-end gap-3 pt-1">
+        <span v-if="taxSaved" class="text-xs text-green-400">✓ {{ t('common.save') }}</span>
         <button class="btn px-6" :disabled="taxSaving" @click="saveTaxSettings">
           {{ taxSaving ? t('common.loading') : t('common.save') }}
         </button>
