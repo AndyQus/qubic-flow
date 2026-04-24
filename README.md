@@ -27,8 +27,8 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 
 - **Unbegrenzte Wallets** — PRIVATE und BUSINESS, verwaltbar über die Oberfläche
 - **Dual-Node-Unterstützung** — Standard-RPC (`rpc.qubic.org`) **und** BOB-Node (`bobnet.qubic.li`) werden unterstützt; der beste verfügbare Node wird automatisch gewählt
-- **Event-Sync** — automatisch alle 60 Sekunden; RPC-Nodes via `getEventLogs`, BOB-Nodes via `POST /getQuTransferForIdentity`
-- **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events; probiert mehrere Feldnamen (`transactionId`, `txId`, `id`, `digest`, `hash`) und bevorzugt die echte 60-Zeichen-Qubic-TxID
+- **Event-Sync** — automatisch alle 60 Sekunden; RPC-Nodes via `getEventLogs` (nutzt `transactionHash` **direkt als Primary Key** — die gleiche 60-Zeichen-ID, die der Qubic-Explorer zeigt), BOB-Nodes via `POST /getQuTransferForIdentity`. SC-interne Events ohne `transactionHash` fallen auf die numerische `logId` zurück (der 16-Zeichen-`logDigest` ist dann auch die Explorer-ID für diese Events).
+- **TX-Sync** — Transfer-Transaktionen via Qubic Archiver API, dedupliziert gegen Events; probiert mehrere Feldnamen (`transactionId`, `txId`, `id`, `digest`, `hash`) und bevorzugt die echte 60-Zeichen-Qubic-TxID. Stub-Reconciliation: bestehende Event-Log-Rows werden anhand `(tick, source, dest, amount)` gematcht und mit der echten TxID in-place aktualisiert (User-Felder wie Kommentar/Item bleiben erhalten). Chunk-basierter Fortschritt mit Per-Chunk-Checkpoint — fehlgeschlagene Chunks landen als `SyncGap` und rollen `last_tx_tick` nicht zurück. Erst-Sync startet bei `current_tick − 500 000` (Archiver-Retention), nicht bei Tick 1.
 - **Smart-Contract-aware Klassifikation** — `logType=0` Transfers werden über Adress-Labels als `TX` (normaler Transfer) oder `EVENT` (Smart Contract / Token Issuer, z. B. QX, Qearn) eingeordnet
 - **Manueller Resync** — Button „Daten neu abrufen" in den Einstellungen (`POST /wallets/resync-all`) setzt Sync-Zähler zurück und importiert insert-only (bestehende Records bleiben unverändert, nur fehlende werden ergänzt)
 - **Tick-Range-Windowing** — überwindet das 10.000-Records-Limit der RPC-API durch rekursives Halbieren
@@ -38,7 +38,7 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
 - **EUR/USD-Kurse** — täglich von CoinGecko abgerufen, in DB gecacht
 - **Statistik-Panels** — Stunden / Tag / Epoch / Monat / Jahr, je mit aktueller und vorheriger Periode
 - **Epochen-Ansicht** — aktuelle Epoche als Wallet-Panel-Grid (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Split, ausgehende Qubics inkl. EUR-Wert); Filter „Alle“ / „Nur mit Eingang“ plus „Alles anzeigen"-Toggle (`?ext=1`) zum Ein-/Ausblenden leerer Sub-Zeilen
-- **Events-Tabelle** — getrennte Spalten für TxId und Tick, je mit Copy-Button und Explorer-Link (`/network/tx/{id}` bzw. `/network/tick/{tick}`); Kurzanzeige 5 Zeichen mit Tooltip, voller Wert beim Kopieren/Öffnen
+- **Events-Tabelle** — getrennte Spalten für TxId und Tick, je mit Copy-Button und Explorer-Link (`/network/tx/{id}` bzw. `/network/tick/{tick}`); Kurzanzeige 5 Zeichen mit Tooltip, voller Wert beim Kopieren/Öffnen. Nur echte 60-Zeichen-Qubic-TxIDs (passend zur `/network/tx/...`-Route) werden angezeigt — SC-interne Events ohne User-TX zeigen in der TxID-Spalte einen Bindestrich.
 - **Wöchentliche Snapshots** — jeden Mittwoch 12:00 UTC
 - **3 Animations-Varianten** für neue Events: Push Down, Slide In, Beam Drop (einstellbar)
 - **Live-Updates** per WebSocket (Events + Node-Status)
@@ -54,6 +54,7 @@ Unterstützt unbegrenzt viele Wallets (PRIVATE / BUSINESS), automatische EUR/USD
   - Mit aufgelösten Adress-Namen im Kommentar-Feld
 - **Interne Transfers** (`is_internal`) — Wallet-zu-Wallet-Transfers werden beim Export steuerlich neutral behandelt
 - **DE / EN** Benutzeroberfläche, Dark / Light Mode
+- **Einstellungen in Tabs** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Backup-Restore, Ledger-Import, Resync); aktiver Tab wird per URL-Query (`?tab=…`) gespiegelt
 - **Vollständig containerisiert** — ein `docker-compose up --build` genügt
 
 ---

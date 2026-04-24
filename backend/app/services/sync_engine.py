@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from ..database import SessionLocal
 from ..models.wallet import Wallet
 from ..models.event import Event
@@ -177,17 +177,26 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         log_id = log.get("logId")
         if not log_id:
             continue
-        if db.query(Event.id).filter(Event.id == log_id, Event.wallet_id == wallet_id).first():
-            continue
-        # Try to find a 60-char Qubic TxID in the log payload — some RPC
-        # variants include it under transactionId / txId. If found, store
-        # it as log_digest so explorer links work.
+        # The archiver's getEventLogs response exposes the 60-char Qubic
+        # TxID under `transactionHash` — the explorer's primary identifier.
+        # Use it as our primary key so `id` matches the explorer's TxID.
+        # Falls back to logId for SC-internal events where the archiver
+        # provides no transactionHash.
         real_tx_id = None
-        for c in (log.get("transactionId"), log.get("txId"),
-                  log.get("logDigest"), log.get("digest")):
+        for c in (log.get("transactionHash"), log.get("transactionId"),
+                  log.get("txId"), log.get("digest")):
             if isinstance(c, str) and len(c) == 60 and c.isalpha() and c.islower():
                 real_tx_id = c
                 break
+        effective_id = real_tx_id if real_tx_id else str(log_id)
+        # Dedup: an existing row may use either key (transactionHash from
+        # new code, logId from older code). Skip if either matches.
+        dedup_keys = {effective_id, str(log_id)}
+        if db.query(Event.id).filter(
+            Event.wallet_id == wallet_id,
+            Event.id.in_(dedup_keys),
+        ).first():
+            continue
 
         qu = log.get("quTransfer", {})
         source = qu.get("source")
@@ -200,10 +209,6 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
 
         is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
-        # Skip if we already stored this event — never overwrite existing data
-        exists = db.query(Event.id).filter(Event.id == log_id, Event.wallet_id == wallet_id).first()
-        if exists is not None:
-            continue
         # Classification:
         #   - logType == 0 (QuTransfer) AND neither side is a known smart contract → TX
         #   - logType == 0 but source or destination IS a smart contract → EVENT
@@ -213,7 +218,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         touches_sc = (source in sc_addresses) or (dest in sc_addresses)
         src_type = "TX" if (log_type == 0 and not touches_sc) else "EVENT"
         event = Event(
-            id=log_id,
+            id=effective_id,
             epoch=log.get("epoch"),
             tick_number=log.get("tickNumber"),
             timestamp_raw=log.get("timestamp"),
@@ -235,7 +240,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         db.add(event)
         inserted += 1
         new_events.append({
-            "id": log_id,
+            "id": effective_id,
             "epoch": event.epoch,
             "tick_number": event.tick_number,
             "timestamp": event.timestamp,
@@ -246,6 +251,9 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
             "qubic_eur_rate": event.qubic_eur_rate,
             "qubic_usd_rate": event.qubic_usd_rate,
             "is_internal": event.is_internal,
+            "log_digest": event.log_digest,
+            "log_type": event.log_type,
+            "source_type": event.source_type,
         })
 
     if inserted > 0:
@@ -321,7 +329,14 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=
     if state is None:
         return
 
-    from_tick = (state.last_tx_tick or 0) + 1
+    # The archiver only keeps a rolling window of recent ticks. On first run
+    # (last_tx_tick == 0), walking from tick 1 causes every chunk before the
+    # retention horizon to 404 and aborts the whole sync before checkpointing,
+    # so the next cycle restarts at 1 forever. Baseline to the last window.
+    if (state.last_tx_tick or 0) == 0:
+        from_tick = max(1, current_tick - TX_WINDOW_SIZE)
+    else:
+        from_tick = state.last_tx_tick + 1
     to_tick = current_tick
 
     if from_tick > to_tick:
@@ -330,18 +345,29 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=
     owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
     total_inserted = 0
 
-    # Split into windows so the API is not overwhelmed by huge tick ranges
     chunk_start = from_tick
     while chunk_start <= to_tick:
         chunk_end = min(chunk_start + TX_WINDOW_SIZE - 1, to_tick)
-        inserted = await _sync_transactions(db, wallet_id, chunk_start, chunk_end, owned_addresses, client)
-        total_inserted += inserted
+        try:
+            inserted = await _sync_transactions(db, wallet_id, chunk_start, chunk_end, owned_addresses, client)
+            total_inserted += inserted
+            # Checkpoint per chunk so a later failure never rewinds progress.
+            state.last_tx_tick = chunk_end
+            if inserted > 0:
+                state.total_events = (state.total_events or 0) + inserted
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            db.add(SyncGap(
+                wallet_id=wallet_id,
+                from_tick=chunk_start,
+                to_tick=chunk_end,
+                detected_at=now_utc_iso(),
+            ))
+            db.commit()
+            logger.warning(f"TX chunk {chunk_start}-{chunk_end} failed for {wallet_id}: {e}")
         chunk_start = chunk_end + 1
 
-    state.last_tx_tick = to_tick
-    if total_inserted > 0:
-        state.total_events = (state.total_events or 0) + total_inserted
-    db.commit()
     logger.info(f"TX sync done for wallet {wallet_id}: {total_inserted} new records (ticks {from_tick}–{to_tick})")
 
 
@@ -405,9 +431,28 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                 price = await get_price_for_date(db, date_str)
                 is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
-                # Skip if we already stored this TX — never overwrite existing data
-                exists = db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first()
-                if exists is not None:
+                # Reconcile with an event-log stub for the same transaction.
+                # getEventLogs only gives us a numeric logId + 16-char hex
+                # logDigest, not the explorer's 60-char txId. Match by
+                # (tick, source, dest, amount) and upgrade the id/log_digest
+                # in place, preserving any user-entered columns (comment,
+                # item tags, verified). length(id) != 60 filters out rows
+                # that were already reconciled on a previous pass.
+                stub = db.query(Event).filter(
+                    Event.wallet_id == wallet_id,
+                    Event.tick_number == tick_number,
+                    Event.source_address == source,
+                    Event.destination_addr == dest,
+                    Event.amount_qubic == amount,
+                    func.length(Event.id) != 60,
+                ).first()
+                if stub is not None:
+                    db.execute(
+                        update(Event)
+                        .where(Event.id == stub.id, Event.wallet_id == wallet_id)
+                        .values(id=tx_id, log_digest=tx_id, epoch=epoch or stub.epoch)
+                    )
+                    inserted += 1
                     continue
                 event = Event(
                     id=tx_id,

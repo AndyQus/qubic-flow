@@ -3,11 +3,24 @@ import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import i18next from 'i18next'
 import { api } from '../api'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '../components/PageHeader.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
+const route = useRoute()
+const router = useRouter()
+
+const TABS = ['display', 'tax', 'data']
+function normalizeTab(q) { return TABS.includes(q) ? q : 'display' }
+const activeTab = ref(normalizeTab(route.query.tab))
+
+watch(() => route.query.tab, (q) => { activeTab.value = normalizeTab(q) })
+
+function setActiveTab(tab) {
+  router.push({ path: '/settings', query: tab === 'display' ? {} : { tab } })
+}
 
 // Tax settings
 const taxSettings = ref({
@@ -192,10 +205,71 @@ function simulate() {
 
 <template>
   <div class="space-y-3">
-  <PageHeader :title="t('nav.settings')" :hint="t('page_hint.settings')" />
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-    <!-- Eingangsanimation (nach Darstellung) -->
-    <div class="card" style="order:2">
+  <PageHeader :title="t('nav.settings')" :hint="t('page_hint.settings')">
+    <div class="tab-group">
+      <button :class="['tab-btn', activeTab === 'display' && 'tab-btn-active']"
+              @click="setActiveTab('display')">{{ t('settings.tab_display') }}</button>
+      <button :class="['tab-btn', activeTab === 'tax' && 'tab-btn-active']"
+              @click="setActiveTab('tax')">{{ t('settings.tab_tax') }}</button>
+      <button :class="['tab-btn', activeTab === 'data' && 'tab-btn-active']"
+              @click="setActiveTab('data')">{{ t('settings.tab_data') }}</button>
+    </div>
+  </PageHeader>
+
+  <!-- Tab: Darstellung (inkl. Animation) -->
+  <div v-if="activeTab === 'display'" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+    <!-- Darstellung -->
+    <div class="card space-y-4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.display') }}</h3>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.currency') }}</span>
+        <div class="flex gap-2">
+          <button v-for="[val, lbl, flag] in [['EUR','Euro','€'],['USD','US-Dollar','$']]"
+                  :key="val"
+                  :class="['btn-ghost text-sm py-2', store.currency === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                  @click="store.setCurrency(val)">
+            <span class="mr-1">{{ flag }}</span>{{ lbl }}
+          </button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.font_size') }}</span>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button v-for="[val, lbl] in [['100', t('settings.font_sm')],['115', t('settings.font_md')],['130', t('settings.font_lg')]]"
+                  :key="val"
+                  :class="['btn-ghost text-sm py-2', store.fontSize === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                  @click="store.setFontSize(val)">
+            {{ lbl }}
+          </button>
+          <span class="text-xs text-gray-500 ml-1">{{ store.fontSize }}%</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.theme') }}</span>
+        <div class="flex gap-2">
+          <button :class="['btn-ghost text-sm py-2', store.theme === 'dark' && 'bg-qubic-teal/20 border-qubic-teal']"
+                  @click="store.setTheme('dark')">{{ t('settings.dark') }}</button>
+          <button :class="['btn-ghost text-sm py-2', store.theme === 'light' && 'bg-qubic-teal/20 border-qubic-teal']"
+                  @click="store.setTheme('light')">{{ t('settings.light') }}</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.language') }}</span>
+        <div class="flex gap-2">
+          <button :class="['btn-ghost text-sm py-2', store.lang === 'de' && 'bg-qubic-teal/20 border-qubic-teal']"
+                  @click="setLang('de')">Deutsch</button>
+          <button :class="['btn-ghost text-sm py-2', store.lang === 'en' && 'bg-qubic-teal/20 border-qubic-teal']"
+                  @click="setLang('en')">English</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Eingangsanimation -->
+    <div class="card">
       <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('moneyAnim.title') }}</h3>
       <div class="flex flex-wrap gap-2 mb-3">
         <button v-for="[val, key] in [['none','none'],['coin-rain','coin_rain'],['money-burst','money_burst'],['floating-coins','floating_coins']]"
@@ -248,60 +322,12 @@ function simulate() {
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Darstellung -->
-    <div class="card space-y-4" style="order:1">
-      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.display') }}</h3>
-
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.currency') }}</span>
-        <div class="flex gap-2">
-          <button v-for="[val, lbl, flag] in [['EUR','Euro','€'],['USD','US-Dollar','$']]"
-                  :key="val"
-                  :class="['btn-ghost text-sm py-2', store.currency === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                  @click="store.setCurrency(val)">
-            <span class="mr-1">{{ flag }}</span>{{ lbl }}
-          </button>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.font_size') }}</span>
-        <div class="flex items-center gap-2 flex-wrap">
-          <button v-for="[val, lbl] in [['100', t('settings.font_sm')],['115', t('settings.font_md')],['130', t('settings.font_lg')]]"
-                  :key="val"
-                  :class="['btn-ghost text-sm py-2', store.fontSize === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
-                  @click="store.setFontSize(val)">
-            {{ lbl }}
-          </button>
-          <span class="text-xs text-gray-500 ml-1">{{ store.fontSize }}%</span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.theme') }}</span>
-        <div class="flex gap-2">
-          <button :class="['btn-ghost text-sm py-2', store.theme === 'dark' && 'bg-qubic-teal/20 border-qubic-teal']"
-                  @click="store.setTheme('dark')">{{ t('settings.dark') }}</button>
-          <button :class="['btn-ghost text-sm py-2', store.theme === 'light' && 'bg-qubic-teal/20 border-qubic-teal']"
-                  @click="store.setTheme('light')">{{ t('settings.light') }}</button>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-4">
-        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('settings.language') }}</span>
-        <div class="flex gap-2">
-          <button :class="['btn-ghost text-sm py-2', store.lang === 'de' && 'bg-qubic-teal/20 border-qubic-teal']"
-                  @click="setLang('de')">Deutsch</button>
-          <button :class="['btn-ghost text-sm py-2', store.lang === 'en' && 'bg-qubic-teal/20 border-qubic-teal']"
-                  @click="setLang('en')">English</button>
-        </div>
-      </div>
-    </div>
-
-
+  <!-- Tab: Daten -->
+  <div v-if="activeTab === 'data'" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
     <!-- Export & Import Panel -->
-    <div class="card space-y-4" style="order:3">
+    <div class="card space-y-4">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.io_title') }}</h3>
 
       <!-- QubicFlow Backup Export -->
@@ -337,7 +363,7 @@ function simulate() {
     </div>
 
     <!-- Import aus Qubic Ledger Panel -->
-    <div class="card space-y-4" style="order:4">
+    <div class="card space-y-4">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.ledger_section') }}</h3>
 
       <div class="space-y-2">
@@ -363,7 +389,7 @@ function simulate() {
     </div>
 
     <!-- Resync / Re-fetch Panel -->
-    <div class="card space-y-4" style="order:5">
+    <div class="card space-y-4">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.resync_section') }}</h3>
       <div class="space-y-2">
         <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.resync_desc') }}</p>
@@ -379,9 +405,12 @@ function simulate() {
         </p>
       </div>
     </div>
+  </div>
 
+  <!-- Tab: Steuern -->
+  <div v-if="activeTab === 'tax'" class="grid grid-cols-1 sm:grid-cols-2 gap-6">
     <!-- Tax Panel 1: Land & Methode -->
-    <div class="card space-y-4 sm:col-start-1" style="order:5">
+    <div class="card space-y-4 sm:col-start-1">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.settings_title') }} — {{ t('tax.country') }} &amp; {{ t('tax.method') }}</h3>
 
       <div class="flex items-start gap-4">
@@ -422,7 +451,7 @@ function simulate() {
     </div>
 
     <!-- Tax Panel 2: Persönliche Daten -->
-    <div class="card space-y-3" style="order:6">
+    <div class="card space-y-3">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.private_data') }}</h3>
 
       <div>
@@ -446,7 +475,7 @@ function simulate() {
     </div>
 
     <!-- Tax Panel 3: Geschäftsdaten -->
-    <div class="card space-y-3 sm:col-span-2" style="order:7">
+    <div class="card space-y-3 sm:col-span-2">
       <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('tax.business_data') }}</h3>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">

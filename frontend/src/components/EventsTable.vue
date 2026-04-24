@@ -84,19 +84,12 @@ function shortTick(tick) {
   return s.length > 5 ? `${s.slice(0, 5)}…` : s
 }
 
-// Prefer the real TX digest (explorer id) over the internal log id.
-// For archiver-sourced records, log_digest === id; for event-log-sourced
-// records, log_digest holds the explorer-visible txId while id is a short logId.
+// Only return a value if it's a real 60-char Qubic TxID (explorer format).
+// SC-internal events have shorter logDigest hashes that don't map to any
+// explorer TX page, so we hide the TxID block entirely for those rows.
 function txId(ev) {
-  return ev.log_digest || ev.id
-}
-
-// Qubic txIds are exactly 60 lowercase letters a–z. The explorer's
-// /network/tx/... route only works with those — for shorter ids
-// (e.g. the 16-hex logDigest from getEventLogs) we hide the tx-icon
-// and keep the separate tick-explorer link as the reliable fallback.
-function isRealTxId(id) {
-  return typeof id === 'string' && /^[a-z]{60}$/.test(id)
+  const id = ev.log_digest || ev.id
+  return (typeof id === 'string' && /^[a-z]{60}$/.test(id)) ? id : null
 }
 
 function walletLabel(addr) {
@@ -184,8 +177,8 @@ function counterpart(ev) {
                 </svg>
               </a>
             </div>
-            <!-- TxId -->
-            <div class="flex items-start gap-1 mt-1 min-w-0">
+            <!-- TxId (only when there's a real 60-char Qubic TxID) -->
+            <div v-if="txId(ev)" class="flex items-start gap-1 mt-1 min-w-0">
               <span class="text-xs text-gray-500 font-mono break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
               <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
                       class="icon-btn" :title="t('event.copy_txid')">
@@ -304,7 +297,7 @@ function counterpart(ev) {
               </td>
               <!-- TxId -->
               <td class="px-3 py-2.5">
-                <div class="flex items-start gap-2 font-mono text-xs text-gray-400 min-w-0">
+                <div v-if="txId(ev)" class="flex items-start gap-2 font-mono text-xs text-gray-400 min-w-0">
                   <span class="break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
                   <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
                           class="icon-btn" :title="t('event.copy_txid')">
@@ -319,6 +312,7 @@ function counterpart(ev) {
                     </svg>
                   </a>
                 </div>
+                <span v-else class="text-gray-500">—</span>
               </td>
               <!-- Tick -->
               <td class="px-3 py-2.5">
