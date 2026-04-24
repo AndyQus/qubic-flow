@@ -8,7 +8,9 @@ export const useAppStore = defineStore('app', () => {
   const soundStyle  = ref(localStorage.getItem('soundStyle')  || 'kaching')
   const theme = ref(localStorage.getItem('theme') || 'dark')
   const lang = ref(localStorage.getItem('lang') || 'en')
-  const fontSize = ref(localStorage.getItem('fontSize') || '115')
+  // Mobile devices default to small (100%), desktop to normal (115%)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const fontSize = ref(localStorage.getItem('fontSize') || (isMobile ? '100' : '115'))
   const hideAddresses = ref(localStorage.getItem('hideAddresses') === 'true')
   const currency = ref(localStorage.getItem('currency') || 'USD')
   const walletFilter = ref('all')

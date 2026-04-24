@@ -100,7 +100,7 @@ function walletTitle(w) {
 function btnClass(id) {
   const selected = props.modelValue.includes(id)
   return [
-    'btn-ghost text-sm py-2 w-44 transition-colors',
+    'btn-ghost text-sm py-2 w-full sm:w-44 transition-colors inline-flex items-center justify-center gap-1.5',
     selected
       ? 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal hover:bg-qubic-teal/30'
       : 'hover:bg-qubic-teal/10 hover:border-qubic-teal/60 hover:text-qubic-teal',
@@ -166,8 +166,8 @@ function ownerType(owner) {
         </button>
       </div>
 
-      <!-- Wallet-Buttons -->
-      <div class="flex flex-wrap gap-2">
+      <!-- Wallet-Buttons: 2-column grid on mobile, wrapping flex on larger screens -->
+      <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <button
           v-for="w in visibleWallets"
           :key="w.id"
@@ -175,7 +175,8 @@ function ownerType(owner) {
           :title="walletTitle(w)"
           @click="toggle(w.id)"
         >
-          {{ walletLabel(w) }}
+          <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
+          <span class="truncate">{{ walletLabel(w) }}</span>
         </button>
       </div>
     </div>

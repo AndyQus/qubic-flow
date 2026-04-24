@@ -6,6 +6,7 @@ import { api } from '../api'
 import EventsTable from '../components/EventsTable.vue'
 import PageHeader from '../components/PageHeader.vue'
 import BackButton from '../components/BackButton.vue'
+import OwnerIcon from '../components/OwnerIcon.vue'
 import { useTranslation } from 'i18next-vue'
 import { useQubicUtils } from '../composables/useQubicUtils'
 
@@ -182,7 +183,10 @@ async function resyncTx() {
     <div v-if="wallet" class="card">
       <div class="flex items-start justify-between gap-3 flex-wrap">
         <div class="min-w-0">
-          <div class="text-base font-bold">{{ maskLabel(wallet.label, wallet.id) }}</div>
+          <div class="text-base font-bold flex items-center gap-1.5">
+            <OwnerIcon :type="wallet.wallet_type" size="w-4 h-4" />
+            {{ maskLabel(wallet.label, wallet.id) }}
+          </div>
           <div class="flex items-center gap-2 mt-1 flex-wrap">
             <span class="text-xs font-mono text-gray-400 break-all">
               {{ store.hideAddresses ? '••••••••••••••••••••' : wallet.id }}

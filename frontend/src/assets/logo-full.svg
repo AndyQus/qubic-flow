@@ -20,15 +20,10 @@
       <stop offset="58%" stop-color="#FFFFFF"/>
       <stop offset="100%" stop-color="#23FFFF"/>
     </linearGradient>
-    <radialGradient id="glow" cx="16%" cy="50%" r="28%">
-      <stop offset="0%" stop-color="#23FFFF" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#23FFFF" stop-opacity="0"/>
-    </radialGradient>
   </defs>
 
-  <!-- Background -->
+  <!-- Background (uniform gradient, no spotlight glow) -->
   <rect width="480" height="150" rx="14" fill="url(#bg)"/>
-  <rect width="480" height="150" rx="14" fill="url(#glow)"/>
   <rect width="480" height="150" rx="14" fill="none" stroke="#23FFFF" stroke-width="0.8" stroke-opacity="0.22"/>
 
   <!-- Mark: Qubic bars centered in the mark area (x=0..160) -->

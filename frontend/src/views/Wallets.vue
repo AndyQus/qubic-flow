@@ -449,7 +449,10 @@ onMounted(async () => {
             <router-link v-for="w in selectedGroup.wallets" :key="w.id" :to="`/wallets/${w.id}`"
                          class="flex items-center justify-between gap-2 px-4 py-2.5 hover:bg-white/[0.02] group">
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</div>
+                <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors flex items-center gap-1.5">
+                  <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
+                  {{ maskLabel(w.label, w.id) }}
+                </div>
                 <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}<span class="ml-0.5 text-gray-500">QUBIC</span></span>
@@ -485,6 +488,7 @@ onMounted(async () => {
               <tr v-for="w in selectedGroup.wallets" :key="w.id" class="tr-row cursor-pointer hover:bg-white/[0.03] transition-colors group" @click="goToWallet(w.id)">
                 <td class="td">
                   <div class="flex items-center gap-1.5 font-medium group-hover:text-qubic-teal transition-colors">
+                    <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
                     <span>
                       {{ maskLabel(w.label, w.id) }}
                       <span v-if="w.function" class="text-xs text-gray-500 font-normal ml-1">· {{ w.function }}</span>
@@ -619,7 +623,10 @@ onMounted(async () => {
       <div v-else class="flex items-center justify-between gap-2">
         <router-link :to="`/wallets/${w.id}`" class="flex items-center gap-2 min-w-0 flex-1 group">
           <div class="min-w-0">
-            <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</div>
+            <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors flex items-center gap-1.5">
+              <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
+              {{ maskLabel(w.label, w.id) }}
+            </div>
             <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
             <div class="flex items-center gap-1 mt-0.5">
               <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}</span>
@@ -720,6 +727,7 @@ onMounted(async () => {
           <tr v-else class="tr-row cursor-pointer hover:bg-white/[0.03] transition-colors group" @click="goToWallet(w.id)">
             <td class="td">
               <div class="flex items-center gap-1.5 font-medium group-hover:text-qubic-teal transition-colors">
+                <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
                 {{ maskLabel(w.label, w.id) }}
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <polyline points="9 18 15 12 9 6"/>

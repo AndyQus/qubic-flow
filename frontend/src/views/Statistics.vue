@@ -419,9 +419,7 @@ const currentEpochFilteredTotals = computed(() => {
             <!-- Header: wallet label + owner -->
             <div class="flex items-start justify-between gap-2 mb-1">
               <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-qubic-teal flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h14a2 2 0 012 2v5zM3 10h18M7 15h4"/>
-                </svg>
+                <OwnerIcon :type="r.wallet.wallet_type" size="w-4 h-4" />
                 <span class="font-medium text-sm truncate group-hover:text-qubic-teal transition-colors">
                   {{ maskLabel(r.wallet.label, r.wallet.id) }}
                 </span>
