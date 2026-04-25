@@ -1,10 +1,12 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.orm import Session
 
+from ...config import settings
 from ...database import get_db
 from ...models.event import Event
 from ...models.node import Node
@@ -17,13 +19,27 @@ router = APIRouter()
 
 TAX_PREFIX = "tax."
 
+_bearer = HTTPBearer(auto_error=False)
+
+
+def _require_backup_auth(
+    credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
+) -> None:
+    if not settings.app_password:
+        return  # No password set → open access (dev mode; Umbrel proxy handles auth)
+    if credentials is None or credentials.credentials != settings.app_password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
 
 def _row(obj) -> dict:
     return {c.key: getattr(obj, c.key) for c in sa_inspect(obj).mapper.column_attrs}
 
 
 @router.get("/backup")
-def export_backup(db: Session = Depends(get_db)):
+def export_backup(
+    _: None = Depends(_require_backup_auth),
+    db: Session = Depends(get_db),
+):
     wallets = [_row(w) for w in db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()]
     nodes = [_row(n) for n in db.query(Node).all()]
     opening_positions = [_row(p) for p in db.query(OpeningPosition).all()]
@@ -50,7 +66,11 @@ def export_backup(db: Session = Depends(get_db)):
 
 
 @router.post("/backup/restore")
-def restore_backup(payload: dict[str, Any], db: Session = Depends(get_db)):
+def restore_backup(
+    payload: dict[str, Any],
+    _: None = Depends(_require_backup_auth),
+    db: Session = Depends(get_db),
+):
     stats: dict[str, Any] = {}
 
     # --- Wallets ---

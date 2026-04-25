@@ -70,8 +70,14 @@ async def _get_event_client(db):
     )
     if bob_node:
         bob = BOBClient(bob_node.url)
-        if await bob.supports_event_logs():
+        try:
+            if await bob.supports_event_logs():
+                logger.info(f"BOB {bob_node.url}: full event log support — using as primary event source")
+            else:
+                logger.debug(f"BOB {bob_node.url}: no getEventLogs endpoint — using QU transfer fallback")
             return bob
+        except Exception as e:
+            logger.warning(f"BOB {bob_node.url} probe failed ({e}) — falling back to RPC")
 
     rpc_node = (
         db.query(Node)
@@ -180,13 +186,25 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
 
         effective_tick = max_valid_tick if max_valid_tick is not None else to_tick
         if effective_tick < to_tick:
-            gap = SyncGap(
-                wallet_id=wallet_id,
-                from_tick=effective_tick + 1,
-                to_tick=to_tick,
-                detected_at=now_utc_iso(),
+            gap_from = effective_tick + 1
+            existing_gap = (
+                db.query(SyncGap)
+                .filter(
+                    SyncGap.wallet_id == wallet_id,
+                    SyncGap.from_tick == gap_from,
+                    SyncGap.resolved_at.is_(None),
+                )
+                .first()
             )
-            db.add(gap)
+            if existing_gap:
+                existing_gap.to_tick = max(existing_gap.to_tick, to_tick)
+            else:
+                db.add(SyncGap(
+                    wallet_id=wallet_id,
+                    from_tick=gap_from,
+                    to_tick=to_tick,
+                    detected_at=now_utc_iso(),
+                ))
             logger.warning(f"Wallet {wallet_id}: validForTick={effective_tick} < to_tick={to_tick}, gap recorded")
         state.last_tick = effective_tick
         state.status = "SUCCESS"

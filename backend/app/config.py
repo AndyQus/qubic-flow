@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     coingecko_api_key: str = ""
     cors_origins: str = "http://localhost:8080,http://localhost:5173"
     log_level: str = "INFO"
+    app_password: str = ""  # Injected by Umbrel as APP_PASSWORD; if set, protects backup endpoints
 
     @property
     def cors_origins_list(self) -> List[str]:
