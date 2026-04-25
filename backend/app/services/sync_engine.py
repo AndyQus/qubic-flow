@@ -51,14 +51,29 @@ def _get_ordered_clients(db):
     return result
 
 
-def _get_rpc_event_client(db):
-    """Return the first active RPC node for event log fetching.
+async def _get_event_client(db):
+    """Return the best available event client.
 
-    BOB nodes only index direct QU transfers — SC-generated events (Qearn,
-    QX, etc.) are missing.  Event syncing must always go through an RPC node
-    so no events are silently skipped.
+    Prefers a BOB node once it announces support for getEventLogs (cached daily).
+    Falls back to an RPC node otherwise, or the default RPC if no nodes are configured.
+    If BOB is unreachable the probe raises and we silently fall through to RPC.
     """
-    node = (
+    bob_node = (
+        db.query(Node)
+        .filter(
+            Node.is_active == 1,
+            Node.node_type == "BOB_NODE",
+            Node.health_status.in_(["ONLINE", "DEGRADED"]),
+        )
+        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .first()
+    )
+    if bob_node:
+        bob = BOBClient(bob_node.url)
+        if await bob.supports_event_logs():
+            return bob
+
+    rpc_node = (
         db.query(Node)
         .filter(
             Node.is_active == 1,
@@ -68,8 +83,8 @@ def _get_rpc_event_client(db):
         .order_by(Node.health_status != "ONLINE", Node.priority)
         .first()
     )
-    if node:
-        return RPCClient(node.url)
+    if rpc_node:
+        return RPCClient(rpc_node.url)
     return RPCClient()
 
 
@@ -122,9 +137,7 @@ async def sync_all_wallets():
                 logger.error(f"Default RPC fallback also failed: {e} — sync skipped")
                 return
 
-        # BOB nodes only carry direct QU transfers — always use an RPC node
-        # for full event log coverage (SC rewards, QX trades, etc.).
-        event_client = _get_rpc_event_client(db)
+        event_client = await _get_event_client(db)
 
         wallets = db.query(Wallet).filter(Wallet.active == 1, Wallet.deleted_at.is_(None)).all()
         for wallet in wallets:

@@ -11,6 +11,11 @@ _RPC_RATE_LIMIT = 100
 _rpc_lock = asyncio.Lock()
 _rpc_request_times: list[float] = []
 
+# Capability cache: url → (supported, checked_at)
+# False entries are retried once per day; True entries are permanent until a 404 is received.
+_BOB_CAPABILITY_RETRY_HOURS = 24
+_bob_capability_cache: dict[str, tuple[bool, datetime]] = {}
+
 
 async def _rpc_rate_limit():
     async with _rpc_lock:
@@ -229,3 +234,37 @@ class BOBClient:
     async def get_transfer_transactions(self, wallet_id: str, from_tick: int, to_tick: int, page: int = 1, page_size: int = 100) -> dict:
         # Transfers are already captured via get_event_logs for BOB nodes
         return {"transactions": [], "pagination": {"totalPages": 1}}
+
+    async def supports_event_logs(self) -> bool:
+        """Return True if this BOB node has the getEventLogs endpoint.
+
+        Result is cached permanently on success, and retried once per day on failure.
+        Transient errors (timeout, 5xx) are not cached so the next sync cycle retries.
+        """
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        cached = _bob_capability_cache.get(self.base_url)
+        if cached is not None:
+            supported, checked_at = cached
+            if supported:
+                return True
+            if now - checked_at < timedelta(hours=_BOB_CAPABILITY_RETRY_HOURS):
+                return False
+
+        try:
+            async with httpx.AsyncClient(verify=False) as client:
+                r = await client.post(
+                    f"{self.base_url}/query/v1/getEventLogs",
+                    json={"should": [], "ranges": {}, "pagination": {"offset": 0, "size": 1}},
+                    timeout=10,
+                )
+            if r.status_code == 404:
+                _bob_capability_cache[self.base_url] = (False, now)
+                logger.info(f"BOB {self.base_url}: getEventLogs not available (404) — retry in {_BOB_CAPABILITY_RETRY_HOURS}h")
+                return False
+            _bob_capability_cache[self.base_url] = (True, now)
+            logger.info(f"BOB {self.base_url}: getEventLogs available — switching event source")
+            return True
+        except Exception as e:
+            logger.debug(f"BOB {self.base_url}: getEventLogs probe failed ({e}) — using RPC this cycle")
+            return False
