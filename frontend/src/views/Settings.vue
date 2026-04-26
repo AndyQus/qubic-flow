@@ -131,6 +131,8 @@ async function handleDbRestore(e) {
   }
 }
 
+const isDebug = import.meta.env.DEV
+
 // Import from Qubic Ledger
 const ledgerImporting = ref(false)
 const ledgerImportResult = ref(null)
@@ -370,9 +372,12 @@ function simulate() {
       </div>
     </div>
 
-    <!-- Import aus Qubic Ledger Panel -->
-    <div class="card space-y-4">
-      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.ledger_section') }}</h3>
+    <!-- Import aus Qubic Ledger Panel (nur im Debug/Dev-Modus sichtbar) -->
+    <div v-if="isDebug" class="card space-y-4 border border-yellow-500/40">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.ledger_section') }}</h3>
+        <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">DEBUG ONLY</span>
+      </div>
 
       <div class="space-y-2">
         <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.ledger_import_desc') }}</p>
