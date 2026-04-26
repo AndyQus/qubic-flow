@@ -116,6 +116,11 @@ function triggerDbRestore() {
 async function handleDbRestore(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  if (file.size > 500 * 1024 * 1024) {
+    dbRestoreResult.value = { error: t('settings.db_restore_too_large') }
+    e.target.value = ''
+    return
+  }
   dbRestoring.value = true
   dbRestoreResult.value = null
   try {
