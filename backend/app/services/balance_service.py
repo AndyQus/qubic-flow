@@ -24,6 +24,8 @@ async def initialize_wallet_balance(wallet_id: str):
             wallet.balance = balance
             wallet.balance_updated_at = now_utc_iso()
             wallet.balance_since_tick = current_tick
+            wallet.balance_live = balance
+            wallet.balance_live_at = now_utc_iso()
             db.commit()
             logger.info(f"Initialized balance for {wallet_id}: {balance} QUBIC at tick {current_tick}")
     except Exception as e:

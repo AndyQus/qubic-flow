@@ -155,7 +155,7 @@ def _match_lots(
     return sub_disposals, total_cost
 
 
-async def calculate_tax_report(
+def calculate_tax_report(
     db: Session,
     wallet_ids: list[str],
     year: int,

@@ -36,9 +36,14 @@ const selectedOwnerName = computed(() => {
 watch(mode, () => { selectedWallets.value = []; report.value = null })
 watch(year, () => { report.value = null })
 
-// Auto-run the report once a selection exists (on mount, mode change, filter change)
+// Auto-run when wallets first become available (initial page load)
+watch(modeWallets, (wallets) => {
+  if (wallets.length && !report.value && !loadingReport.value) generateReport()
+}, { immediate: true })
+
+// Auto-run on explicit wallet selection, year or mode change
 watch([selectedWallets, year, mode], () => {
-  if (!selectedWallets.value.length) return
+  if (!modeWallets.value.length) return
   generateReport()
 }, { deep: true })
 

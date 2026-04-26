@@ -1,13 +1,14 @@
 import json
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.orm import Session
 
 from ...config import settings
 from ...database import get_db
+from ...services.balance_service import check_all_balances
 from ...models.event import Event
 from ...models.node import Node
 from ...models.opening_position import OpeningPosition
@@ -67,6 +68,7 @@ def export_backup(
 @router.post("/backup/restore")
 def restore_backup(
     payload: dict[str, Any],
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     stats: dict[str, Any] = {}
@@ -215,4 +217,5 @@ def restore_backup(
         db.commit()
         stats["tax_settings"] = "restored"
 
+    background_tasks.add_task(check_all_balances)
     return stats

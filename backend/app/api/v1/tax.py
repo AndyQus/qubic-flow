@@ -146,7 +146,7 @@ async def get_tax_report(
     country = settings_map.get("country") or "DE"
     method = settings_map.get("method") or "FIFO"
 
-    report = await tax_engine.calculate_tax_report(
+    report = tax_engine.calculate_tax_report(
         db=db,
         wallet_ids=wallet_ids,
         year=year,
