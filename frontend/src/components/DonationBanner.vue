@@ -1,64 +1,18 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useRouter } from 'vue-router'
-import { api } from '../api'
+import { useDonationState } from '../composables/useDonationState'
 
 const { t } = useTranslation()
 const router = useRouter()
-
-const STORAGE_KEY_CLOSED = 'donation_closed_date'
-const STORAGE_KEY_SUPPRESSED = 'donation_suppressed_until'
-
-const today = new Date().toISOString().slice(0, 10)
-
-const closedToday = ref(false)
-const suppressedUntil = ref(null)
-const minimized = ref(false)
-
-const isVisible = computed(() => !suppressedUntil.value && !closedToday.value)
-const isSuppressed = computed(() => !!suppressedUntil.value)
-const showMiniTab = computed(() => !isSuppressed.value && closedToday.value)
-
-function close() {
-  localStorage.setItem(STORAGE_KEY_CLOSED, today)
-  closedToday.value = true
-}
+const { isVisible, showMiniTab, close, init } = useDonationState()
 
 function goToSupport() {
   router.push('/support')
 }
 
-onMounted(async () => {
-  const closed = localStorage.getItem(STORAGE_KEY_CLOSED)
-  closedToday.value = closed === today
-
-  // First check DB (persisted, no blockchain call needed)
-  try {
-    const stored = await api.events.donationSuppression()
-    if (stored.suppressed_until && stored.suppressed_until > today) {
-      suppressedUntil.value = stored.suppressed_until
-      return
-    }
-  } catch {}
-
-  // Then check localStorage cache
-  const sup = localStorage.getItem(STORAGE_KEY_SUPPRESSED)
-  if (sup && sup > today) {
-    suppressedUntil.value = sup
-    return
-  }
-
-  // Finally do full blockchain check
-  localStorage.removeItem(STORAGE_KEY_SUPPRESSED)
-  try {
-    const data = await api.events.donationCheck()
-    if (data.suppressed_until) {
-      localStorage.setItem(STORAGE_KEY_SUPPRESSED, data.suppressed_until)
-      suppressedUntil.value = data.suppressed_until
-    }
-  } catch {}
-})
+onMounted(init)
 </script>
 
 <template>
@@ -87,17 +41,6 @@ onMounted(async () => {
           </svg>
         </button>
       </div>
-    </div>
-  </div>
-
-  <!-- Suppressed notice -->
-  <div v-else-if="isSuppressed"
-       class="w-full bg-emerald-600/20 border-b border-emerald-600/30">
-    <div class="w-full px-4 sm:px-6 lg:px-8 py-1.5 flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-      </svg>
-      <p class="text-xs text-emerald-400">{{ t('donation.banner_suppressed') }} {{ suppressedUntil }}</p>
     </div>
   </div>
 

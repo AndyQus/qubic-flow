@@ -12,12 +12,7 @@ from ...models.settings import AppSetting
 
 DONATION_ADDRESS = "CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI"
 DONATION_QU_PER_MONTH = 1_000_000
-
-# Wallets granted lifetime access via Discord contact (@andyqus)
-# address → amount paid (QU)
-FOREVER_ADDRESSES: dict[str, int] = {
-    "DOHHVRRXYFCBABRXZWOYEXGPVGTBWLARZAMAVMHOZDBXBRYCXXFBMJLDDBKI": 100_000_000,  # test
-}
+DONATION_QU_FOREVER = 100_000_000
 
 router = APIRouter()
 
@@ -121,14 +116,15 @@ async def donation_check(db: Session = Depends(get_db)):
 
     # Collect user wallet addresses
     user_wallets = db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()
-    user_addresses = {w.id for w in user_wallets if w.id != DONATION_ADDRESS}
+    all_addresses = {w.id for w in user_wallets}
 
-    # Check lifetime whitelist first
-    matched = user_addresses & FOREVER_ADDRESSES.keys()
-    if matched:
-        amount = sum(FOREVER_ADDRESSES[a] for a in matched)
+    # If the donation address itself is registered as a wallet → owner mode, no blockchain check needed
+    if DONATION_ADDRESS in all_addresses:
         _save_suppression(db, "2099-12-31")
-        return {"total_qu": amount, "months_earned": 0, "suppressed_until": "2099-12-31", "donation_address": DONATION_ADDRESS, "forever": True}
+        return {"total_qu": 0, "months_earned": 0, "suppressed_until": "2099-12-31",
+                "donation_address": DONATION_ADDRESS, "forever": True}
+
+    user_addresses = all_addresses
 
     if not user_addresses:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
@@ -191,6 +187,17 @@ async def donation_check(db: Session = Depends(get_db)):
 
     total_qu = sum(a for _, a in payments)
     months_earned = total_qu // DONATION_QU_PER_MONTH
+
+    # 100M QU = forever
+    if total_qu >= DONATION_QU_FOREVER:
+        _save_suppression(db, "2099-12-31")
+        last_tick, last_amount = max(payments, key=lambda x: x[0])
+        days_since_last = max(0, (current_tick - last_tick) / TICKS_PER_DAY)
+        last_payment_date = (now - timedelta(days=days_since_last)).date().isoformat()
+        return {"total_qu": total_qu, "months_earned": int(months_earned), "suppressed_until": "2099-12-31",
+                "donation_address": DONATION_ADDRESS, "forever": True,
+                "last_payment_amount": last_amount, "last_payment_date": last_payment_date}
+
     suppressed_until = suppressed_until_dt.date().isoformat() if suppressed_until_dt > now else None
 
     last_tick, last_amount = max(payments, key=lambda x: x[0])
@@ -209,3 +216,113 @@ async def donation_check(db: Session = Depends(get_db)):
         "last_payment_amount": last_amount,
         "last_payment_date": last_payment_date,
     }
+
+
+@router.get("/events/donation-top")
+async def donation_top():
+    from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
+    from ...services.qubic_client import RPCClient
+
+    rpc = RPCClient()
+    try:
+        current_tick = await rpc.get_current_tick()
+    except Exception:
+        return {"donors": []}
+
+    from_tick = max(0, current_tick - 500_000)
+    all_transactions = []
+    page = 1
+    while True:
+        try:
+            data = await rpc.get_transfer_transactions(DONATION_ADDRESS, from_tick, current_tick, page=page, page_size=100)
+        except Exception:
+            break
+        txs = data.get("transactions") or []
+        if not txs:
+            break
+        all_transactions.extend(txs)
+        total_pages = data.get("pagination", {}).get("totalPages", 1)
+        if page >= total_pages:
+            break
+        page += 1
+
+    now = datetime.now(timezone.utc)
+    TICKS_PER_DAY = 86_400
+    donors: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0})
+
+    for tx in all_transactions:
+        source = tx.get("sourceId") or tx.get("source") or ""
+        dest = tx.get("destId") or tx.get("destination") or ""
+        amount = int(tx.get("amount", 0))
+        tick = int(tx.get("tickNumber") or tx.get("tick") or 0)
+        if dest == DONATION_ADDRESS and amount > 0 and source:
+            donors[source]["total_qu"] += amount
+            if tick > donors[source]["last_tick"]:
+                donors[source]["last_tick"] = tick
+
+    result = []
+    for address, d in donors.items():
+        days_since = max(0, (current_tick - d["last_tick"]) / TICKS_PER_DAY)
+        date = (now - timedelta(days=days_since)).date().isoformat()
+        result.append({"address": address, "total_qu": d["total_qu"], "date": date})
+
+    result.sort(key=lambda x: x["total_qu"], reverse=True)
+    return {"donors": result[:20]}
+
+
+@router.get("/events/donation-history")
+async def donation_history(mine_only: bool = False, db: Session = Depends(get_db)):
+    from datetime import datetime, timezone, timedelta
+    from ...services.qubic_client import RPCClient
+
+    user_addresses: set | None = None
+    if mine_only:
+        user_wallets = db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()
+        user_addresses = {w.id for w in user_wallets}
+        if not user_addresses:
+            return {"transactions": [], "total_qu": 0}
+
+    rpc = RPCClient()
+    try:
+        current_tick = await rpc.get_current_tick()
+    except Exception:
+        return {"transactions": [], "total_qu": 0}
+
+    from_tick = max(0, current_tick - 500_000)
+    all_transactions = []
+    page = 1
+    while True:
+        try:
+            data = await rpc.get_transfer_transactions(DONATION_ADDRESS, from_tick, current_tick, page=page, page_size=100)
+        except Exception:
+            break
+        txs = data.get("transactions") or []
+        if not txs:
+            break
+        all_transactions.extend(txs)
+        total_pages = data.get("pagination", {}).get("totalPages", 1)
+        if page >= total_pages:
+            break
+        page += 1
+
+    now = datetime.now(timezone.utc)
+    TICKS_PER_DAY = 86_400
+    result = []
+    total_qu = 0
+
+    for tx in all_transactions:
+        source = tx.get("sourceId") or tx.get("source") or ""
+        dest = tx.get("destId") or tx.get("destination") or ""
+        amount = int(tx.get("amount", 0))
+        tick = int(tx.get("tickNumber") or tx.get("tick") or 0)
+        if dest == DONATION_ADDRESS and amount > 0 and source:
+            if user_addresses is not None and source not in user_addresses:
+                continue
+            days_since = max(0, (current_tick - tick) / TICKS_PER_DAY)
+            date = (now - timedelta(days=days_since)).date().isoformat()
+            result.append({"address": source, "amount": amount, "tick": tick, "date": date})
+            total_qu += amount
+
+    result.sort(key=lambda x: x["tick"], reverse=True)
+    return {"transactions": result, "total_qu": total_qu}

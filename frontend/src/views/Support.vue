@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import QRCode from 'qrcode'
 import { api } from '../api'
@@ -11,19 +11,72 @@ const DONATION_ADDRESS = 'CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLY
 const qrDataUrl = ref('')
 const copied = ref(false)
 const donationStatus = ref(null)
+const topDonors = ref([])
+const donationHistory = ref([])
+const donationTotalQu = ref(0)
 
-const DISCORD_URL = 'https://discord.com/channels/768887649540243497/1455213108535627917'
+const isDebug = import.meta.env.DEV
+const debugSimulate = ref(false)
+const debugScenario = ref('single')
+
+const DEBUG_SCENARIOS = {
+  single: {
+    label: '1 Zahlung · 1 Monat',
+    status: { total_qu: 1_000_000, months_earned: 1, suppressed_until: '2026-05-26', forever: false,
+              last_payment_amount: 1_000_000, last_payment_date: '2026-04-26' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17500000, date: '2026-04-26' },
+    ],
+    totalQu: 1_000_000,
+  },
+  multi: {
+    label: '3 Zahlungen · 2 abgelaufen · aktiv bis Jun 10',
+    status: { total_qu: 4_000_000, months_earned: 4, suppressed_until: '2026-06-10', forever: false,
+              last_payment_amount: 2_000_000, last_payment_date: '2026-04-10' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 2_000_000, tick: 17480000, date: '2026-04-10' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17000000, date: '2026-03-01' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 16500000, date: '2026-01-15' },
+    ],
+    totalQu: 4_000_000,
+  },
+  gap: {
+    label: 'Lücke zwischen Zahlungen',
+    status: { total_qu: 2_000_000, months_earned: 2, suppressed_until: '2026-04-14', forever: false,
+              last_payment_amount: 1_000_000, last_payment_date: '2026-03-15' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17100000, date: '2026-03-15' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 15000000, date: '2026-01-10' },
+    ],
+    totalQu: 2_000_000,
+  },
+  forever: {
+    label: '≥ 100 Mio QU · Forever',
+    status: { total_qu: 150_000_000, months_earned: 150, suppressed_until: '2099-12-31', forever: true,
+              last_payment_amount: 50_000_000, last_payment_date: '2026-04-01' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 17450000, date: '2026-04-01' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 16000000, date: '2026-02-15' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 14500000, date: '2025-12-20' },
+    ],
+    totalQu: 150_000_000,
+  },
+}
+
+const effectiveDonationStatus = computed(() =>
+  isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].status : donationStatus.value
+)
+const effectiveDonationHistory = computed(() =>
+  isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].history : donationHistory.value
+)
+const effectiveDonationTotalQu = computed(() =>
+  isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].totalQu : donationTotalQu.value
+)
 
 const tiers = [
-  { amount: '1.000.000 QU',  label: 'tier_1m' },
-  { amount: '3.000.000 QU',  label: 'tier_3m' },
-  { amount: '6.000.000 QU',  label: 'tier_6m' },
-  { amount: '12.000.000 QU', label: 'tier_12m' },
-]
-
-// Supporters who donated > 100,000,000 QU and gave permission to be listed
-// Format: { name, amount_qu, date }
-const supporters = [
+  { amount: '1.000.000 QU',     label: 'tier_1m' },
+  { amount: '12.000.000 QU',    label: 'tier_12m' },
+  { amount: '> 100.000.000 QU', label: 'tier_forever' },
 ]
 
 const otherApps = [
@@ -42,6 +95,14 @@ async function copyAddress() {
   setTimeout(() => { copied.value = false }, 2000)
 }
 
+function explorerUrl(address) {
+  return `https://explorer.qubic.org/network/address/${address}`
+}
+
+function shortAddr(address) {
+  return address.slice(0, 8) + '…' + address.slice(-8)
+}
+
 onMounted(async () => {
   qrDataUrl.value = await QRCode.toDataURL(DONATION_ADDRESS, {
     width: 220,
@@ -51,11 +112,20 @@ onMounted(async () => {
   try {
     donationStatus.value = await api.events.donationCheck()
   } catch {}
+  try {
+    const res = await api.events.donationTop()
+    topDonors.value = res.donors || []
+  } catch {}
+  try {
+    const res = await api.events.donationHistory(true)
+    donationHistory.value = res.transactions || []
+    donationTotalQu.value = res.total_qu || 0
+  } catch {}
 })
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto space-y-8">
+  <div class="max-w-7xl mx-auto space-y-8">
 
     <!-- Header (full width) -->
     <div class="text-center space-y-1">
@@ -63,10 +133,36 @@ onMounted(async () => {
       <p class="text-sm text-gray-400">{{ t('donation.page_subtitle') }}</p>
     </div>
 
-    <!-- Two-column grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+    <!-- Debug simulator (dev mode only) -->
+    <div v-if="isDebug" class="border border-dashed border-yellow-500/60 rounded-xl p-4 bg-yellow-500/5 space-y-3">
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <span class="text-xs font-semibold text-yellow-400 uppercase tracking-wide">Debug — nur im Dev-Modus sichtbar</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" v-model="debugSimulate" class="accent-yellow-400" />
+          <span class="text-sm text-yellow-300">Zahlung simulieren</span>
+        </label>
+        <div v-if="debugSimulate" class="flex flex-wrap gap-2">
+          <button
+            v-for="(s, key) in DEBUG_SCENARIOS" :key="key"
+            @click="debugScenario = key"
+            class="px-3 py-1 rounded text-xs font-medium transition-colors"
+            :class="debugScenario === key ? 'bg-yellow-400 text-black' : 'bg-yellow-400/20 text-yellow-300 hover:bg-yellow-400/40'"
+          >
+            {{ s.label }}
+          </button>
+        </div>
+      </div>
+    </div>
 
-      <!-- LEFT column: About, Why, Tiers, Forever -->
+    <!-- Three-column grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+      <!-- COL 1: About, Why -->
       <div class="space-y-6">
 
         <!-- About AndyQus -->
@@ -103,45 +199,45 @@ onMounted(async () => {
           </ul>
         </div>
 
-        <!-- Tiers -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-4">
-          <h2 class="font-semibold text-white text-base">{{ t('donation.tiers_title') }}</h2>
-          <p class="text-xs text-gray-400">{{ t('donation.tiers_note') }}</p>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-gray-400 text-xs border-b border-qubic-border">
-                  <th class="text-left pb-2 font-medium">Betrag / Amount</th>
-                  <th class="text-left pb-2 font-medium">{{ t('donation.tiers_title').split(' ')[0] }}</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-qubic-border/40">
-                <tr v-for="tier in tiers" :key="tier.label" class="text-gray-300">
-                  <td class="py-2 font-mono text-qubic-teal">{{ tier.amount }}</td>
-                  <td class="py-2">{{ t(`donation.${tier.label}`) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Forever tier via Discord -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-3">
-          <h2 class="font-semibold text-white text-base">{{ t('donation.tier_forever') }}</h2>
-          <p class="text-sm text-gray-300">{{ t('donation.forever_desc') }}</p>
-          <a :href="DISCORD_URL" target="_blank" rel="noopener noreferrer"
-             class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
-            </svg>
-            {{ t('donation.forever_cta') }}
-          </a>
-        </div>
-
       </div>
 
-      <!-- RIGHT column: QR+Address, Payment detected, Supporters -->
+      <!-- COL 2: Payment detected, QR+Address, Tiers -->
       <div class="space-y-6">
+
+        <!-- Payment detected (only shown when payment found) -->
+        <div v-if="effectiveDonationStatus && effectiveDonationStatus.suppressed_until"
+             class="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-6 space-y-3">
+          <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            <h2 class="font-semibold text-emerald-400 text-base">{{ t('donation.check_title') }}</h2>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-400">{{ t('donation.check_total') }}</span>
+              <span class="text-emerald-400 font-mono">{{ effectiveDonationStatus.total_qu.toLocaleString() }} QU</span>
+            </div>
+            <div v-if="!effectiveDonationStatus.forever" class="flex justify-between text-sm">
+              <span class="text-gray-400">{{ t('donation.check_months') }}</span>
+              <span class="text-white font-semibold">{{ effectiveDonationStatus.months_earned }}</span>
+            </div>
+            <div v-if="effectiveDonationStatus.last_payment_amount" class="flex justify-between text-sm">
+              <span class="text-gray-400">{{ t('donation.check_last_amount') }}</span>
+              <span class="text-emerald-400 font-mono">{{ effectiveDonationStatus.last_payment_amount.toLocaleString() }} QU</span>
+            </div>
+            <div v-if="effectiveDonationStatus.last_payment_date" class="flex justify-between text-sm">
+              <span class="text-gray-400">{{ t('donation.check_last_date') }}</span>
+              <span class="text-white">{{ effectiveDonationStatus.last_payment_date }}</span>
+            </div>
+            <div v-if="effectiveDonationStatus.suppressed_until" class="flex justify-between text-sm">
+              <span class="text-gray-400">{{ t('donation.check_until') }}</span>
+              <span class="text-emerald-400 font-semibold">
+                {{ effectiveDonationStatus.forever ? t('donation.check_forever') : effectiveDonationStatus.suppressed_until }}
+              </span>
+            </div>
+          </div>
+        </div>
 
         <!-- QR + Address -->
         <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-4">
@@ -164,42 +260,32 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Payment detected (only shown when payment found) -->
-        <div v-if="donationStatus && donationStatus.suppressed_until"
-             class="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-6 space-y-3">
-          <div class="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-            </svg>
-            <h2 class="font-semibold text-emerald-400 text-base">{{ t('donation.check_title') }}</h2>
-          </div>
-          <div class="space-y-2">
-            <div class="flex justify-between text-sm">
-              <span class="text-gray-400">{{ t('donation.check_total') }}</span>
-              <span class="text-emerald-400 font-mono">{{ donationStatus.total_qu.toLocaleString() }} QU</span>
-            </div>
-            <div v-if="!donationStatus.forever" class="flex justify-between text-sm">
-              <span class="text-gray-400">{{ t('donation.check_months') }}</span>
-              <span class="text-white font-semibold">{{ donationStatus.months_earned }}</span>
-            </div>
-            <div v-if="donationStatus.last_payment_amount" class="flex justify-between text-sm">
-              <span class="text-gray-400">{{ t('donation.check_last_amount') }}</span>
-              <span class="text-emerald-400 font-mono">{{ donationStatus.last_payment_amount.toLocaleString() }} QU</span>
-            </div>
-            <div v-if="donationStatus.last_payment_date" class="flex justify-between text-sm">
-              <span class="text-gray-400">{{ t('donation.check_last_date') }}</span>
-              <span class="text-white">{{ donationStatus.last_payment_date }}</span>
-            </div>
-            <div v-if="donationStatus.suppressed_until" class="flex justify-between text-sm">
-              <span class="text-gray-400">{{ t('donation.check_until') }}</span>
-              <span class="text-emerald-400 font-semibold">
-                {{ donationStatus.forever ? t('donation.check_forever') : donationStatus.suppressed_until }}
-              </span>
-            </div>
-          </div>
+        <!-- Tiers -->
+        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-3">
+          <h2 class="font-semibold text-white text-base">{{ t('donation.tiers_title') }}</h2>
+          <p class="text-sm text-gray-300 leading-relaxed">{{ t('donation.tiers_note') }}</p>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-gray-400 text-xs border-b border-qubic-border">
+                <th class="text-left pb-2 font-medium">Betrag / Amount</th>
+                <th class="text-left pb-2 font-medium">Dauer / Duration</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-qubic-border/40">
+              <tr v-for="tier in tiers" :key="tier.label" class="text-gray-300">
+                <td class="py-1.5 font-mono text-qubic-teal">{{ tier.amount }}</td>
+                <td class="py-1.5">{{ t(`donation.${tier.label}`) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <!-- Supporters -->
+      </div>
+
+      <!-- COL 3: Top Supporters + Donation History -->
+      <div class="space-y-6">
+
+        <!-- Top 20 Supporters -->
         <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-4">
           <div class="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -207,30 +293,76 @@ onMounted(async () => {
             </svg>
             <h2 class="font-semibold text-white text-base">{{ t('donation.supporters_title') }}</h2>
           </div>
-          <p class="text-sm text-gray-400 leading-relaxed">{{ t('donation.supporters_text') }}</p>
-
-          <div v-if="supporters.length === 0" class="text-sm text-gray-500 italic text-center py-4">
+          <p class="text-xs text-gray-400">{{ t('donation.supporters_text') }}</p>
+          <div v-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
-          <div v-else class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-gray-400 text-xs border-b border-qubic-border">
-                  <th class="text-left pb-2 font-medium">Name</th>
-                  <th class="text-left pb-2 font-medium">{{ t('donation.supporters_amount') }}</th>
-                  <th class="text-left pb-2 font-medium">{{ t('donation.supporters_date') }}</th>
+          <div v-else class="overflow-x-auto max-h-[340px] overflow-y-auto">
+            <table class="w-full text-xs">
+              <thead class="sticky top-0 bg-qubic-card">
+                <tr class="text-gray-400 border-b border-qubic-border">
+                  <th class="text-left pb-2 font-medium">#</th>
+                  <th class="text-left pb-2 font-medium">{{ t('donation.history_sender') }}</th>
+                  <th class="text-right pb-2 font-medium">{{ t('donation.supporters_amount') }}</th>
+                  <th class="text-right pb-2 font-medium">{{ t('donation.supporters_date') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-qubic-border/40">
-                <tr v-for="s in supporters" :key="s.name + s.date" class="text-gray-300">
-                  <td class="py-2 font-medium text-white flex items-center gap-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                    </svg>
-                    {{ s.name }}
+                <tr v-for="(donor, i) in topDonors" :key="donor.address" class="text-gray-300">
+                  <td class="py-1.5 text-gray-500">{{ i + 1 }}</td>
+                  <td class="py-1.5">
+                    <a :href="explorerUrl(donor.address)" target="_blank" rel="noopener noreferrer"
+                       class="font-mono text-qubic-teal hover:text-white transition-colors"
+                       :title="donor.address">
+                      {{ shortAddr(donor.address) }}
+                    </a>
                   </td>
-                  <td class="py-2 font-mono text-amber-400">{{ s.amount_qu.toLocaleString() }} QU</td>
-                  <td class="py-2 text-gray-400">{{ s.date }}</td>
+                  <td class="py-1.5 text-right font-mono text-amber-400">{{ donor.total_qu.toLocaleString() }}</td>
+                  <td class="py-1.5 text-right text-gray-400">{{ donor.date }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Donation History (only shown when payment detected) -->
+        <div v-if="effectiveDonationStatus && effectiveDonationStatus.suppressed_until"
+             class="bg-emerald-500/10 border border-emerald-500/40 rounded-xl p-6 space-y-4">
+          <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            <h2 class="font-semibold text-emerald-400 text-base">{{ t('donation.history_title') }}</h2>
+          </div>
+          <!-- Total -->
+          <div class="flex justify-between items-center bg-emerald-500/10 rounded-lg px-4 py-2 border border-emerald-500/30">
+            <span class="text-sm text-gray-400">{{ t('donation.history_total') }}</span>
+            <span class="font-mono text-emerald-400 font-semibold">{{ effectiveDonationTotalQu.toLocaleString() }} QU</span>
+          </div>
+
+          <div v-if="effectiveDonationHistory.length === 0" class="text-sm text-gray-500 italic text-center py-4">
+            {{ t('donation.history_empty') }}
+          </div>
+          <div v-else class="overflow-x-auto max-h-[520px] overflow-y-auto">
+            <table class="w-full text-xs">
+              <thead class="sticky top-0 bg-transparent">
+                <tr class="text-gray-400 border-b border-emerald-500/30">
+                  <th class="text-left pb-2 font-medium">{{ t('donation.history_sender') }}</th>
+                  <th class="text-right pb-2 font-medium">{{ t('donation.history_amount') }}</th>
+                  <th class="text-right pb-2 font-medium">{{ t('donation.history_date') }}</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-emerald-500/20">
+                <tr v-for="tx in effectiveDonationHistory" :key="tx.tick + tx.address" class="text-gray-300">
+                  <td class="py-1.5">
+                    <a :href="explorerUrl(tx.address)" target="_blank" rel="noopener noreferrer"
+                       class="font-mono text-emerald-400 hover:text-white transition-colors"
+                       :title="tx.address">
+                      {{ shortAddr(tx.address) }}
+                    </a>
+                  </td>
+                  <td class="py-1.5 text-right font-mono text-emerald-400">{{ tx.amount.toLocaleString() }}</td>
+                  <td class="py-1.5 text-right text-gray-400">{{ tx.date }}</td>
                 </tr>
               </tbody>
             </table>

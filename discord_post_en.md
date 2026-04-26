@@ -32,6 +32,6 @@ Also available as an Umbrel app (Community App Store).
 QubicFlow is free to use. If you'd like to support the project, you can send QU to:
 `CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI`
 
-QubicFlow detects donations from your own wallets automatically — directly on-chain. **1,000,000 QU = 1 month** — donors get the donation banner in the app silenced for as many months as they've donated. No subscription, no cloud, no account — just an on-chain payment straight from your own wallet.
+QubicFlow detects donations from your own wallets automatically — directly on-chain. **1,000,000 QU = 1 month** — donors receive a thank-you notice in the app for as many months as they've donated. No subscription, no cloud, no account — just an on-chain payment straight from your own wallet.
 
-If you'd like lifetime access, just message me here on Discord (@andyqus) and I'll add you to the lifetime whitelist manually.
+If you'd like to be shown as a permanent supporter, just message me here on Discord (@AndyQus ױ) and I'll add you to the lifetime whitelist manually.

@@ -40,6 +40,8 @@ export const api = {
     filterOptions: (walletId) => req(`/events/filter-options?wallet_id=${walletId}`),
     donationCheck: () => req('/events/donation-check'),
     donationSuppression: () => req('/events/donation-suppression'),
+    donationTop: () => req('/events/donation-top'),
+    donationHistory: (mineOnly = false) => req(`/events/donation-history${mineOnly ? '?mine_only=true' : ''}`),
   },
   nodes: {
     list: () => req('/nodes'),

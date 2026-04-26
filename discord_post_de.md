@@ -38,6 +38,6 @@ docker compose up --build
 QubicFlow ist kostenlos nutzbar. Wer das Projekt unterstützen möchte, kann QU an folgende Adresse senden:
 `CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI`
 
-QubicFlow erkennt Spenden aus euren eigenen Wallets automatisch direkt on-chain. **1.000.000 QU = 1 Monat** — wer spendet, schaltet den Spendenhinweis in der App für entsprechend viele Monate stumm. Kein Abo, keine Cloud, kein Konto — nur eine On-Chain-Zahlung direkt aus eurer eigenen Wallet.
+QubicFlow erkennt Spenden aus euren eigenen Wallets automatisch direkt on-chain. **1.000.000 QU = 1 Monat** — wer spendet, bekommt in der App für entsprechend viele Monate einen Dankeschön-Hinweis angezeigt. Kein Abo, keine Cloud, kein Konto — nur eine On-Chain-Zahlung direkt aus eurer eigenen Wallet.
 
-Wer dauerhaften Zugang möchte, kann mich einfach hier auf Discord anschreiben (@andyqus) — ich trage euch manuell in die Lifetime-Liste ein.
+Wer dauerhaft als Unterstützer angezeigt werden möchte, kann mich einfach hier auf Discord anschreiben (@AndyQus ױ) — ich trage euch manuell in die Lifetime-Liste ein.
