@@ -107,7 +107,7 @@ export const de = {
     banner_text: 'Deine Unterstützung ermöglicht Weiterentwicklung, neue Features, Support und spart Zeit. Wenn dir die App hilft, freue ich mich über eine freiwillige Spende in Qubic.',
     banner_cta: 'Jetzt unterstützen',
     banner_dismiss: 'Später',
-    banner_suppressed: 'Danke für deine Unterstützung! Aktiv bis',
+    banner_suppressed: 'Danke für deine Unterstützung! Aktiv bis', banner_suppressed_forever: 'Danke für deine Unterstützung! Aktiv für immer.',
     thanks_badge: 'Danke',
     tab_reopen: 'Unterstützung',
     tiers_title: 'Bei Spende wird ein Dankeschön-Banner angezeigt.',

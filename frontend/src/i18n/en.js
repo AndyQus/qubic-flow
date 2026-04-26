@@ -107,7 +107,7 @@ export const en = {
     banner_text: 'Your support enables further development, new features, user support, and saves time. If this app helps you, a voluntary donation in Qubic is greatly appreciated.',
     banner_cta: 'Support now',
     banner_dismiss: 'Later',
-    banner_suppressed: 'Thank you for your support! Active until',
+    banner_suppressed: 'Thank you for your support! Active until', banner_suppressed_forever: 'Thank you for your support! Active forever.',
     thanks_badge: 'Thank you',
     tab_reopen: 'Support',
     tiers_title: 'A thank-you banner is shown upon donation.',
