@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import QRCode from 'qrcode'
 import { api } from '../api'
+import { setDebugSuppression } from '../composables/useDonationState'
 
 const { t } = useTranslation()
 
@@ -66,6 +67,13 @@ const DEBUG_SCENARIOS = {
 const effectiveDonationStatus = computed(() =>
   isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].status : donationStatus.value
 )
+
+if (isDebug) {
+  watch([debugSimulate, debugScenario], () => {
+    setDebugSuppression(debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].status.suppressed_until : null)
+  })
+  onUnmounted(() => setDebugSuppression(null))
+}
 const effectiveDonationHistory = computed(() =>
   isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].history : donationHistory.value
 )
@@ -166,7 +174,7 @@ onMounted(async () => {
       <div class="space-y-6">
 
         <!-- About AndyQus -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-3">
+        <div class="card !p-6 space-y-3">
           <h2 class="font-semibold text-white text-base">{{ t('donation.about_title') }}</h2>
           <p class="text-sm text-gray-300 leading-relaxed">
             {{ t('donation.about_core_prefix') }}
@@ -183,10 +191,21 @@ onMounted(async () => {
             </template>,
             {{ t('donation.about_text2') }}
           </p>
+          <!-- Open Source -->
+          <div class="border-t border-qubic-border pt-3 space-y-2">
+            <p class="text-sm text-gray-300 leading-relaxed">{{ t('donation.about_open_source') }}</p>
+            <a href="https://github.com/AndyQus/qubic-flow" target="_blank" rel="noopener noreferrer"
+               class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-qubic-border bg-qubic-bg hover:bg-qubic-card text-sm text-gray-300 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.385-1.335-1.755-1.335-1.755-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 21.795 24 17.295 24 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              {{ t('donation.about_github_btn') }}
+            </a>
+          </div>
         </div>
 
         <!-- Why support -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-3">
+        <div class="card !p-6 space-y-3">
           <h2 class="font-semibold text-white text-base">{{ t('donation.why_title') }}</h2>
           <ul class="space-y-2">
             <li v-for="key in ['why_dev','why_new_projects','why_support','why_time','why_appreciation']" :key="key"
@@ -240,7 +259,7 @@ onMounted(async () => {
         </div>
 
         <!-- QR + Address -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-4">
+        <div class="card !p-6 space-y-4">
           <h2 class="font-semibold text-white text-base">{{ t('donation.address_label') }}</h2>
           <div class="flex flex-col items-center gap-4">
             <img v-if="qrDataUrl" :src="qrDataUrl" alt="Donation QR Code" class="rounded-lg w-[200px] h-[200px]" />
@@ -261,7 +280,7 @@ onMounted(async () => {
         </div>
 
         <!-- Tiers -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-3">
+        <div class="card !p-6 space-y-3">
           <h2 class="font-semibold text-white text-base">{{ t('donation.tiers_title') }}</h2>
           <p class="text-sm text-gray-300 leading-relaxed">{{ t('donation.tiers_note') }}</p>
           <table class="w-full text-sm">
@@ -286,7 +305,7 @@ onMounted(async () => {
       <div class="space-y-6">
 
         <!-- Top 20 Supporters -->
-        <div class="bg-qubic-card border border-qubic-border rounded-xl p-6 space-y-4">
+        <div class="card !p-6 space-y-4">
           <div class="flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
               <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>

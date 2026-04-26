@@ -2,7 +2,7 @@
 
 **QubicFlow — Self-Hosted Qubic Wallet Tracker**
 
-Hey everyone! I've been working on a tool over the past few weeks that I'd love to share with the community.
+Hey everyone! I've been working on a tool over the past few weeks that I'd love to share with the community — and it's **open source** 🎉
 
 **What is QubicFlow?**
 A self-hosted wallet tracker built specifically for Qubic — your data stays on your own machine/server, nothing goes to third parties.
@@ -20,6 +20,9 @@ A self-hosted wallet tracker built specifically for Qubic — your data stays on
 - CSV export for CoinTracking & your accountant
 - PDF tax report at the click of a button
 
+**Source Code (MIT License):**
+https://github.com/AndyQus/qubic-flow
+
 **Start with a single command:**
 ```
 docker compose up --build
@@ -32,6 +35,24 @@ Also available as an Umbrel app (Community App Store).
 QubicFlow is free to use. If you'd like to support the project, you can send QU to:
 `CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI`
 
-QubicFlow detects donations from your own wallets automatically — directly on-chain. **1,000,000 QU = 1 month** — donors receive a thank-you notice in the app for as many months as they've donated. No subscription, no cloud, no account — just an on-chain payment straight from your own wallet.
+QubicFlow detects donations from your own wallets automatically — directly on-chain. No subscription, no cloud, no account — just an on-chain payment straight from your own wallet.
+
+**Donation tiers:**
+- **1,000,000 QU** = 1 month thank-you notice in the app
+- **12,000,000 QU** = 1 year
+- **100,000,000+ QU** = forever
 
 If you'd like to be shown as a permanent supporter, just message me here on Discord (@AndyQus ױ) and I'll add you to the lifetime whitelist manually.
+
+---
+
+**More tools by me**
+In case you need other Qubic tools — I've built a few more things:
+
+- [MyLedger](https://myledger.qubic.tools) — Qubic Ledger Tool
+- [Dividends](https://dividends.qubic.tools) — Dividend Tracker
+- [Auctions](https://auctions.qubic.tools) — Qubic Auction Monitor
+- [Doge-Mining-Stats](https://doge.qubic.tools) — Doge Mining Stats
+- [Explorer](https://live.qubic.org/explorer) — Qubic Live Explorer
+- [Live](https://live.qubic.org) — Qubic Live Network
+- [QPI Language Support](https://marketplace.visualstudio.com/items?itemName=AndyQus.qubic-org-qpi) — VSCode Extension for QPI

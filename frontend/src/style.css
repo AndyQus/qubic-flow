@@ -186,6 +186,20 @@ html.light .btn-action { color: #007A7A !important; }
 html.light .btn-action:hover { color: #005f5f !important; }
 html.light .icon-btn:hover { color: #007A7A !important; }
 
+/* Footer — light mode */
+html.light .footer-disclaimer {
+  background: rgba(255, 251, 235, 0.95);
+  border-color: rgba(180, 83, 9, 0.2);
+}
+html.light .footer-disclaimer p,
+html.light .footer-disclaimer strong { color: #78350f !important; }
+html.light .footer-disclaimer svg { color: #d97706 !important; }
+html.light .footer-disclaimer a { color: #92400e !important; }
+html.light .footer-bar {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 /* Push Down: Zeile klappt von oben auf (accordion) */
 @keyframes push-down {
   0%   { opacity: 0; transform: scaleY(0); }

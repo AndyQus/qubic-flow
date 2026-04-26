@@ -9,9 +9,18 @@ const closedToday = ref(false)
 const suppressedUntil = ref(null)
 let initialized = false
 
+// Debug override — only used in DEV builds
+const debugSuppressedUntil = ref(null)
+
+export function setDebugSuppression(value) {
+  if (!import.meta.env.DEV) return
+  debugSuppressedUntil.value = value
+}
+
 export function useDonationState() {
-  const isVisible = computed(() => !suppressedUntil.value && !closedToday.value)
-  const isSuppressed = computed(() => !!suppressedUntil.value)
+  const effectiveSuppressed = computed(() => debugSuppressedUntil.value ?? suppressedUntil.value)
+  const isVisible = computed(() => !effectiveSuppressed.value && !closedToday.value)
+  const isSuppressed = computed(() => !!effectiveSuppressed.value)
   const showMiniTab = computed(() => !isSuppressed.value && closedToday.value)
 
   function close() {
@@ -50,5 +59,5 @@ export function useDonationState() {
     } catch {}
   }
 
-  return { isVisible, isSuppressed, showMiniTab, close, init, suppressedUntil }
+  return { isVisible, isSuppressed, showMiniTab, close, init, suppressedUntil: effectiveSuppressed }
 }

@@ -1,7 +1,12 @@
 # QubicFlow
 
-Selbst gehosteter Qubic Wallet Tracker für steuerliche Dokumentation (BMF-konform).  
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Open Source](https://img.shields.io/badge/open%20source-%E2%9D%A4-brightgreen.svg)](https://github.com/AndyQus/qubic-flow)
+
+Selbst gehosteter, **Open-Source** Qubic Wallet Tracker für steuerliche Dokumentation (BMF-konform).  
 Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-Kurse, Live-Events per WebSocket, Steuerauswertung (FIFO/LIFO/HIFO/AVCO, länderspezifische Regeln) sowie CSV-Export für CoinTracking und den Steuerberater.
+
+**GitHub:** https://github.com/AndyQus/qubic-flow
 
 ---
 
@@ -57,6 +62,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 - **Deutsch / Englisch** Benutzeroberfläche, Dunkel- / Hellmodus
 - **Einstellungen in Reitern** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Sicherung/Wiederherstellung, Ledger-Import, Resync); aktiver Reiter wird per URL-Abfrageparameter (`?tab=…`) gespiegelt
 - **Vollständig containerisiert** — ein `docker-compose up --build` genügt
+- **Footer** — Haftungsausschluss-Banner und fixer Footer mit Copyright, Links (Qubic.org, Nutzungsbedingungen, Datenschutz) und Versionsnummer
 
 ---
 
@@ -298,7 +304,7 @@ qubic-flow/
 ├── frontend/
 │   ├── src/
 │   │   ├── views/           # Seiten (Dashboard, Wallets, Assets, Statistiken, Steuer usw.)
-│   │   ├── components/      # AppHeader, AppNav, StatsPanel, EventsTable, WalletFilter
+│   │   ├── components/      # AppHeader, AppNav, AppFooter, StatsPanel, EventsTable, WalletFilter
 │   │   ├── composables/     # useWebSocket (automatische Wiederverbindung)
 │   │   ├── stores/          # Pinia-Zustandsspeicher
 │   │   ├── i18n/            # DE / EN Übersetzungen
@@ -607,3 +613,12 @@ https://github.com/AndyQus/qubicflow-umbrel-store
 ```
 
 Umbrel → App Store → ⋮ → Community App Stores → URL einfügen → QubicFlow installieren
+
+---
+
+## Lizenz
+
+MIT License — siehe [LICENSE](LICENSE)
+
+QubicFlow ist freie Open-Source-Software. Der Quellcode ist öffentlich auf GitHub verfügbar:  
+**https://github.com/AndyQus/qubic-flow**

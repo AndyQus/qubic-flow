@@ -108,6 +108,7 @@ export const de = {
     banner_cta: 'Jetzt unterstützen',
     banner_dismiss: 'Später',
     banner_suppressed: 'Danke für deine Unterstützung! Aktiv bis',
+    thanks_badge: 'Danke',
     tab_reopen: 'Unterstützung',
     tiers_title: 'Bei Spende wird ein Dankeschön-Banner angezeigt.',
     tiers_note: 'Sende QU von einer eingetragenen Wallet an die Spendenadresse — QubicFlow erkennt die Zahlung automatisch on-chain, kein Login nötig. 1.000.000 QU = 1 Monat, alle Zahlungen werden kumuliert. Ab 100.000.000 QU gilt der Dankeschön-Banner für immer.',
@@ -155,5 +156,7 @@ export const de = {
     about_core_suffix: 'tätig — wofür er damals vom Qubic Core Team vergütet wurde.',
     about_text2: 'entstanden seit Januar 2025 ausschließlich in seiner Freizeit — kostenlos, ohne Vergütung, allein für die Community.',
     about_tools_prefix: 'Alle weiteren Tools, wie',
+    about_open_source: 'QubicFlow ist Open Source (MIT-Lizenz) — der Quellcode ist frei auf GitHub verfügbar. Wer das Projekt unterstützen möchte, kann es ⭐ starren oder eine Spende senden.',
+    about_github_btn: 'Quellcode auf GitHub',
   },
 }

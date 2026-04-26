@@ -41,6 +41,28 @@ def _init_db():
 _init_db()
 
 
+def _seed_defaults():
+    from .database import SessionLocal
+    from .models.node import Node
+    db = SessionLocal()
+    try:
+        if db.query(Node).count() == 0:
+            db.add(Node(
+                url="https://rpc.qubic.org",
+                node_type="RPC",
+                label="Qubic RPC",
+                priority=10,
+                is_active=1,
+                health_status="ONLINE",
+            ))
+            db.commit()
+    finally:
+        db.close()
+
+
+_seed_defaults()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()

@@ -14,7 +14,8 @@ const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const DEFAULT_BOB = 'https://bobnet.qubic.li'
-const form = ref({ url: DEFAULT_BOB, node_type: 'BOB_NODE', label: '', priority: 1 })
+const isDev = import.meta.env.DEV
+const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1 })
 
 watch(() => form.value.node_type, (type) => {
   if (!editId.value) {
@@ -38,7 +39,7 @@ function cancelForm() {
   editId.value   = null
   showForm.value = false
   error.value    = ''
-  form.value     = { url: DEFAULT_BOB, node_type: 'BOB_NODE', label: '', priority: 1 }
+  form.value     = { url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1 }
 }
 
 async function submit() {
@@ -103,7 +104,7 @@ onMounted(reload)
     </div>
     <select v-model="form.node_type" class="input w-full">
       <option value="RPC">RPC</option>
-      <option value="BOB_NODE">BOB_NODE</option>
+      <option v-if="isDev" value="BOB_NODE">BOB_NODE</option>
     </select>
     <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
     <input v-model.number="form.priority" type="number" min="1" max="5" class="input w-full" />
