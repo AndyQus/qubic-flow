@@ -48,17 +48,13 @@ QubicFlow erkennt Spenden aus euren eigenen Wallets automatisch direkt on-chain.
 - **12.000.000 QU** = 1 Jahr
 - **ab 100.000.000 QU** = für immer
 
-Wer dauerhaft als Unterstützer angezeigt werden möchte, kann mich einfach hier auf Discord anschreiben (@AndyQus ױ) — ich trage euch manuell in die Lifetime-Liste ein.
+Die **Top 20 Unterstützer** nach gesendeten QU werden direkt in der App angezeigt — Daten live vom Qubic Explorer.
 
 ---
 
-**Weitere Tools von mir**
-Falls ihr noch andere Qubic-Tools braucht — ich hab da noch ein paar Sachen gebaut:
+**Über AndyQus**
+AndyQus ist seit mehreren Jahren aktiver Community-Entwickler im Qubic-Ökosystem. Er war als Projektmanager beim offiziellen [Qubic Explorer](https://explorer.qubic.org), als Admin bei Quottery und als Entwickler beim [Qubic Web Wallet](https://wallet.qubic.org) tätig — wofür er damals vom Qubic Core Team vergütet wurde.
 
-- [MyLedger](https://myledger.qubic.tools) — Qubic Ledger Tool
-- [Dividends](https://dividends.qubic.tools) — Dividend Tracker
-- [Auctions](https://auctions.qubic.tools) — Qubic Auction Monitor
-- [Doge-Mining-Stats](https://doge.qubic.tools) — Doge Mining Stats
-- [Explorer](https://live.qubic.org/explorer) — Qubic Live Explorer
-- [Live](https://live.qubic.org) — Qubic Live Network
-- [QPI Language Support](https://marketplace.visualstudio.com/items?itemName=AndyQus.qubic-org-qpi) — VSCode Extension für QPI
+Alle weiteren Tools, wie [MyLedger](https://myledger.qubic.tools), [Dividends](https://dividends.qubic.tools), [Auctions](https://auctions.qubic.tools), [Doge-Mining-Stats](https://doge.qubic.tools), [Explorer](https://live.qubic.org/explorer), [Live](https://live.qubic.org), [QPI Language Support](https://marketplace.visualstudio.com/items?itemName=AndyQus.qubic-org-qpi), entstanden seit Januar 2025 ausschließlich in seiner Freizeit — kostenlos, ohne Vergütung, allein für die Community.
+
+QubicFlow ist Open Source (MIT-Lizenz) — der Quellcode ist frei auf GitHub verfügbar. Wer das Projekt unterstützen möchte, kann es ⭐ starren oder eine Spende senden.
