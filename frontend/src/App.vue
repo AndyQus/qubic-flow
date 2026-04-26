@@ -6,6 +6,7 @@ import { api } from './api'
 import AppHeader from './components/AppHeader.vue'
 import AppNav from './components/AppNav.vue'
 import MoneyAnimation from './components/MoneyAnimation.vue'
+import DonationBanner from './components/DonationBanner.vue'
 
 const store = useAppStore()
 useWebSocket()
@@ -27,6 +28,7 @@ onMounted(async () => {
   <div class="min-h-screen flex flex-col">
     <AppHeader />
     <AppNav />
+    <DonationBanner />
     <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
       <router-view />
     </main>

@@ -20,6 +20,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 - [Hintergrund-Jobs](#hintergrund-jobs)
 - [Tests ausführen](#tests-ausführen)
 - [Technologie-Stack](#technologie-stack)
+- [Deployment & Veröffentlichung](#deployment--veröffentlichung)
 
 ---
 
@@ -533,3 +534,76 @@ Setzt einen laufenden Backend-Server voraus. Der Vite-Entwicklungsserver wird vo
 | Webserver  | nginx (alpine) für Frontend + Proxy    |
 | Datenbank  | SQLite mit WAL-Modus                   |
 | Datenpfad  | Docker-Volume `qubicflow-data`         |
+
+---
+
+## Deployment & Veröffentlichung
+
+QubicFlow wird als Multi-Arch Docker Image (linux/amd64 + linux/arm64) auf Docker Hub veröffentlicht und ist über den Umbrel Community App Store installierbar.
+
+### Branch-Strategie
+
+```
+develop  →  Entwicklung, Tests, Bugfixes  (kein automatischer Build)
+   ↓  merge
+main     →  GitHub Actions startet automatisch  →  Docker Hub + Umbrel Store
+```
+
+- Auf `develop` wird entwickelt — beliebig viele Commits, kein Build
+- Jeder Merge zu `main` löst den vollständigen Release-Prozess aus
+- Für offizielle Versionen: `git tag v1.2.3 && git push origin v1.2.3`
+
+### GitHub Actions Workflow (`.github/workflows/docker-publish.yml`)
+
+Der Workflow besteht aus 4 aufeinanderfolgenden Jobs:
+
+| Job | Beschreibung |
+|-----|--------------|
+| `prepare` | Berechnet die Version: `YYYY.MM.DD` bei Branch-Merge, Semver `1.2.3` bei Tag |
+| `build-backend` | Cython-Kompilierung + Multi-Arch Docker Image → Docker Hub |
+| `build-frontend` | Vue-Build + nginx Docker Image → Docker Hub |
+| `update-umbrel-store` | Aktualisiert automatisch die Versionsnummern im Store-Repo |
+
+**Versionierung:**
+- Merge zu `main` → Version `2025.04.25` (Datum des Builds)
+- Tag `v1.2.3` → Version `1.2.3` (explizite Semver-Version)
+
+### Quellcode-Schutz (Cython)
+
+Die folgenden sensitiven Services werden vor dem Docker-Push zu `.so`-Binaries kompiliert — der Python-Quellcode ist im veröffentlichten Image nicht lesbar:
+
+- `backend/app/services/tax_engine.py`
+- `backend/app/services/sync_engine.py`
+- `backend/app/services/export_service.py`
+- `backend/app/services/label_service.py`
+
+Das Kompilier-Script liegt unter `backend/compile.py`. Der `backend/Dockerfile` verwendet einen Multi-Stage-Build: Stage 1 kompiliert und löscht die `.py`-Dateien, Stage 2 enthält nur das saubere Runtime-Image.
+
+### Erforderliche GitHub Secrets
+
+Im `qubic-flow` Repository unter Settings → Secrets and variables → Actions:
+
+| Secret | Wert |
+|--------|------|
+| `DOCKERHUB_USERNAME` | Docker Hub Benutzername |
+| `DOCKERHUB_TOKEN` | Docker Hub Personal Access Token |
+| `STORE_REPO_TOKEN` | GitHub Fine-grained PAT für `qubicflow-umbrel-store` (Contents: Read+Write) |
+
+### Ersten Release auslösen
+
+```bash
+git checkout main
+git merge develop
+git push origin main
+# → Build startet automatisch auf GitHub Actions
+```
+
+### Umbrel Installation
+
+Community App Store URL im Umbrel-Gerät eintragen:
+
+```
+https://github.com/AndyQus/qubicflow-umbrel-store
+```
+
+Umbrel → App Store → ⋮ → Community App Stores → URL einfügen → QubicFlow installieren

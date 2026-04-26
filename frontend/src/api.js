@@ -38,6 +38,8 @@ export const api = {
       return req(`/events/count${q ? '?' + q : ''}`)
     },
     filterOptions: (walletId) => req(`/events/filter-options?wallet_id=${walletId}`),
+    donationCheck: () => req('/events/donation-check'),
+    donationSuppression: () => req('/events/donation-suppression'),
   },
   nodes: {
     list: () => req('/nodes'),
