@@ -37,7 +37,6 @@ def _row(obj) -> dict:
 
 @router.get("/backup")
 def export_backup(
-    _: None = Depends(_require_backup_auth),
     db: Session = Depends(get_db),
 ):
     wallets = [_row(w) for w in db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()]
@@ -68,7 +67,6 @@ def export_backup(
 @router.post("/backup/restore")
 def restore_backup(
     payload: dict[str, Any],
-    _: None = Depends(_require_backup_auth),
     db: Session = Depends(get_db),
 ):
     stats: dict[str, Any] = {}
