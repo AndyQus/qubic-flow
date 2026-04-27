@@ -6,6 +6,9 @@ All notable changes to QubicFlow are documented here.
 
 ## [0.1.7] — 2026-04-27
 
+### Added
+- **Token-Dividenden-Erfassung dokumentiert** — Qubics, die über Token-Ausschüttungen eingehen (z. B. QMine-Dividenden), werden automatisch als EVENTs erkannt und je Epoche vollständig erfasst; Token-Issuer-Adressen werden täglich vom Qubic-Assets-Register synchronisiert
+
 ### Fixed
 - Tax report returned HTTP 500 on Umbrel OS — `OpeningPosition` was missing from `Base.metadata` registration, so the `opening_positions` table was never created on fresh deployments via the `create_all` fallback path
 - Error logging added to the tax report endpoint (`logger.exception`) for better diagnostics in production
@@ -37,7 +40,8 @@ All notable changes to QubicFlow are documented here.
 
 **Dashboard & Statistics**
 - Stats panels: Hour / Day / Epoch / Month / Year
-- Epoch view with per-wallet breakdown (TX / Event split)
+- Epoch view with per-wallet breakdown (TX / Event split) — all epochs navigable, not just the current one
+- Dividends from Smart Contract payouts and token distributions (e.g. QX shares, Qearn, QMine) are automatically detected as EVENTs and fully visible per epoch
 - Weekly snapshots (every Wednesday 12:00 UTC)
 - Events table with TxId, Tick, copy & Explorer links
 
