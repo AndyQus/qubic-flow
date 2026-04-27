@@ -261,7 +261,7 @@ onMounted(async () => {
   <div class="space-y-3">
   <PageHeader :title="t('nav.wallets')"
               :hint="activeTab === 'portfolio' ? t('wallet.tab_portfolio') : t('wallet.tab_config')">
-    <div class="filter-row">
+    <div v-if="activeTab === 'config'" class="filter-row">
       <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
       <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
@@ -288,8 +288,16 @@ onMounted(async () => {
 
     <!-- =================== PORTFOLIO TAB =================== -->
     <div v-if="activeTab === 'portfolio'" class="space-y-3">
-      <!-- Add Wallet button (portfolio tab) -->
-      <div class="flex justify-end">
+      <!-- Filter pills + Add Wallet button -->
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="filter-row">
+          <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
+                  @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
+          <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
+                  @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
+          <button :class="['filter-pill', store.walletFilter === 'business' && 'filter-pill-active']"
+                  @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
+        </div>
         <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
       </div>
 
