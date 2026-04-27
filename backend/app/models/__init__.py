@@ -7,3 +7,4 @@ from .sync_gap import SyncGap
 from .snapshot import WeeklySnapshot
 from .settings import AppSetting
 from .address_label import AddressLabel
+from .opening_position import OpeningPosition

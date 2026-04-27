@@ -49,7 +49,7 @@ async def create_wallet(payload: WalletCreate, background_tasks: BackgroundTasks
 
 
 @router.put("/wallets/{wallet_id}", response_model=WalletOut)
-def update_wallet(wallet_id: str, payload: WalletUpdate, db: Session = Depends(get_db)):
+async def update_wallet(wallet_id: str, payload: WalletUpdate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     wallet = db.query(Wallet).filter(Wallet.id == wallet_id, Wallet.deleted_at.is_(None)).first()
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
@@ -59,6 +59,7 @@ def update_wallet(wallet_id: str, payload: WalletUpdate, db: Session = Depends(g
     wallet.updated_at = now_utc_iso()
     db.commit()
     db.refresh(wallet)
+    background_tasks.add_task(initialize_wallet_balance, wallet.id)
     return wallet
 
 

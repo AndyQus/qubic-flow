@@ -1,10 +1,13 @@
 import json
+import logging
 from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from ...database import get_db
 from ...models.settings import AppSetting
@@ -146,14 +149,19 @@ async def get_tax_report(
     country = settings_map.get("country") or "DE"
     method = settings_map.get("method") or "FIFO"
 
-    report = tax_engine.calculate_tax_report(
-        db=db,
-        wallet_ids=wallet_ids,
-        year=year,
-        mode=mode,
-        country=country,
-        method=method,
-    )
+    try:
+        report = tax_engine.calculate_tax_report(
+            db=db,
+            wallet_ids=wallet_ids,
+            year=year,
+            mode=mode,
+            country=country,
+            method=method,
+        )
+    except Exception:
+        logger.exception("Tax report calculation failed")
+        raise
+
     report["meta"] = {
         "year": year,
         "mode": mode,
