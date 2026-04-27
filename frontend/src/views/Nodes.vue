@@ -115,60 +115,103 @@ onMounted(reload)
     </div>
   </div>
 
-  <div class="card overflow-hidden">
-    <table class="table-std">
-      <thead class="thead-std">
-        <tr>
-          <th class="th">{{ t('node.priority') }}</th>
-          <th class="th w-8"></th>
-          <th class="th">{{ t('node.url') }}</th>
-          <th class="th">{{ t('node.type') }}</th>
-          <th class="th">{{ t('node.label') }}</th>
-          <th class="th">{{ t('node.tick') }}</th>
-          <th class="th">{{ t('node.response') }}</th>
-          <th class="th">{{ t('node.health') }}</th>
-          <th class="th-center">{{ t('node.active') }}</th>
-          <th class="th-right">{{ t('wallet.actions') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="n in store.nodes" :key="n.id" :class="['border-b border-qubic-border/50 transition-opacity', !n.is_active && 'opacity-40']">
-          <td class="td">{{ n.priority }}</td>
-          <td class="td text-center">
-            <span v-if="n.is_sync_active"
-                  class="relative flex h-2.5 w-2.5 mx-auto"
-                  :title="t('node.sync_active_hint')">
+  <!-- Mobile: cards -->
+  <div class="sm:hidden space-y-2">
+    <div v-for="n in store.nodes" :key="n.id"
+         :class="['card space-y-2', !n.is_active && 'opacity-40']">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span v-if="n.is_sync_active" class="relative flex h-2.5 w-2.5 shrink-0" :title="t('node.sync_active_hint')">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-qubic-teal opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-qubic-teal"></span>
             </span>
-          </td>
-          <td class="td font-mono">{{ n.url }}</td>
-          <td class="td"><span class="pill">{{ n.node_type }}</span></td>
-          <td class="td text-gray-300">{{ n.label || '—' }}</td>
-          <td class="td font-mono">{{ n.tick || '—' }}</td>
-          <td class="td">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
-          <td class="td">
-            <span :class="healthColor(n.health_status)" :title="n.last_checked ? 'Zuletzt geprüft: ' + n.last_checked : ''">● {{ n.health_status }}</span>
-            <span v-if="n.fail_count" class="ml-1.5 text-xs text-gray-500">({{ n.fail_count }}×)</span>
-            <div v-if="n.last_error" class="text-xs text-red-400/70 mt-0.5 max-w-xs truncate" :title="n.last_error">
-              {{ n.last_error }}
-            </div>
-          </td>
-          <td class="td text-center">
-            <button @click="toggle(n.id)"
-                    :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
-                             n.is_active ? 'bg-qubic-teal' : 'bg-gray-600']">
-              <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200',
-                             n.is_active ? 'translate-x-4' : 'translate-x-1']" />
-            </button>
-          </td>
-          <td class="td text-right flex justify-end gap-3">
-            <button @click="startEdit(n)" class="btn-action">{{ t('wallet.edit') }}</button>
-            <button @click="remove(n.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <span class="font-mono text-xs text-gray-300 break-all">{{ n.url }}</span>
+          </div>
+          <div class="flex items-center gap-2 mt-1 flex-wrap">
+            <span class="pill">{{ n.node_type }}</span>
+            <span v-if="n.label" class="text-xs text-gray-400">{{ n.label }}</span>
+            <span class="text-xs text-gray-500">{{ t('node.priority') }}: {{ n.priority }}</span>
+          </div>
+        </div>
+        <button @click="toggle(n.id)"
+                :class="['relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                         n.is_active ? 'bg-qubic-teal' : 'bg-gray-600']">
+          <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200',
+                         n.is_active ? 'translate-x-4' : 'translate-x-1']" />
+        </button>
+      </div>
+      <div class="flex items-center gap-4 text-xs flex-wrap">
+        <span :class="healthColor(n.health_status)">● {{ n.health_status }}</span>
+        <span class="text-gray-400">{{ t('node.tick') }}: <span class="font-mono">{{ n.tick || '—' }}</span></span>
+        <span class="text-gray-400">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</span>
+        <span v-if="n.fail_count" class="text-gray-500">({{ n.fail_count }}×)</span>
+      </div>
+      <div v-if="n.last_error" class="text-xs text-red-400/70 break-all">{{ n.last_error }}</div>
+      <div class="flex gap-2 pt-1">
+        <button @click="startEdit(n)" class="btn-action text-xs">{{ t('wallet.edit') }}</button>
+        <button @click="remove(n.id)" class="btn-delete text-xs">{{ t('wallet.delete') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop: table -->
+  <div class="card overflow-hidden hidden sm:block">
+    <div class="overflow-x-auto">
+      <table class="table-std">
+        <thead class="thead-std">
+          <tr>
+            <th class="th">{{ t('node.priority') }}</th>
+            <th class="th w-8"></th>
+            <th class="th">{{ t('node.url') }}</th>
+            <th class="th">{{ t('node.type') }}</th>
+            <th class="th">{{ t('node.label') }}</th>
+            <th class="th">{{ t('node.tick') }}</th>
+            <th class="th">{{ t('node.response') }}</th>
+            <th class="th">{{ t('node.health') }}</th>
+            <th class="th-center">{{ t('node.active') }}</th>
+            <th class="th-right">{{ t('wallet.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="n in store.nodes" :key="n.id" :class="['border-b border-qubic-border/50 transition-opacity', !n.is_active && 'opacity-40']">
+            <td class="td">{{ n.priority }}</td>
+            <td class="td text-center">
+              <span v-if="n.is_sync_active"
+                    class="relative flex h-2.5 w-2.5 mx-auto"
+                    :title="t('node.sync_active_hint')">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-qubic-teal opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-qubic-teal"></span>
+              </span>
+            </td>
+            <td class="td font-mono">{{ n.url }}</td>
+            <td class="td"><span class="pill">{{ n.node_type }}</span></td>
+            <td class="td text-gray-300">{{ n.label || '—' }}</td>
+            <td class="td font-mono">{{ n.tick || '—' }}</td>
+            <td class="td">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
+            <td class="td">
+              <span :class="healthColor(n.health_status)" :title="n.last_checked ? 'Zuletzt geprüft: ' + n.last_checked : ''">● {{ n.health_status }}</span>
+              <span v-if="n.fail_count" class="ml-1.5 text-xs text-gray-500">({{ n.fail_count }}×)</span>
+              <div v-if="n.last_error" class="text-xs text-red-400/70 mt-0.5 max-w-xs truncate" :title="n.last_error">
+                {{ n.last_error }}
+              </div>
+            </td>
+            <td class="td text-center">
+              <button @click="toggle(n.id)"
+                      :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                               n.is_active ? 'bg-qubic-teal' : 'bg-gray-600']">
+                <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200',
+                               n.is_active ? 'translate-x-4' : 'translate-x-1']" />
+              </button>
+            </td>
+            <td class="td text-right flex justify-end gap-3">
+              <button @click="startEdit(n)" class="btn-action">{{ t('wallet.edit') }}</button>
+              <button @click="remove(n.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
   </template>
   </div>

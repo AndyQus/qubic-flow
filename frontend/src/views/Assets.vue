@@ -118,6 +118,7 @@ function categoryLabel(cat) {
     <!-- Table -->
     <PageLoader v-if="loading" />
     <div v-else class="card overflow-hidden p-0">
+      <div class="overflow-x-auto">
       <table class="table-std">
         <thead class="thead-std">
           <tr>
@@ -217,6 +218,7 @@ function categoryLabel(cat) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
 </template>
