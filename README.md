@@ -606,6 +606,8 @@ git push origin main
 
 ### Umbrel Installation
 
+#### Community App Store (available now)
+
 1. Open Umbrel → **App Store**
 2. Click **⋮** in the top right → **Community App Stores**
 3. Enter the following link and confirm:
@@ -613,6 +615,14 @@ git push origin main
    https://github.com/AndyQus/qubicflow-umbrel-store
    ```
 4. QubicFlow appears in the App Store → **Install**
+
+#### Official Umbrel App Store (submission pending)
+
+QubicFlow has been submitted to the official Umbrel App Store and is currently under review by the Umbrel team.
+
+> **PR:** https://github.com/getumbrel/umbrel-apps/pull/5461
+
+Once accepted, QubicFlow will be available directly in the built-in Umbrel App Store without adding a community store URL. Until then, use the community store link above.
 
 ---
 
