@@ -4,6 +4,18 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.7] — 2026-04-27
+
+### Fixed
+- Tax report returned HTTP 500 on Umbrel OS — `OpeningPosition` was missing from `Base.metadata` registration, so the `opening_positions` table was never created on fresh deployments via the `create_all` fallback path
+- Error logging added to the tax report endpoint (`logger.exception`) for better diagnostics in production
+
+### Changed
+- Balance is now refreshed immediately in the background when a wallet is updated/saved (previously only on wallet creation)
+- Balance scheduler confirmed at 1-hour interval
+
+---
+
 ## [0.1.0] — 2026-04-26
 
 ### First public release
