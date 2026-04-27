@@ -32,6 +32,7 @@ class Event(Base):
     item_name = Column(Text)
     comment = Column(Text)
     trade_group = Column(Text)
+    note = Column(Text)
     verified = Column(Integer, default=0)
     created_at = Column(Text)
 

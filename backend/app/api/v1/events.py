@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List
 from ...database import get_db
 from ...models.event import Event
 from ...models.wallet import Wallet
-from ...schemas.event import EventOut
+from ...schemas.event import EventOut, EventNoteUpdate
 from ...services.label_service import get_label
 
 from ...models.settings import AppSetting
@@ -92,6 +92,15 @@ def list_events(
         out.destination_name = get_label(db, e.destination_addr)
         result.append(out)
     return result
+
+
+@router.patch("/events/{event_id}/note", status_code=204)
+def update_event_note(event_id: str, body: EventNoteUpdate, db: Session = Depends(get_db)):
+    event = db.query(Event).filter(Event.id == event_id, Event.wallet_id == body.wallet_id).first()
+    if not event:
+        raise HTTPException(404, "Event not found")
+    event.note = body.note or None
+    db.commit()
 
 
 def _save_suppression(db: Session, until: str):
