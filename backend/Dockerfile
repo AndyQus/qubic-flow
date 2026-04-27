@@ -1,4 +1,5 @@
 FROM python:3.12-slim AS compiler
+ARG TARGETARCH
 
 WORKDIR /app
 
@@ -9,11 +10,11 @@ RUN pip install --no-cache-dir -r requirements.txt cython setuptools
 
 COPY . .
 
-RUN python compile.py build_ext --inplace && \
-    rm app/services/tax_engine.py \
-       app/services/sync_engine.py \
-       app/services/export_service.py \
-       app/services/label_service.py
+# Cython compilation only on amd64 — ARM64 via QEMU emulation is too slow (6h+ timeout)
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      python compile.py build_ext --inplace && \
+      rm app/services/tax_engine.py app/services/sync_engine.py app/services/export_service.py app/services/label_service.py; \
+    fi
 
 
 FROM python:3.12-slim
