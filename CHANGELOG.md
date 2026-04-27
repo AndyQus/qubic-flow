@@ -4,6 +4,15 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.8] — 2026-04-27
+
+### Changed
+- Submitted to the official Umbrel App Store (PR [#5461](https://github.com/getumbrel/umbrel-apps/pull/5461) — pending review)
+- README updated in English and German with official store submission announcement
+- Both README.md (EN) and README.de.md (DE) are now maintained in sync
+
+---
+
 ## [0.1.7] — 2026-04-27
 
 ### Added
