@@ -4,6 +4,19 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.9] — 2026-04-27
+
+### Added
+- **Event notes** — every transaction/event can now have a user-defined note; editable inline directly in the list (pencil icon → input → green checkmark to save / red X to cancel); stored persistently in the database
+- **Add Wallet in Portfolio tab** — the "+ Add Wallet" button is now visible directly in the portfolio view without having to switch to the configuration tab; filter pills (All / Private / Business) moved into the same row on the left
+- **i18n** — note field keys added for German and English
+
+### Changed
+- Copy icons removed from all event columns (Source, Destination, TxId, Tick); the value itself is now clickable to copy — saves space and reduces visual clutter
+- "Banner hidden until" label renamed to "Thank you forever banner" in the support page (EN)
+
+---
+
 ## [0.1.8] — 2026-04-27
 
 ### Changed

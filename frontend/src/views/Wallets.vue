@@ -261,7 +261,7 @@ onMounted(async () => {
   <div class="space-y-3">
   <PageHeader :title="t('nav.wallets')"
               :hint="activeTab === 'portfolio' ? t('wallet.tab_portfolio') : t('wallet.tab_config')">
-    <div class="filter-row">
+    <div v-if="activeTab === 'config'" class="filter-row">
       <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
               @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
       <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
@@ -288,6 +288,45 @@ onMounted(async () => {
 
     <!-- =================== PORTFOLIO TAB =================== -->
     <div v-if="activeTab === 'portfolio'" class="space-y-3">
+      <!-- Filter pills + Add Wallet button -->
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="filter-row">
+          <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
+                  @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
+          <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
+                  @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
+          <button :class="['filter-pill', store.walletFilter === 'business' && 'filter-pill-active']"
+                  @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
+        </div>
+        <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
+      </div>
+
+      <!-- Add-Form (shared, shown in both tabs) -->
+      <div v-if="showForm" class="card space-y-3">
+        <input v-model="form.id"    :placeholder="t('wallet.address')" class="input w-full font-mono text-xs" />
+        <input v-model="form.label" :placeholder="t('wallet.label')"   class="input w-full text-xs" />
+        <input v-model="form.owner" :placeholder="t('wallet.owner')"   class="input w-full text-xs"
+               list="owner-list-add-portfolio" autocomplete="off" />
+        <datalist id="owner-list-add-portfolio">
+          <option v-for="o in uniqueOwners" :key="o" :value="o" />
+        </datalist>
+        <input v-model="form.note"  :placeholder="t('wallet.note')"    class="input w-full text-xs" />
+        <select v-model="form.wallet_type" class="input w-full text-xs">
+          <option value="PRIVATE">PRIVATE</option>
+          <option value="BUSINESS">BUSINESS</option>
+        </select>
+        <input v-model="form.function" :placeholder="t('wallet.function')" class="input w-full text-xs"
+               list="function-list-add-portfolio" autocomplete="off" />
+        <datalist id="function-list-add-portfolio">
+          <option v-for="f in uniqueFunctions" :key="f" :value="f" />
+        </datalist>
+        <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
+        <div class="flex gap-2">
+          <button class="btn text-sm" @click="submit">{{ t('common.save') }}</button>
+          <button class="btn-ghost text-sm" @click="showForm = false; error = ''">{{ t('common.cancel') }}</button>
+        </div>
+      </div>
+
       <div v-if="!ownerGroups.length" class="card p-6 text-center text-gray-500 text-xs">{{ t('wallet.none') }}</div>
 
       <!-- Grand total summary bar (icon + colored label per column, like Dashboard panels) -->

@@ -18,6 +18,12 @@ class EventOut(BaseModel):
     is_internal: int = 0
     source_name: Optional[str] = None
     destination_name: Optional[str] = None
+    note: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class EventNoteUpdate(BaseModel):
+    wallet_id: str
+    note: Optional[str] = None

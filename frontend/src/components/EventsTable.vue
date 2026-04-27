@@ -1,14 +1,43 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import { useQubicUtils } from '../composables/useQubicUtils'
+import { api } from '../api'
 
 const props = defineProps({
   events:  { type: Array, required: true },
   loading: { type: Boolean, default: false },
   title:   { type: String, default: null },
 })
+
+const editingNoteId = ref(null)
+const noteInput     = ref('')
+const noteSaving    = ref(false)
+
+function noteKey(ev) { return `${ev.id}__${ev.wallet_id}` }
+
+function startEditNote(ev) {
+  editingNoteId.value = noteKey(ev)
+  noteInput.value = ev.note || ''
+}
+
+function cancelEditNote() {
+  editingNoteId.value = null
+  noteInput.value = ''
+}
+
+async function saveNote(ev) {
+  noteSaving.value = true
+  try {
+    await api.events.updateNote(ev.id, ev.wallet_id, noteInput.value)
+    ev.note = noteInput.value || null
+    editingNoteId.value = null
+  } finally {
+    noteSaving.value = false
+  }
+}
+
 const store = useAppStore()
 const { t } = useTranslation()
 const { explorerUrl, txUrl, tickUrl, copyAddress, shortAddr } = useQubicUtils()
@@ -29,12 +58,6 @@ function flashClass(ev) {
   if (ev._dir === 'IN') return 'flash-in'
   if (ev._dir === 'OUT') return 'flash-out'
   return ''
-}
-
-function maskName(name, addr) {
-  if (store.hideAddresses) return '••••••••••••'
-  if (name) return name.length > 13 ? name.slice(0, 13) + '…' : name
-  return shortAddr(addr)
 }
 
 function getWallet(addr) {
@@ -84,9 +107,6 @@ function shortTick(tick) {
   return s.length > 5 ? `${s.slice(0, 5)}…` : s
 }
 
-// Only return a value if it's a real 60-char Qubic TxID (explorer format).
-// SC-internal events have shorter logDigest hashes that don't map to any
-// explorer TX page, so we hide the TxID block entirely for those rows.
 function txId(ev) {
   const id = ev.log_digest || ev.id
   return (typeof id === 'string' && /^[a-z]{60}$/.test(id)) ? id : null
@@ -108,7 +128,6 @@ function counterpart(ev) {
   return { addr: ev.source_address, name: ev.source_name }
 }
 
-// Pre-compute direction and sign once per event to avoid repeated calls in template.
 const processedEvents = computed(() => props.events.map(ev => {
   const _dir = ev.is_internal ? 'INTERNAL'
     : ownedIds.value.has(ev.destination_addr) ? 'IN'
@@ -155,15 +174,11 @@ const processedEvents = computed(() => props.events.map(ev => {
             <div class="text-xs text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
             <!-- Counterpart address -->
             <div v-if="counterpart(ev).addr" class="flex items-center gap-1 mt-1">
-              <span :class="['text-xs font-mono truncate', isOwnWallet(counterpart(ev).addr) ? 'text-violet-300' : 'text-gray-400']">
+              <span :class="['text-xs font-mono truncate', isOwnWallet(counterpart(ev).addr) ? 'text-violet-300' : 'text-gray-400', !store.hideAddresses && 'cursor-pointer hover:opacity-80']"
+                    :title="!store.hideAddresses ? t('assets.copy') : ''"
+                    @click="!store.hideAddresses && copyAddress(counterpart(ev).addr)">
                 {{ walletDisplay(counterpart(ev).name, counterpart(ev).addr) }}
               </span>
-              <button v-if="!store.hideAddresses" @click="copyAddress(counterpart(ev).addr)"
-                      class="icon-btn" :title="t('assets.copy')">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-              </button>
               <a :href="explorerUrl(counterpart(ev).addr)" target="_blank" rel="noopener"
                  class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -171,15 +186,13 @@ const processedEvents = computed(() => props.events.map(ev => {
                 </svg>
               </a>
             </div>
-            <!-- TxId (only when there's a real 60-char Qubic TxID) -->
+            <!-- TxId -->
             <div v-if="txId(ev)" class="flex items-start gap-1 mt-1 min-w-0">
-              <span class="text-xs text-gray-500 font-mono break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
-              <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
-                      class="icon-btn" :title="t('event.copy_txid')">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-              </button>
+              <span :class="['text-xs text-gray-500 font-mono break-all', !store.hideAddresses && 'cursor-pointer hover:text-gray-300']"
+                    :title="store.hideAddresses ? '' : t('event.copy_txid')"
+                    @click="!store.hideAddresses && copyAddress(txId(ev))">
+                {{ shortTx(txId(ev)) }}
+              </span>
               <a :href="txUrl(txId(ev))" target="_blank" rel="noopener"
                  class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -189,19 +202,51 @@ const processedEvents = computed(() => props.events.map(ev => {
             </div>
             <!-- Tick -->
             <div v-if="ev.tick_number" class="flex items-center gap-1 mt-0.5">
-              <span class="text-xs text-gray-500 font-mono" :title="ev.tick_number">{{ t('event.tick') }}: {{ shortTick(ev.tick_number) }}</span>
-              <button @click="copyAddress(String(ev.tick_number))"
-                      class="icon-btn" :title="t('event.copy_tick')">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-              </button>
+              <span class="text-xs text-gray-500 font-mono cursor-pointer hover:text-gray-300"
+                    :title="t('event.copy_tick')"
+                    @click="copyAddress(String(ev.tick_number))">
+                {{ t('event.tick') }}: {{ shortTick(ev.tick_number) }}
+              </span>
               <a :href="tickUrl(ev.tick_number)" target="_blank" rel="noopener"
                  class="icon-btn" :title="t('assets.explorer')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
               </a>
+            </div>
+            <!-- Note (mobile) -->
+            <div class="mt-1.5">
+              <template v-if="editingNoteId === noteKey(ev)">
+                <div class="flex items-center gap-1.5">
+                  <input v-model="noteInput"
+                         class="input text-xs py-0.5 px-2 flex-1 min-w-0"
+                         :placeholder="t('event.note_placeholder')"
+                         @keyup.enter="saveNote(ev)"
+                         @keyup.esc="cancelEditNote" />
+                  <button :disabled="noteSaving" @click="saveNote(ev)"
+                          class="icon-btn text-green-400 hover:text-green-300" :title="t('event.note_save')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </button>
+                  <button @click="cancelEditNote"
+                          class="icon-btn text-red-400 hover:text-red-300" :title="t('event.note_cancel')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              </template>
+              <template v-else>
+                <div class="flex items-center gap-1.5">
+                  <span v-if="ev.note" class="text-xs text-gray-300 break-all">{{ ev.note }}</span>
+                  <button class="icon-btn" :title="t('event.note')" @click.stop="startEditNote(ev)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -222,11 +267,13 @@ const processedEvents = computed(() => props.events.map(ev => {
               <th class="text-right px-3 py-2.5">{{ t('event.destination') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.txid') }}</th>
               <th class="text-left px-3 py-2.5">{{ t('event.tick') }}</th>
+              <th class="text-left px-3 py-2.5">{{ t('event.note') }}</th>
+              <th class="px-3 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!events.length">
-              <td colspan="10" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
+              <td colspan="12" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
             </tr>
             <tr v-for="ev in processedEvents" :key="ev.id"
                 :class="[
@@ -244,21 +291,19 @@ const processedEvents = computed(() => props.events.map(ev => {
                 <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
                 <span v-else class="text-gray-500">—</span>
               </td>
-              <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]"><span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU</td>
+              <td :class="['px-3 py-2.5 font-mono text-right whitespace-nowrap', signClass(ev)]">
+                <span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU
+              </td>
               <td class="px-3 py-2.5 font-mono text-gray-400 text-right hidden lg:table-cell whitespace-nowrap">{{ fmtRate(ev) }}</td>
               <td class="px-3 py-2.5 font-mono text-right whitespace-nowrap">{{ fmtValue(ev) }}</td>
               <!-- Source -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.source_address" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
-                  <span :class="isOwnWallet(ev.source_address) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.source_address">
+                  <span :class="['truncate', isOwnWallet(ev.source_address) ? 'text-violet-300' : '', !store.hideAddresses && 'cursor-pointer hover:opacity-80']"
+                        :title="store.hideAddresses ? '' : ev.source_address"
+                        @click="!store.hideAddresses && copyAddress(ev.source_address)">
                     {{ walletDisplay(ev.source_name || walletLabel(ev.source_address), ev.source_address) }}
                   </span>
-                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.source_address)"
-                          class="icon-btn" :title="t('assets.copy')">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                  </button>
                   <a :href="explorerUrl(ev.source_address)" target="_blank" rel="noopener"
                      class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -271,15 +316,11 @@ const processedEvents = computed(() => props.events.map(ev => {
               <!-- Destination -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.destination_addr" class="flex items-center justify-end gap-2 font-mono text-xs text-gray-400">
-                  <span :class="isOwnWallet(ev.destination_addr) ? 'text-violet-300' : ''" :title="store.hideAddresses ? '' : ev.destination_addr">
+                  <span :class="['truncate', isOwnWallet(ev.destination_addr) ? 'text-violet-300' : '', !store.hideAddresses && 'cursor-pointer hover:opacity-80']"
+                        :title="store.hideAddresses ? '' : ev.destination_addr"
+                        @click="!store.hideAddresses && copyAddress(ev.destination_addr)">
                     {{ walletDisplay(ev.destination_name || walletLabel(ev.destination_addr), ev.destination_addr) }}
                   </span>
-                  <button v-if="!store.hideAddresses" @click="copyAddress(ev.destination_addr)"
-                          class="icon-btn" :title="t('assets.copy')">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                  </button>
                   <a :href="explorerUrl(ev.destination_addr)" target="_blank" rel="noopener"
                      class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -291,16 +332,14 @@ const processedEvents = computed(() => props.events.map(ev => {
               </td>
               <!-- TxId -->
               <td class="px-3 py-2.5">
-                <div v-if="txId(ev)" class="flex items-start gap-2 font-mono text-xs text-gray-400 min-w-0">
-                  <span class="break-all" :title="store.hideAddresses ? '' : txId(ev)">{{ shortTx(txId(ev)) }}</span>
-                  <button v-if="!store.hideAddresses" @click="copyAddress(txId(ev))"
-                          class="icon-btn" :title="t('event.copy_txid')">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                  </button>
+                <div v-if="txId(ev)" class="flex items-center gap-2 font-mono text-xs text-gray-400 min-w-0">
+                  <span :class="['break-all', !store.hideAddresses && 'cursor-pointer hover:text-gray-200']"
+                        :title="store.hideAddresses ? '' : t('event.copy_txid')"
+                        @click="!store.hideAddresses && copyAddress(txId(ev))">
+                    {{ shortTx(txId(ev)) }}
+                  </span>
                   <a :href="txUrl(txId(ev))" target="_blank" rel="noopener"
-                     class="icon-btn" :title="t('assets.explorer')">
+                     class="icon-btn shrink-0" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                     </svg>
@@ -311,13 +350,11 @@ const processedEvents = computed(() => props.events.map(ev => {
               <!-- Tick -->
               <td class="px-3 py-2.5">
                 <div v-if="ev.tick_number" class="flex items-center gap-2 font-mono text-xs text-gray-400">
-                  <span :title="ev.tick_number">{{ shortTick(ev.tick_number) }}</span>
-                  <button @click="copyAddress(String(ev.tick_number))"
-                          class="icon-btn" :title="t('event.copy_tick')">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                    </svg>
-                  </button>
+                  <span class="cursor-pointer hover:text-gray-200"
+                        :title="t('event.copy_tick')"
+                        @click="copyAddress(String(ev.tick_number))">
+                    {{ shortTick(ev.tick_number) }}
+                  </span>
                   <a :href="tickUrl(ev.tick_number)" target="_blank" rel="noopener"
                      class="icon-btn" :title="t('assets.explorer')">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -326,6 +363,47 @@ const processedEvents = computed(() => props.events.map(ev => {
                   </a>
                 </div>
                 <span v-else class="text-gray-500">—</span>
+              </td>
+              <!-- Note -->
+              <td class="px-3 py-2.5 min-w-[160px]">
+                <template v-if="editingNoteId === noteKey(ev)">
+                  <input v-model="noteInput"
+                         class="input text-xs py-0.5 px-2 w-full"
+                         :placeholder="t('event.note_placeholder')"
+                         @keyup.enter="saveNote(ev)"
+                         @keyup.esc="cancelEditNote" />
+                </template>
+                <template v-else>
+                  <span v-if="ev.note" class="text-xs text-gray-300 truncate block max-w-[200px]" :title="ev.note">{{ ev.note }}</span>
+                  <span v-else class="text-xs text-gray-600">—</span>
+                </template>
+              </td>
+              <!-- Note actions -->
+              <td class="px-3 py-2.5 whitespace-nowrap">
+                <template v-if="editingNoteId === noteKey(ev)">
+                  <div class="flex items-center gap-1.5">
+                    <button :disabled="noteSaving" @click="saveNote(ev)"
+                            class="icon-btn text-green-400 hover:text-green-300" :title="t('event.note_save')">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
+                    <button @click="cancelEditNote"
+                            class="icon-btn text-red-400 hover:text-red-300" :title="t('event.note_cancel')">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </div>
+                </template>
+                <template v-else>
+                  <button @click.stop="startEditNote(ev)"
+                          class="icon-btn" :title="t('event.note')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                    </svg>
+                  </button>
+                </template>
               </td>
             </tr>
           </tbody>
