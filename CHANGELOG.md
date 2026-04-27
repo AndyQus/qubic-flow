@@ -4,7 +4,19 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.8] — 2026-04-27
+
+### Changed
+- Submitted to the official Umbrel App Store (PR [#5461](https://github.com/getumbrel/umbrel-apps/pull/5461) — pending review)
+- README updated in English and German with official store submission announcement
+- Both README.md (EN) and README.de.md (DE) are now maintained in sync
+
+---
+
 ## [0.1.7] — 2026-04-27
+
+### Added
+- **Token-Dividenden-Erfassung dokumentiert** — Qubics, die über Token-Ausschüttungen eingehen (z. B. QMine-Dividenden), werden automatisch als EVENTs erkannt und je Epoche vollständig erfasst; Token-Issuer-Adressen werden täglich vom Qubic-Assets-Register synchronisiert
 
 ### Fixed
 - Tax report returned HTTP 500 on Umbrel OS — `OpeningPosition` was missing from `Base.metadata` registration, so the `opening_positions` table was never created on fresh deployments via the `create_all` fallback path
@@ -37,7 +49,8 @@ All notable changes to QubicFlow are documented here.
 
 **Dashboard & Statistics**
 - Stats panels: Hour / Day / Epoch / Month / Year
-- Epoch view with per-wallet breakdown (TX / Event split)
+- Epoch view with per-wallet breakdown (TX / Event split) — all epochs navigable, not just the current one
+- Dividends from Smart Contract payouts and token distributions (e.g. QX shares, Qearn, QMine) are automatically detected as EVENTs and fully visible per epoch
 - Weekly snapshots (every Wednesday 12:00 UTC)
 - Events table with TxId, Tick, copy & Explorer links
 
