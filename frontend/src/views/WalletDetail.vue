@@ -148,9 +148,9 @@ async function load() {
 
 function setFilter(mode) {
   filterMode.value  = mode
-  filterEpoch.value = ''
-  filterMonth.value = ''
-  filterYear.value  = ''
+  filterEpoch.value = mode === 'epoch' ? (availableEpochs.value[0] ?? '') : ''
+  filterMonth.value = mode === 'month' ? (availableMonths.value[0] ?? '') : ''
+  filterYear.value  = mode === 'year'  ? (availableYears.value[0]  ?? '')  : ''
   page.value = 1
   load()
 }

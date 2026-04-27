@@ -6,6 +6,9 @@ on:
       - main          # Trigger on every merge to main
   workflow_dispatch:  # Allow manual re-run if the action fails
 
+permissions:
+  contents: write   # needed to create and push git tags
+
 jobs:
 
   tag:
