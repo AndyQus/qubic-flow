@@ -98,7 +98,18 @@ const otherApps = [
 ]
 
 async function copyAddress() {
-  await navigator.clipboard.writeText(DONATION_ADDRESS)
+  try {
+    await navigator.clipboard.writeText(DONATION_ADDRESS)
+  } catch {
+    const el = document.createElement('textarea')
+    el.value = DONATION_ADDRESS
+    el.style.position = 'fixed'
+    el.style.opacity = '0'
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+  }
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
 }
