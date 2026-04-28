@@ -141,7 +141,7 @@ export const de = {
     supporters_empty: 'Noch keine Unterstützer eingetragen. Sei der Erste!',
     honorary_title: 'Ehrenunterstützer',
     honorary_note: 'frühere Adresse',
-    honorary_eko: 'Ein herzliches Dankeschön an Eko für seine großzügige Unterstützung in der Vergangenheit — noch bevor QubicFlow eine Spendenadresse hatte. Dein frühes Vertrauen in dieses Projekt bedeutet mir sehr viel! 💛',
+    honorary_eko: 'Ein herzliches Dankeschön an Eko für seine großzügige Unterstützung in der Vergangenheit. 💛',
     supporters_amount: 'Betrag',
     supporters_date: 'Datum',
     history_title: 'Meine Spenden',

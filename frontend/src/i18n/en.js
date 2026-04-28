@@ -141,7 +141,7 @@ export const en = {
     supporters_empty: 'No supporters listed yet. Be the first!',
     honorary_title: 'Honorary Supporters',
     honorary_note: 'previous address',
-    honorary_eko: 'A heartfelt thank you to Eko for his generous support in the past — even before QubicFlow had a donation address. Your early belief in this project means a lot! 💛',
+    honorary_eko: 'A heartfelt thank you to Eko for his generous support in the past. 💛',
     supporters_amount: 'Amount',
     supporters_date: 'Date',
     history_title: 'My Donations',
