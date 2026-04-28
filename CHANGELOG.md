@@ -4,6 +4,14 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.10] — 2026-04-28
+
+### Added
+- **UmbrelOS quick-start section** — new "Start with UmbrelOS" section in both README.md (EN) and README.de.md (DE), above "Start with Docker"; includes 4-step Community App Store installation guide and link to https://github.com/AndyQus/qubicflow-umbrel-store
+- **Dashboard screenshot** — QubicFlow dashboard screenshot added at the top of both READMEs
+
+---
+
 ## [0.1.9] — 2026-04-27
 
 ### Added
