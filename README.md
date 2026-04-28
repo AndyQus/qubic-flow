@@ -9,12 +9,15 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 **GitHub:** https://github.com/AndyQus/qubic-flow  
 **German README:** [README.de.md](README.de.md)
 
+![Dashboard](https://raw.githubusercontent.com/AndyQus/qubicflow-umbrel-store/main/qfstore-qubicflow/gallery/1.png)
+
 ---
 
 ## Table of Contents
 
 - [Features](#features)
 - [Requirements](#requirements)
+- [Start with UmbrelOS](#start-with-umbrelOS)
 - [Start with Docker](#start-with-docker)
 - [Start in VSCode (Development)](#start-in-vscode-development)
 - [Configuration (.env)](#configuration-env)
@@ -80,6 +83,25 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 - Python 3.12+
 - Node.js 22+
 - VSCode with the **Python** (ms-python.python) and **Debugpy** extensions
+
+---
+
+## Start with UmbrelOS
+
+QubicFlow is available for [UmbrelOS](https://umbrel.com/) — the self-hosted home server OS that runs on a Raspberry Pi or any Linux machine.
+
+**Umbrel Store Repository:** https://github.com/AndyQus/qubicflow-umbrel-store
+
+### Install via Community App Store (available now)
+
+1. Open the Umbrel App Store
+2. Click **⋮** (top-right menu) → **Community App Stores**
+3. Enter the store URL: `https://github.com/AndyQus/qubicflow-umbrel-store`
+4. Click **Install** next to QubicFlow
+
+QubicFlow will be available at `http://<your-umbrel-ip>:8080` after installation.
+
+> **Official App Store** — A submission to the official Umbrel App Store is pending (PR #5461). Once approved, QubicFlow will be installable directly from the built-in store without adding a community source.
 
 ---
 

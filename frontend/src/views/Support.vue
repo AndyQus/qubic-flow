@@ -313,6 +313,7 @@ onMounted(async () => {
             <h2 class="font-semibold text-white text-base">{{ t('donation.supporters_title') }}</h2>
           </div>
           <p class="text-xs text-gray-400">{{ t('donation.supporters_text') }}</p>
+
           <div v-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
@@ -342,6 +343,8 @@ onMounted(async () => {
               </tbody>
             </table>
           </div>
+          <!-- Honorary thank-you -->
+          <p class="text-xs text-amber-400/80 italic pt-1">{{ t('donation.honorary_eko') }}</p>
         </div>
 
         <!-- Donation History (only shown when payment detected) -->

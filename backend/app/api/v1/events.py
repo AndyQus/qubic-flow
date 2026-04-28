@@ -103,6 +103,43 @@ def update_event_note(event_id: str, body: EventNoteUpdate, db: Session = Depend
     db.commit()
 
 
+def _parse_v2_transfers(pages: list[dict]) -> list[tuple[int, str, str, int]]:
+    """Flatten the v2 /transfers response (tick-grouped, nested) into (tick, source, dest, amount) tuples."""
+    result = []
+    for page_data in pages:
+        for tick_group in (page_data.get("transactions") or []):
+            tick_number = int(tick_group.get("tickNumber") or 0)
+            for tx_data in (tick_group.get("transactions") or []):
+                if not tx_data.get("moneyFlew", True):
+                    continue
+                tx = tx_data.get("transaction") or tx_data
+                source = tx.get("sourceId") or tx.get("source") or ""
+                dest   = tx.get("destId")   or tx.get("destination") or ""
+                amount = int(tx.get("amount") or 0)
+                if source and dest and amount > 0:
+                    result.append((tick_number, source, dest, amount))
+    return result
+
+
+async def _fetch_all_transfer_pages(rpc, address: str, from_tick: int, to_tick: int) -> list[dict]:
+    pages = []
+    page = 1
+    while True:
+        try:
+            data = await rpc.get_transfer_transactions(address, from_tick, to_tick, page=page, page_size=100)
+        except Exception:
+            break
+        pages.append(data)
+        tick_groups = data.get("transactions") or []
+        if not tick_groups:
+            break
+        total_pages = data.get("pagination", {}).get("totalPages", 1)
+        if page >= total_pages:
+            break
+        page += 1
+    return pages
+
+
 def _save_suppression(db: Session, until: str):
     row = db.query(AppSetting).filter(AppSetting.key == "donation_suppressed_until").first()
     if row:
@@ -147,30 +184,13 @@ async def donation_check(db: Session = Depends(get_db)):
 
     from_tick = max(0, current_tick - 500_000)
 
-    all_transactions = []
-    page = 1
-    while True:
-        try:
-            data = await rpc.get_transfer_transactions(DONATION_ADDRESS, from_tick, current_tick, page=page, page_size=100)
-        except Exception:
-            break
-        txs = data.get("transactions") or []
-        if not txs:
-            break
-        all_transactions.extend(txs)
-        total_pages = data.get("pagination", {}).get("totalPages", 1)
-        if page >= total_pages:
-            break
-        page += 1
+    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    transfers = _parse_v2_transfers(pages)
 
     # Filter: source must be a registered user wallet, destination must be donation address
     payments: list[tuple[int, int]] = []  # (tick, amount)
-    for tx in all_transactions:
-        source = tx.get("sourceId") or tx.get("source") or ""
-        dest = tx.get("destId") or tx.get("destination") or ""
-        amount = int(tx.get("amount", 0))
-        tick = int(tx.get("tickNumber") or tx.get("tick") or 0)
-        if source in user_addresses and dest == DONATION_ADDRESS and amount > 0:
+    for tick, source, dest, amount in transfers:
+        if source in user_addresses and dest == DONATION_ADDRESS:
             payments.append((tick, amount))
 
     if not payments:
@@ -240,32 +260,15 @@ async def donation_top():
         return {"donors": []}
 
     from_tick = max(0, current_tick - 500_000)
-    all_transactions = []
-    page = 1
-    while True:
-        try:
-            data = await rpc.get_transfer_transactions(DONATION_ADDRESS, from_tick, current_tick, page=page, page_size=100)
-        except Exception:
-            break
-        txs = data.get("transactions") or []
-        if not txs:
-            break
-        all_transactions.extend(txs)
-        total_pages = data.get("pagination", {}).get("totalPages", 1)
-        if page >= total_pages:
-            break
-        page += 1
+    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    transfers = _parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
     TICKS_PER_DAY = 86_400
     donors: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0})
 
-    for tx in all_transactions:
-        source = tx.get("sourceId") or tx.get("source") or ""
-        dest = tx.get("destId") or tx.get("destination") or ""
-        amount = int(tx.get("amount", 0))
-        tick = int(tx.get("tickNumber") or tx.get("tick") or 0)
-        if dest == DONATION_ADDRESS and amount > 0 and source:
+    for tick, source, dest, amount in transfers:
+        if dest == DONATION_ADDRESS and source:
             donors[source]["total_qu"] += amount
             if tick > donors[source]["last_tick"]:
                 donors[source]["last_tick"] = tick
@@ -299,33 +302,16 @@ async def donation_history(mine_only: bool = False, db: Session = Depends(get_db
         return {"transactions": [], "total_qu": 0}
 
     from_tick = max(0, current_tick - 500_000)
-    all_transactions = []
-    page = 1
-    while True:
-        try:
-            data = await rpc.get_transfer_transactions(DONATION_ADDRESS, from_tick, current_tick, page=page, page_size=100)
-        except Exception:
-            break
-        txs = data.get("transactions") or []
-        if not txs:
-            break
-        all_transactions.extend(txs)
-        total_pages = data.get("pagination", {}).get("totalPages", 1)
-        if page >= total_pages:
-            break
-        page += 1
+    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    transfers = _parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
     TICKS_PER_DAY = 86_400
     result = []
     total_qu = 0
 
-    for tx in all_transactions:
-        source = tx.get("sourceId") or tx.get("source") or ""
-        dest = tx.get("destId") or tx.get("destination") or ""
-        amount = int(tx.get("amount", 0))
-        tick = int(tx.get("tickNumber") or tx.get("tick") or 0)
-        if dest == DONATION_ADDRESS and amount > 0 and source:
+    for tick, source, dest, amount in transfers:
+        if dest == DONATION_ADDRESS and source:
             if user_addresses is not None and source not in user_addresses:
                 continue
             days_since = max(0, (current_tick - tick) / TICKS_PER_DAY)
