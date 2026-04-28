@@ -75,8 +75,10 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 
 ### Docker (recommended for production)
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows / Mac / Linux)
-- `docker-compose` (included with Docker Desktop)
+- [Docker](https://docs.docker.com/engine/install/) (Windows / Mac / Linux)
+- Docker Compose plugin — included with Docker Desktop and with the `docker-compose-plugin` package on Linux
+
+> **Note:** The modern command is `docker compose` (with a space). The legacy `docker-compose` (with a hyphen) is outdated and may not be available on your system.
 
 ### Local Development (VSCode)
 
@@ -109,11 +111,13 @@ QubicFlow will be available at `http://<your-umbrel-ip>:8080` after installation
 
 ```bash
 cd qubic-flow
-docker-compose up --build   # first start or after code changes
-docker-compose up           # subsequent starts (no --build needed)
-docker-compose down         # stop (data is preserved)
-docker-compose down -v      # stop + delete all data
+docker compose up --build   # first start or after code changes
+docker compose up -d        # subsequent starts, runs in background
+docker compose down         # stop (data is preserved)
+docker compose down -v      # stop + delete all data
 ```
+
+> **Note:** Use `docker compose` (with a space) — the legacy `docker-compose` (with a hyphen) is outdated.
 
 **→ Main page: http://localhost:8080**
 
@@ -128,6 +132,13 @@ docker-compose down -v      # stop + delete all data
 The backend automatically runs `alembic upgrade head` on startup — database migrations run without manual intervention.
 
 Data is stored in the Docker volume `qubicflow-data` and persists across restarts.
+
+### Linux / Raspberry Pi — Detailed Installation Guide
+
+For a full step-by-step guide including Docker installation, permission fixes (important for Raspberry Pi) and troubleshooting, see:
+
+📄 **[INSTALL_Linux.md](INSTALL_Linux.md)** (English)  
+📄 **[INSTALL_Linux.de.md](INSTALL_Linux.de.md)** (Deutsch)
 
 ---
 
