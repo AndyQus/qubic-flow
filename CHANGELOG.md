@@ -4,6 +4,15 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.11] — 2026-04-28
+
+### Changed
+- **Top 20 supporters** — addresses now show only the first 5 characters (no explorer link)
+- **Eko thank-you** — honorary note below the Top 20 list is now centered
+- **README** — updated Docker installation instructions (`docker compose` instead of `docker-compose`); added `qubicflow.webp` asset
+
+---
+
 ## [0.1.10] — 2026-04-28
 
 ### Added
