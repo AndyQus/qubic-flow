@@ -74,8 +74,10 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 
 ### Docker (empfohlen für den Produktivbetrieb)
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows / Mac / Linux)
-- `docker-compose` (bei Docker Desktop inklusive)
+- [Docker](https://docs.docker.com/engine/install/) (Windows / Mac / Linux)
+- Docker Compose Plugin — bei Docker Desktop enthalten, auf Linux als `docker-compose-plugin` Paket
+
+> **Hinweis:** Der moderne Befehl lautet `docker compose` (mit Leerzeichen). Das veraltete `docker-compose` (mit Bindestrich) ist nicht mehr aktuell und möglicherweise nicht auf deinem System verfügbar.
 
 ### Lokale Entwicklung (VSCode)
 
@@ -108,11 +110,13 @@ QubicFlow ist nach der Installation unter `http://<deine-umbrel-ip>:8080` erreic
 
 ```bash
 cd qubic-flow
-docker-compose up --build   # erster Start oder nach Code-Änderungen
-docker-compose up           # danach reicht das (ohne --build)
-docker-compose down         # stoppen (Daten bleiben erhalten)
-docker-compose down -v      # stoppen + Daten vollständig löschen
+docker compose up --build   # erster Start oder nach Code-Änderungen
+docker compose up -d        # danach reicht das, läuft im Hintergrund
+docker compose down         # stoppen (Daten bleiben erhalten)
+docker compose down -v      # stoppen + Daten vollständig löschen
 ```
+
+> **Hinweis:** Bitte `docker compose` (mit Leerzeichen) verwenden — das veraltete `docker-compose` (mit Bindestrich) ist nicht mehr aktuell.
 
 **→ Hauptseite: http://localhost:8080**
 
@@ -127,6 +131,13 @@ docker-compose down -v      # stoppen + Daten vollständig löschen
 Das Backend führt beim Start automatisch `alembic upgrade head` aus — Datenbankmigrationen laufen ohne manuellen Eingriff.
 
 Daten werden im Docker-Volume `qubicflow-data` gespeichert und bleiben beim Neustart erhalten.
+
+### Linux / Raspberry Pi — Ausführliche Installationsanleitung
+
+Eine vollständige Schritt-für-Schritt-Anleitung mit Docker-Installation, Berechtigungs-Fixes (wichtig für Raspberry Pi) und Fehlerbehebung findest du hier:
+
+📄 **[INSTALL_Linux.de.md](INSTALL_Linux.de.md)** (Deutsch)  
+📄 **[INSTALL_Linux.md](INSTALL_Linux.md)** (English)
 
 ---
 

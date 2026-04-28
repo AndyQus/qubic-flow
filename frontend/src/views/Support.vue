@@ -331,11 +331,9 @@ onMounted(async () => {
                 <tr v-for="(donor, i) in topDonors" :key="donor.address" class="text-gray-300">
                   <td class="py-1.5 text-gray-500">{{ i + 1 }}</td>
                   <td class="py-1.5">
-                    <a :href="explorerUrl(donor.address)" target="_blank" rel="noopener noreferrer"
-                       class="font-mono text-qubic-teal hover:text-white transition-colors"
-                       :title="donor.address">
-                      {{ shortAddr(donor.address) }}
-                    </a>
+                    <span class="font-mono text-gray-300" :title="donor.address">
+                      {{ donor.address.slice(0, 5) }}
+                    </span>
                   </td>
                   <td class="py-1.5 text-right font-mono text-amber-400">{{ donor.total_qu.toLocaleString() }}</td>
                   <td class="py-1.5 text-right text-gray-400">{{ donor.date }}</td>
@@ -344,7 +342,7 @@ onMounted(async () => {
             </table>
           </div>
           <!-- Honorary thank-you -->
-          <p class="text-xs text-amber-400/80 italic pt-1">{{ t('donation.honorary_eko') }}</p>
+          <p class="text-xs text-amber-400/80 italic pt-1 text-center">{{ t('donation.honorary_eko') }}</p>
         </div>
 
         <!-- Donation History (only shown when payment detected) -->

@@ -3,7 +3,7 @@ import { useTranslation } from 'i18next-vue'
 import logoMark from '../assets/logo-mark.svg'
 
 const { t } = useTranslation()
-const APP_VERSION = 'v0.1.10 (BETA)'
+const APP_VERSION = 'v0.1.11 (BETA)'
 const year = new Date().getFullYear()
 </script>
 
