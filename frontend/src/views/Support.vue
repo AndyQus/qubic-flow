@@ -313,6 +313,22 @@ onMounted(async () => {
             <h2 class="font-semibold text-white text-base">{{ t('donation.supporters_title') }}</h2>
           </div>
           <p class="text-xs text-gray-400">{{ t('donation.supporters_text') }}</p>
+
+          <!-- Honorary supporters (past donations, not on current address) -->
+          <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3 space-y-1">
+            <div class="flex items-center gap-1.5 mb-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+              </svg>
+              <span class="text-xs font-semibold text-amber-400 uppercase tracking-wide">{{ t('donation.honorary_title') }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-semibold text-amber-300">Eko</span>
+              <span class="text-xs text-amber-400/70 italic">{{ t('donation.honorary_note') }}</span>
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">{{ t('donation.honorary_eko') }}</p>
+          </div>
+
           <div v-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
