@@ -8,7 +8,7 @@ import logoLight from '../assets/logo-full-light.svg'
 
 const store = useAppStore()
 const { t } = useTranslation()
-const { isSuppressed, suppressedUntil } = useDonationState()
+const { isSuppressed, suppressedUntil, donorRank } = useDonationState()
 
 const logoUrl = computed(() => store.theme === 'light' ? logoLight : logoDark)
 const isLight = computed(() => store.theme === 'light')
@@ -59,7 +59,13 @@ const isLight = computed(() => store.theme === 'light')
             <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
           </svg>
           <span>
-            {{ suppressedUntil === '2099-12-31' ? t('donation.banner_suppressed_forever') : (t('donation.banner_suppressed') + ' ' + suppressedUntil) }}
+            {{ donorRank
+              ? (suppressedUntil === '2099-12-31'
+                  ? t('donation.banner_suppressed_rank_forever', { rank: donorRank.name })
+                  : t('donation.banner_suppressed_rank', { rank: donorRank.name, date: suppressedUntil }))
+              : (suppressedUntil === '2099-12-31'
+                  ? t('donation.banner_suppressed_forever')
+                  : t('donation.banner_suppressed') + ' ' + suppressedUntil) }}
           </span>
         </router-link>
 

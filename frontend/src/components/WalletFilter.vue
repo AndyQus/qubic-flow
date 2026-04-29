@@ -51,11 +51,14 @@ const uniqueOwners = computed(() =>
   [...new Set(allWallets.value.map(w => w.owner).filter(Boolean))].sort()
 )
 
-const visibleWallets = computed(() =>
-  selectedOwners.value.length
+const visibleWallets = computed(() => {
+  const base = selectedOwners.value.length
     ? allWallets.value.filter(w => selectedOwners.value.includes(w.owner))
     : allWallets.value
-)
+  return [...base].sort((a, b) =>
+    (a.label || a.id || '').toLowerCase().localeCompare((b.label || b.id || '').toLowerCase())
+  )
+})
 
 function toggle(id) {
   const next = props.modelValue.includes(id)

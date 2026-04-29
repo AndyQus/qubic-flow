@@ -149,8 +149,12 @@ onMounted(reload)
       </div>
       <div v-if="n.last_error" class="text-xs text-red-400/70 break-all">{{ n.last_error }}</div>
       <div class="flex gap-2 pt-1">
-        <button @click="startEdit(n)" class="btn-action text-xs">{{ t('wallet.edit') }}</button>
-        <button @click="remove(n.id)" class="btn-delete text-xs">{{ t('wallet.delete') }}</button>
+        <button @click="startEdit(n)" class="btn-action" :title="t('wallet.edit')">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+        <button @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -205,8 +209,12 @@ onMounted(reload)
               </button>
             </td>
             <td class="td text-right flex justify-end gap-3">
-              <button @click="startEdit(n)" class="btn-action">{{ t('wallet.edit') }}</button>
-              <button @click="remove(n.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
+              <button @click="startEdit(n)" class="btn-action" :title="t('wallet.edit')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
             </td>
           </tr>
         </tbody>

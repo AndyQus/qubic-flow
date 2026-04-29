@@ -280,7 +280,7 @@ async def donation_top():
         result.append({"address": address, "total_qu": d["total_qu"], "date": date})
 
     result.sort(key=lambda x: x["total_qu"], reverse=True)
-    return {"donors": result[:20]}
+    return {"donors": result[:50]}
 
 
 @router.get("/events/donation-history")

@@ -315,7 +315,10 @@ const currentEpochRows = computed(() => {
     .filter(r => r.wallet && r.wallet.deleted_at == null && (r.in_qubic > 0 || r.out_qubic > 0))
     .filter(r => !picked.length || picked.includes(r.wallet_id))
     .filter(r => !selectedFunction.value || r.wallet?.function === selectedFunction.value)
-    .sort((a, b) => b.in_qubic - a.in_qubic)
+    .sort((a, b) =>
+      (a.wallet?.label || a.wallet?.id || '').toLowerCase()
+        .localeCompare((b.wallet?.label || b.wallet?.id || '').toLowerCase())
+    )
 })
 
 // Totals derived from the visible rows so header reflects wallet-filter selection
@@ -510,9 +513,9 @@ const currentEpochFilteredTotals = computed(() => {
                   {{ maskLabel(r.wallet.label, r.wallet.id) }}
                 </span>
               </div>
-              <div class="flex items-center gap-1 text-xs text-gray-400 shrink-0 min-w-0">
-                <OwnerIcon :type="r.wallet.wallet_type" size="w-3 h-3" />
-                <span class="truncate">{{ store.hideAddresses ? '••••••' : (r.wallet.owner || '—') }}</span>
+              <div class="flex items-center gap-1 text-xs text-gray-400 min-w-0 max-w-[45%]">
+                <OwnerIcon :type="r.wallet.wallet_type" size="w-3 h-3 shrink-0" />
+                <span class="truncate" :title="store.hideAddresses ? '' : (r.wallet.owner || '')">{{ store.hideAddresses ? '••••••' : (r.wallet.owner || '—') }}</span>
               </div>
             </div>
 

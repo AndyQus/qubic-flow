@@ -3,9 +3,11 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import QRCode from 'qrcode'
 import { api } from '../api'
-import { setDebugSuppression } from '../composables/useDonationState'
+import { useAppStore } from '../stores/app'
+import { setDebugSuppression, setDebugTotalQu, DONATION_RANKS, getDonorRank } from '../composables/useDonationState'
 
 const { t } = useTranslation()
+const store = useAppStore()
 
 const DONATION_ADDRESS = 'CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI'
 
@@ -18,11 +20,11 @@ const donationTotalQu = ref(0)
 
 const isDebug = import.meta.env.DEV
 const debugSimulate = ref(false)
-const debugScenario = ref('single')
+const debugScenario = ref('spark')
 
 const DEBUG_SCENARIOS = {
-  single: {
-    label: '1 Zahlung · 1 Monat',
+  spark: {
+    label: '⚡ Quantum Spark · 1 Mio',
     status: { total_qu: 1_000_000, months_earned: 1, suppressed_until: '2026-05-26', forever: false,
               last_payment_amount: 1_000_000, last_payment_date: '2026-04-26' },
     history: [
@@ -30,29 +32,35 @@ const DEBUG_SCENARIOS = {
     ],
     totalQu: 1_000_000,
   },
-  multi: {
-    label: '3 Zahlungen · 2 abgelaufen · aktiv bis Jun 10',
-    status: { total_qu: 4_000_000, months_earned: 4, suppressed_until: '2026-06-10', forever: false,
-              last_payment_amount: 2_000_000, last_payment_date: '2026-04-10' },
+  knight: {
+    label: '🗡️ Qubic Knight · 10 Mio',
+    status: { total_qu: 10_000_000, months_earned: 10, suppressed_until: '2027-02-26', forever: false,
+              last_payment_amount: 10_000_000, last_payment_date: '2026-04-26' },
     history: [
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 2_000_000, tick: 17480000, date: '2026-04-10' },
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17000000, date: '2026-03-01' },
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 16500000, date: '2026-01-15' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 10_000_000, tick: 17500000, date: '2026-04-26' },
     ],
-    totalQu: 4_000_000,
+    totalQu: 10_000_000,
   },
-  gap: {
-    label: 'Lücke zwischen Zahlungen',
-    status: { total_qu: 2_000_000, months_earned: 2, suppressed_until: '2026-04-14', forever: false,
-              last_payment_amount: 1_000_000, last_payment_date: '2026-03-15' },
+  avenger: {
+    label: '⚔️ Crypto Avenger · 25 Mio',
+    status: { total_qu: 25_000_000, months_earned: 25, suppressed_until: '2028-05-26', forever: false,
+              last_payment_amount: 25_000_000, last_payment_date: '2026-04-26' },
     history: [
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17100000, date: '2026-03-15' },
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 15000000, date: '2026-01-10' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 25_000_000, tick: 17500000, date: '2026-04-26' },
     ],
-    totalQu: 2_000_000,
+    totalQu: 25_000_000,
   },
-  forever: {
-    label: '≥ 100 Mio QU · Forever',
+  guardian: {
+    label: '🛡️ Block Guardian · 50 Mio',
+    status: { total_qu: 50_000_000, months_earned: 50, suppressed_until: '2030-06-26', forever: false,
+              last_payment_amount: 50_000_000, last_payment_date: '2026-04-26' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 17500000, date: '2026-04-26' },
+    ],
+    totalQu: 50_000_000,
+  },
+  legend: {
+    label: '👑 Chain Legend · Forever',
     status: { total_qu: 150_000_000, months_earned: 150, suppressed_until: '2099-12-31', forever: true,
               last_payment_amount: 50_000_000, last_payment_date: '2026-04-01' },
     history: [
@@ -62,6 +70,17 @@ const DEBUG_SCENARIOS = {
     ],
     totalQu: 150_000_000,
   },
+  multi: {
+    label: '3 Zahlungen · 4 Mio · aktiv bis Jun 10',
+    status: { total_qu: 4_000_000, months_earned: 4, suppressed_until: '2026-06-10', forever: false,
+              last_payment_amount: 2_000_000, last_payment_date: '2026-04-10' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 2_000_000, tick: 17480000, date: '2026-04-10' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 17000000, date: '2026-03-01' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 1_000_000, tick: 16500000, date: '2026-01-15' },
+    ],
+    totalQu: 4_000_000,
+  },
 }
 
 const effectiveDonationStatus = computed(() =>
@@ -70,9 +89,14 @@ const effectiveDonationStatus = computed(() =>
 
 if (isDebug) {
   watch([debugSimulate, debugScenario], () => {
-    setDebugSuppression(debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].status.suppressed_until : null)
+    const s = debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value] : null
+    setDebugSuppression(s?.status.suppressed_until ?? null)
+    setDebugTotalQu(s?.totalQu ?? null)
   })
-  onUnmounted(() => setDebugSuppression(null))
+  onUnmounted(() => {
+    setDebugSuppression(null)
+    setDebugTotalQu(null)
+  })
 }
 const effectiveDonationHistory = computed(() =>
   isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].history : donationHistory.value
@@ -81,11 +105,8 @@ const effectiveDonationTotalQu = computed(() =>
   isDebug && debugSimulate.value ? DEBUG_SCENARIOS[debugScenario.value].totalQu : donationTotalQu.value
 )
 
-const tiers = [
-  { amount: '1.000.000 QU',     label: 'tier_1m' },
-  { amount: '12.000.000 QU',    label: 'tier_12m' },
-  { amount: '> 100.000.000 QU', label: 'tier_forever' },
-]
+const rankDesc = (rank) => store.lang === 'de' ? rank.descDe : rank.descEn
+const currentDonorRank = computed(() => getDonorRank(effectiveDonationTotalQu.value))
 
 const otherApps = [
   { name: 'MyLedger',  url: 'https://myledger.qubic.tools',    desc: 'Qubic Ledger Tool' },
@@ -241,7 +262,9 @@ onMounted(async () => {
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
             </svg>
-            <h2 class="font-semibold text-emerald-400 text-base">{{ t('donation.check_title') }}</h2>
+            <h2 class="font-semibold text-emerald-400 text-base">
+              {{ currentDonorRank ? t('donation.check_title_rank', { rank: currentDonorRank.name }) : t('donation.check_title') }}
+            </h2>
           </div>
           <div class="space-y-2">
             <div class="flex justify-between text-sm">
@@ -290,24 +313,23 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Tiers -->
+        <!-- Supporter Ranks -->
         <div class="card !p-6 space-y-3">
           <h2 class="font-semibold text-white text-base">{{ t('donation.tiers_title') }}</h2>
           <p class="text-sm text-gray-300 leading-relaxed">{{ t('donation.tiers_note') }}</p>
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="text-gray-400 text-xs border-b border-qubic-border">
-                <th class="text-left pb-2 font-medium">Betrag / Amount</th>
-                <th class="text-left pb-2 font-medium">Dauer / Duration</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-qubic-border/40">
-              <tr v-for="tier in tiers" :key="tier.label" class="text-gray-300">
-                <td class="py-1.5 font-mono text-qubic-teal">{{ tier.amount }}</td>
-                <td class="py-1.5">{{ t(`donation.${tier.label}`) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="divide-y divide-qubic-border/30">
+            <div v-for="rank in DONATION_RANKS" :key="rank.name"
+                 class="flex items-center gap-3 py-2.5">
+              <span class="text-2xl flex-shrink-0">{{ rank.icon }}</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-sm" :style="{ color: rank.color }">{{ rank.name }}</div>
+                <div class="text-xs text-gray-500">{{ rankDesc(rank) }}</div>
+              </div>
+              <div class="font-mono text-xs text-right flex-shrink-0" :style="{ color: rank.color }">
+                ≥ {{ rank.minQu.toLocaleString() }} QU
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -328,11 +350,12 @@ onMounted(async () => {
           <div v-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
-          <div v-else class="overflow-x-auto max-h-[340px] overflow-y-auto">
+          <div v-else class="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table class="w-full text-xs">
               <thead class="sticky top-0 bg-qubic-card">
                 <tr class="text-gray-400 border-b border-qubic-border">
                   <th class="text-left pb-2 font-medium">#</th>
+                  <th class="text-left pb-2 font-medium">Rang</th>
                   <th class="text-left pb-2 font-medium">{{ t('donation.history_sender') }}</th>
                   <th class="text-right pb-2 font-medium">{{ t('donation.supporters_amount') }}</th>
                   <th class="text-right pb-2 font-medium">{{ t('donation.supporters_date') }}</th>
@@ -341,6 +364,15 @@ onMounted(async () => {
               <tbody class="divide-y divide-qubic-border/40">
                 <tr v-for="(donor, i) in topDonors" :key="donor.address" class="text-gray-300">
                   <td class="py-1.5 text-gray-500">{{ i + 1 }}</td>
+                  <td class="py-1.5 whitespace-nowrap">
+                    <template v-if="getDonorRank(donor.total_qu)">
+                      <span class="mr-1">{{ getDonorRank(donor.total_qu).icon }}</span>
+                      <span class="font-semibold text-xs" :style="{ color: getDonorRank(donor.total_qu).color }">
+                        {{ getDonorRank(donor.total_qu).name }}
+                      </span>
+                    </template>
+                    <span v-else class="text-gray-600">—</span>
+                  </td>
                   <td class="py-1.5">
                     <span class="font-mono text-gray-300" :title="donor.address">
                       {{ donor.address.slice(0, 5) }}
