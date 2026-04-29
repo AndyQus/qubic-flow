@@ -25,14 +25,25 @@ const router = useRouter()
 const route = useRoute()
 
 function goToWallet(id) { router.push(`/wallets/${id}`) }
-const showForm      = ref(false)
-const loading       = ref(true)
-const editingId     = ref(null)
-const error         = ref('')
-const editError     = ref('')
-const selectedOwner = ref(null)
-const form          = ref({ id: '', label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
-const editForm      = ref({ label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
+const showForm        = ref(false)
+const loading         = ref(true)
+const editingId       = ref(null)
+const error           = ref('')
+const editError       = ref('')
+const selectedOwner   = ref(null)
+const configSortKey   = ref('label')
+const configSortDir   = ref('asc')
+const form            = ref({ id: '', label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
+const editForm        = ref({ label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
+
+function toggleConfigSort(key) {
+  if (configSortKey.value === key) {
+    configSortDir.value = configSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    configSortKey.value = key
+    configSortDir.value = 'asc'
+  }
+}
 
 const uniqueOwners = computed(() =>
   [...new Set(store.wallets.map(w => w.owner).filter(Boolean))].sort()
@@ -44,8 +55,24 @@ const uniqueFunctions = computed(() =>
 
 const displayedWallets = computed(() => {
   const base = Array.isArray(store.filteredWallets) ? store.filteredWallets : []
-  if (!selectedOwner.value) return base
-  return base.filter(w => w && w.owner === selectedOwner.value)
+  const filtered = !selectedOwner.value ? base : base.filter(w => w && w.owner === selectedOwner.value)
+  return [...filtered].sort((a, b) => {
+    let av, bv
+    switch (configSortKey.value) {
+      case 'label':    av = (a.label || a.id || '').toLowerCase();   bv = (b.label || b.id || '').toLowerCase();   break
+      case 'owner':    av = (a.owner || '').toLowerCase();            bv = (b.owner || '').toLowerCase();            break
+      case 'address':  av = (a.id || '').toLowerCase();               bv = (b.id || '').toLowerCase();               break
+      case 'type':     av = (a.wallet_type || '').toLowerCase();      bv = (b.wallet_type || '').toLowerCase();      break
+      case 'function': av = (a.function || '').toLowerCase();         bv = (b.function || '').toLowerCase();         break
+      case 'note':     av = (a.note || '').toLowerCase();             bv = (b.note || '').toLowerCase();             break
+      case 'balance':  av = a.balance ?? -Infinity;                   bv = b.balance ?? -Infinity;                   break
+      case 'entries':  av = a.total_events ?? -1;                     bv = b.total_events ?? -1;                     break
+      default:         av = ''; bv = ''
+    }
+    if (av < bv) return configSortDir.value === 'asc' ? -1 : 1
+    if (av > bv) return configSortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
 })
 
 async function reload() {
@@ -194,11 +221,22 @@ function walletPnlPct(w) {
 }
 
 const fiatSymbol = computed(() => store.currency === 'USD' ? '$' : '€')
+const altFiatSymbol = computed(() => store.currency === 'USD' ? '€' : '$')
+const unitPriceAlt = computed(() => {
+  if (!currentPrice.value) return null
+  return store.currency === 'USD' ? currentPrice.value.eur : currentPrice.value.usd
+})
 
 function fmtFiat(n) {
   if (n == null) return '—'
   if (store.hideAddresses) return '••••••'
-  return `${fiatSymbol.value}${n.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${n.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${fiatSymbol.value}`
+}
+
+function fmtFiatAlt(n) {
+  if (n == null || unitPrice.value == null || !unitPriceAlt.value || store.hideAddresses) return undefined
+  const alt = n * (unitPriceAlt.value / unitPrice.value)
+  return `${alt.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${altFiatSymbol.value}`
 }
 
 function fmtPct(n) {
@@ -230,10 +268,18 @@ const ownerGroups = computed(() => {
     const cb = cbMap.get(w.id)
     if (cb != null && cb > 0) { g.totalCost += cb; g.hasCost = true }
   }
-  return [...map.values()].sort((a, b) => {
+  const groups = [...map.values()]
+  for (const g of groups) {
+    g.wallets.sort((a, b) =>
+      (a.label || a.id || '').toLowerCase().localeCompare((b.label || b.id || '').toLowerCase())
+    )
+  }
+  return groups.sort((a, b) => {
     if (a.owner === '—') return 1
     if (b.owner === '—') return -1
-    return a.owner.localeCompare(b.owner)
+    const aKey = (a.wallets[0]?.label || a.wallets[0]?.id || a.owner || '').toLowerCase()
+    const bKey = (b.wallets[0]?.label || b.wallets[0]?.id || b.owner || '').toLowerCase()
+    return aKey.localeCompare(bKey)
   })
 })
 
@@ -353,7 +399,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('wallet.value') }}</span>
             </div>
-            <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap">{{ fmtFiat(grandTotal.value) }}</div>
+            <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap" :title="fmtFiatAlt(grandTotal.value)">{{ fmtFiat(grandTotal.value) }}</div>
           </div>
 
           <!-- Unrealized P&L -->
@@ -369,7 +415,7 @@ onMounted(async () => {
                 {{ t('wallet.pnl_unrealized') }}
               </span>
             </div>
-            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
+            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(grandTotal.value - grandTotal.cost)">
               {{ (grandTotal.value - grandTotal.cost) >= 0 ? '+' : '' }}{{ fmtFiat(grandTotal.value - grandTotal.cost) }}
               <span class="text-xs font-normal"
                     :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
@@ -386,7 +432,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-sky-400">{{ t('wallet.current_price') }}</span>
             </div>
-            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
+            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap" :title="unitPriceAlt != null ? unitPriceAlt.toFixed(10).replace(/\.?0+$/, '') + altFiatSymbol : undefined">{{ unitPrice.toFixed(10).replace(/\.?0+$/, '') }}{{ fiatSymbol }}</div>
           </div>
         </div>
       </div>
@@ -417,7 +463,7 @@ onMounted(async () => {
           </div>
 
           <!-- Fiat value -->
-          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5 whitespace-nowrap">
+          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtFiatAlt(group.totalValue)">
             {{ fmtFiat(group.totalValue) }}
           </div>
 
@@ -429,7 +475,8 @@ onMounted(async () => {
               {{ fmtPct((group.totalValue - group.totalCost) / group.totalCost * 100) }}
             </span>
             <span class="font-mono text-xs whitespace-nowrap"
-                  :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
+                  :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'"
+                  :title="fmtFiatAlt(group.totalValue - group.totalCost)">
               {{ (group.totalValue - group.totalCost) >= 0 ? '+' : '' }}{{ fmtFiat(group.totalValue - group.totalCost) }}
             </span>
           </div>
@@ -469,11 +516,11 @@ onMounted(async () => {
             </div>
             <div v-if="selectedGroup.hasValue" class="text-right">
               <div class="text-xs text-gray-500">{{ t('wallet.value') }}</div>
-              <div class="font-mono text-sm">{{ fmtFiat(selectedGroup.totalValue) }}</div>
+              <div class="font-mono text-sm" :title="fmtFiatAlt(selectedGroup.totalValue)">{{ fmtFiat(selectedGroup.totalValue) }}</div>
             </div>
             <div v-if="selectedGroup.hasCost" class="text-right">
               <div class="text-xs text-gray-500">{{ t('wallet.pnl') }}</div>
-              <div class="font-mono text-sm" :class="(selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'">
+              <div class="font-mono text-sm" :class="(selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(selectedGroup.totalValue - selectedGroup.totalCost)">
                 {{ (selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? '+' : '' }}{{ fmtFiat(selectedGroup.totalValue - selectedGroup.totalCost) }}
                 <span class="text-xs">{{ fmtPct((selectedGroup.totalValue - selectedGroup.totalCost) / selectedGroup.totalCost * 100) }}</span>
               </div>
@@ -494,10 +541,11 @@ onMounted(async () => {
                 </div>
                 <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}<span class="ml-0.5 text-gray-500">QUBIC</span></span>
-                  <span v-if="walletValue(w) != null" class="text-xs font-mono text-gray-400">· {{ fmtFiat(walletValue(w)) }}</span>
+                  <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}<span class="ml-0.5 text-gray-500">QUBIC</span></span><span v-if="w.balance != null" :class="['text-xs ml-0.5', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
+                  <span v-if="walletValue(w) != null" class="text-xs font-mono text-gray-400" :title="fmtFiatAlt(walletValue(w))">· {{ fmtFiat(walletValue(w)) }}</span>
                   <span v-if="walletPnl(w) != null" class="text-xs font-mono"
-                        :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'">
+                        :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'"
+                        :title="fmtFiatAlt(walletPnl(w))">
                     {{ walletPnl(w) >= 0 ? '+' : '' }}{{ fmtFiat(walletPnl(w)) }} ({{ fmtPct(walletPnlPct(w)) }})
                   </span>
                   <span v-if="w.function" class="text-xs text-gray-500">· {{ w.function }}</span>
@@ -520,7 +568,7 @@ onMounted(async () => {
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.value') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.pnl') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.entries') }}</th>
-                <th class="th-right"></th>
+                <th class="th-right" :title="t('walletDetail.entries')"></th>
               </tr>
             </thead>
             <tbody>
@@ -556,12 +604,12 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
-                  <span v-if="walletValue(w) != null" class="text-gray-300">{{ fmtFiat(walletValue(w)) }}</span>
+                  <span v-if="walletValue(w) != null" class="text-gray-300" :title="fmtFiatAlt(walletValue(w))">{{ fmtFiat(walletValue(w)) }}</span>
                   <span v-else class="text-gray-600">—</span>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
                   <template v-if="walletPnl(w) != null">
-                    <div :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'">
+                    <div :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(walletPnl(w))">
                       {{ walletPnl(w) >= 0 ? '+' : '' }}{{ fmtFiat(walletPnl(w)) }}
                     </div>
                     <div class="text-xs" :class="walletPnl(w) >= 0 ? 'text-green-400/70' : 'text-red-400/70'">
@@ -574,7 +622,11 @@ onMounted(async () => {
                   {{ w.total_events != null ? w.total_events.toLocaleString(store.locale) : '—' }}
                 </td>
                 <td class="td text-right">
-                  <router-link :to="`/wallets/${w.id}`" class="btn-action text-xs" @click.stop>{{ t('walletDetail.entries') }}</router-link>
+                  <router-link :to="`/wallets/${w.id}`" class="icon-btn" :title="t('walletDetail.entries')" @click.stop>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/>
+                    </svg>
+                  </router-link>
                 </td>
               </tr>
             </tbody>
@@ -692,8 +744,12 @@ onMounted(async () => {
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
           </a>
-          <button @click="startEdit(w)" class="btn-action text-xs">{{ t('wallet.edit') }}</button>
-          <button @click="remove(w.id)" class="btn-delete text-xs">{{ t('wallet.delete') }}</button>
+          <button @click="startEdit(w)" class="btn-action" :title="t('wallet.edit')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button @click="remove(w.id)" class="btn-delete" :title="t('wallet.delete')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -704,14 +760,30 @@ onMounted(async () => {
     <table class="table-std">
       <thead class="thead-std">
         <tr>
-          <th class="th">{{ t('wallet.label') }}</th>
-          <th class="th hidden md:table-cell">{{ t('wallet.owner') }}</th>
-          <th class="th">{{ t('wallet.address') }}</th>
-          <th class="th">{{ t('wallet.type') }}</th>
-          <th class="th hidden md:table-cell">{{ t('wallet.function') }}</th>
-          <th class="th hidden md:table-cell">{{ t('wallet.note') }}</th>
-          <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.balance') }} QUBIC</th>
-          <th class="th-right hidden lg:table-cell whitespace-nowrap">{{ t('wallet.entries') }}</th>
+          <th class="th cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('label')">
+            <span class="flex items-center gap-1">{{ t('wallet.label') }}<span class="opacity-50">{{ configSortKey === 'label' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th hidden md:table-cell cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('owner')">
+            <span class="flex items-center gap-1">{{ t('wallet.owner') }}<span class="opacity-50">{{ configSortKey === 'owner' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('address')">
+            <span class="flex items-center gap-1">{{ t('wallet.address') }}<span class="opacity-50">{{ configSortKey === 'address' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('type')">
+            <span class="flex items-center gap-1">{{ t('wallet.type') }}<span class="opacity-50">{{ configSortKey === 'type' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th hidden md:table-cell cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('function')">
+            <span class="flex items-center gap-1">{{ t('wallet.function') }}<span class="opacity-50">{{ configSortKey === 'function' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th hidden md:table-cell cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('note')">
+            <span class="flex items-center gap-1">{{ t('wallet.note') }}<span class="opacity-50">{{ configSortKey === 'note' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span></span>
+          </th>
+          <th class="th-right hidden lg:table-cell whitespace-nowrap cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('balance')">
+            <span class="flex items-center justify-end gap-1"><span class="opacity-50">{{ configSortKey === 'balance' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>{{ t('wallet.balance') }} QUBIC</span>
+          </th>
+          <th class="th-right hidden lg:table-cell whitespace-nowrap cursor-pointer select-none hover:text-qubic-teal transition-colors" @click="toggleConfigSort('entries')">
+            <span class="flex items-center justify-end gap-1"><span class="opacity-50">{{ configSortKey === 'entries' ? (configSortDir === 'asc' ? '↑' : '↓') : '↕' }}</span>{{ t('wallet.entries') }}</span>
+          </th>
           <th class="th-right">{{ t('wallet.actions') }}</th>
         </tr>
       </thead>
@@ -821,8 +893,12 @@ onMounted(async () => {
             </td>
             <td class="td text-right">
               <div class="flex justify-end gap-3">
-                <button @click.stop="startEdit(w)" class="btn-action">{{ t('wallet.edit') }}</button>
-                <button @click.stop="remove(w.id)" class="btn-delete">{{ t('wallet.delete') }}</button>
+                <button @click.stop="startEdit(w)" class="btn-action" :title="t('wallet.edit')">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button @click.stop="remove(w.id)" class="btn-delete" :title="t('wallet.delete')">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
               </div>
             </td>
           </tr>

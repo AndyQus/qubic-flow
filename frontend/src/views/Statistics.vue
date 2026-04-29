@@ -40,10 +40,14 @@ const periodColors = {
   year:  'text-rose-400',
 }
 
-const currencySymbol = computed(() => store.currency === 'USD' ? '$' : '€')
-const volumeKey      = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
-const inFiatKey      = computed(() => store.currency === 'USD' ? 'in_usd' : 'in_eur')
-const outFiatKey     = computed(() => store.currency === 'USD' ? 'out_usd' : 'out_eur')
+const currencySymbol    = computed(() => store.currency === 'USD' ? '$' : '€')
+const altCurrencySymbol = computed(() => store.currency === 'USD' ? '€' : '$')
+const volumeKey         = computed(() => store.currency === 'USD' ? 'volume_usd' : 'volume_eur')
+const altVolumeKey      = computed(() => store.currency === 'USD' ? 'volume_eur' : 'volume_usd')
+const inFiatKey         = computed(() => store.currency === 'USD' ? 'in_usd' : 'in_eur')
+const altInFiatKey      = computed(() => store.currency === 'USD' ? 'in_eur' : 'in_usd')
+const outFiatKey        = computed(() => store.currency === 'USD' ? 'out_usd' : 'out_eur')
+const altOutFiatKey     = computed(() => store.currency === 'USD' ? 'out_eur' : 'out_usd')
 const stats          = ref(null)
 const snaps          = ref([])
 const history        = ref([])
@@ -129,7 +133,12 @@ onMounted(loadStats)
 function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString(store.locale) }
 function fmtCurrency(n) {
   if (n == null) return '—'
-  return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currencySymbol.value
+  return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + currencySymbol.value
+}
+
+function fmtCurrencyAlt(n) {
+  if (n == null) return undefined
+  return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + altCurrencySymbol.value
 }
 
 // ── Trend-Pfeil ─────────────────────────────────────────────────
@@ -306,7 +315,10 @@ const currentEpochRows = computed(() => {
     .filter(r => r.wallet && r.wallet.deleted_at == null && (r.in_qubic > 0 || r.out_qubic > 0))
     .filter(r => !picked.length || picked.includes(r.wallet_id))
     .filter(r => !selectedFunction.value || r.wallet?.function === selectedFunction.value)
-    .sort((a, b) => b.in_qubic - a.in_qubic)
+    .sort((a, b) =>
+      (a.wallet?.label || a.wallet?.id || '').toLowerCase()
+        .localeCompare((b.wallet?.label || b.wallet?.id || '').toLowerCase())
+    )
 })
 
 // Totals derived from the visible rows so header reflects wallet-filter selection
@@ -483,7 +495,7 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('stats.incoming') }} {{ store.currency }}</span>
               </div>
-              <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
+              <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap" :title="fmtCurrencyAlt(currentEpochFilteredTotals[altInFiatKey])">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
             </div>
           </div>
         </div>
@@ -501,9 +513,9 @@ const currentEpochFilteredTotals = computed(() => {
                   {{ maskLabel(r.wallet.label, r.wallet.id) }}
                 </span>
               </div>
-              <div class="flex items-center gap-1 text-xs text-gray-400 shrink-0 min-w-0">
-                <OwnerIcon :type="r.wallet.wallet_type" size="w-3 h-3" />
-                <span class="truncate">{{ store.hideAddresses ? '••••••' : (r.wallet.owner || '—') }}</span>
+              <div class="flex items-center gap-1 text-xs text-gray-400 min-w-0 max-w-[45%]">
+                <OwnerIcon :type="r.wallet.wallet_type" size="w-3 h-3 shrink-0" />
+                <span class="truncate" :title="store.hideAddresses ? '' : (r.wallet.owner || '')">{{ store.hideAddresses ? '••••••' : (r.wallet.owner || '—') }}</span>
               </div>
             </div>
 
@@ -533,7 +545,8 @@ const currentEpochFilteredTotals = computed(() => {
                 <template v-if="extended || r.in_qubic > 0">
                   <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')" />
                   <div class="font-mono text-xs whitespace-nowrap"
-                       :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
+                       :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'"
+                       :title="r.in_qubic > 0 ? fmtCurrencyAlt(r[altInFiatKey]) : undefined">
                     <template v-if="r.in_qubic > 0">{{ fmtCurrency(r[inFiatKey]) }}</template>
                     <template v-else>—</template>
                   </div>
@@ -577,7 +590,8 @@ const currentEpochFilteredTotals = computed(() => {
                   <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')"
                              :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
                   <div class="font-mono text-xs whitespace-nowrap"
-                       :class="r.out_qubic > 0 ? 'text-gray-400' : 'text-gray-600'">
+                       :class="r.out_qubic > 0 ? 'text-gray-400' : 'text-gray-600'"
+                       :title="r.out_qubic > 0 ? fmtCurrencyAlt(r[altOutFiatKey]) : undefined">
                     <template v-if="r.out_qubic > 0">{{ fmtCurrency(r[outFiatKey]) }}</template>
                     <template v-else>—</template>
                   </div>
@@ -697,14 +711,14 @@ const currentEpochFilteredTotals = computed(() => {
           </span>
         </div>
         <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(p.cur.volume_qubic) }}</div>
-        <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtCurrencyAlt(p.cur[altVolumeKey])">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-violet-400">{{ fmt(p.cur.event_count) }} Events</span>
           <span class="text-xs font-semibold text-amber-400">{{ fmt(p.cur.tx_count) }} TX</span>
         </div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
           <div class="text-sm font-semibold text-gray-400 whitespace-nowrap">{{ fmt(p.prev.volume_qubic) }}</div>
-          <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtCurrencyAlt(p.prev[altVolumeKey])">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-violet-400/70">{{ fmt(p.prev.event_count) }} Events</span>
             <span class="text-xs text-amber-400/70">{{ fmt(p.prev.tx_count) }} TX</span>

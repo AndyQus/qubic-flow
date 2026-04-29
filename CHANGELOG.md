@@ -4,6 +4,25 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.12] — 2026-04-29
+
+### Added
+- **Donor rank system** — 5 tiers based on total QU donated: ⚡ Quantum Spark (1M), 🗡️ Qubic Knight (10M), ⚔️ Crypto Avenger (25M), 🛡️ Block Guardian (50M), 👑 Chain Legend (100M+)
+- **Rank-aware thank-you banners** — desktop header and mobile banner now show rank name (e.g. "Danke für deine Unterstützung lieber Block Guardian!")
+- **Support page rank list** — donation tiers displayed with icon, colored name, description, and threshold; rank column added to Top 50 supporters table
+- **"Zahlung erkannt für \<Rang\>"** — payment detection title on Support page dynamically shows the donor's rank
+- **Top 50 supporters** — increased from Top 20; backend endpoint updated accordingly
+- **Sortable config table** — Wallets config tab columns are now clickable with ascending/descending sort indicators (↑↓↕); default sort by label
+- **Icon buttons** — Edit/Delete text buttons replaced with SVG pencil/trash icons in Wallets and Nodes views
+- **DEV simulation** — all 5 rank scenarios available in debug panel; rank propagates globally to all banners
+
+### Changed
+- **Wallet & filter sorting** — wallet filter buttons, owner group pills, and portfolio groups now sorted alphabetically by label
+- **Statistics** — wallet panels sorted by name; long owner names truncated with full-name tooltip on hover
+- **i18n** — added `banner_suppressed_rank`, `banner_suppressed_rank_forever`, `check_title_rank` keys in DE and EN
+
+---
+
 ## [0.1.11] — 2026-04-28
 
 ### Changed

@@ -42,6 +42,6 @@ onUnmounted(() => clearInterval(intervalId))
     <PageHeader :title="t('nav.dashboard')" :hint="t('page_hint.dashboard')" />
     <WalletFilter v-model="selectedWallets" />
     <StatsPanel :stats="stats" :loading="loadingStats" />
-    <EventsTable :events="store.events" :loading="loadingEvents" :title="t('event.last10')" />
+    <EventsTable :events="store.events" :loading="loadingEvents" :title="t('event.last10')" :readonly="true" />
   </div>
 </template>
