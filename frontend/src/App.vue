@@ -10,6 +10,7 @@ import AppNav from './components/AppNav.vue'
 import MoneyAnimation from './components/MoneyAnimation.vue'
 import DonationBanner from './components/DonationBanner.vue'
 import AppFooter from './components/AppFooter.vue'
+import { copyToast } from './composables/useQubicUtils'
 
 const store = useAppStore()
 const { isSuppressed, suppressedUntil } = useDonationState()
@@ -31,7 +32,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col">
+  <div class="min-h-screen flex flex-col overflow-x-hidden">
     <AppHeader />
 
     <!-- Dankeschön-Leiste Mobile (nur < sm) -->
@@ -50,10 +51,28 @@ onMounted(async () => {
 
     <AppNav />
     <DonationBanner />
-    <main class="flex-1 w-full px-4 sm:px-6 lg:px-8 py-6">
+    <main class="flex-1 w-full min-w-0 px-4 sm:px-6 lg:px-8 py-6">
       <router-view />
     </main>
     <MoneyAnimation />
     <AppFooter />
+
+    <!-- Copy-Toast -->
+    <Transition name="copy-toast">
+      <div v-if="copyToast"
+           class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-lg border border-qubic-border/60 bg-qubic-surface px-4 py-2.5 font-mono text-xs text-qubic-teal shadow-xl pointer-events-none">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        {{ copyToast }}
+      </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.copy-toast-enter-active,
+.copy-toast-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.copy-toast-enter-from,
+.copy-toast-leave-to    { opacity: 0; transform: translateY(6px); }
+</style>

@@ -194,11 +194,22 @@ function walletPnlPct(w) {
 }
 
 const fiatSymbol = computed(() => store.currency === 'USD' ? '$' : '€')
+const altFiatSymbol = computed(() => store.currency === 'USD' ? '€' : '$')
+const unitPriceAlt = computed(() => {
+  if (!currentPrice.value) return null
+  return store.currency === 'USD' ? currentPrice.value.eur : currentPrice.value.usd
+})
 
 function fmtFiat(n) {
   if (n == null) return '—'
   if (store.hideAddresses) return '••••••'
-  return `${fiatSymbol.value}${n.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `${n.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${fiatSymbol.value}`
+}
+
+function fmtFiatAlt(n) {
+  if (n == null || unitPrice.value == null || !unitPriceAlt.value || store.hideAddresses) return undefined
+  const alt = n * (unitPriceAlt.value / unitPrice.value)
+  return `${alt.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${altFiatSymbol.value}`
 }
 
 function fmtPct(n) {
@@ -353,7 +364,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('wallet.value') }}</span>
             </div>
-            <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap">{{ fmtFiat(grandTotal.value) }}</div>
+            <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap" :title="fmtFiatAlt(grandTotal.value)">{{ fmtFiat(grandTotal.value) }}</div>
           </div>
 
           <!-- Unrealized P&L -->
@@ -369,7 +380,7 @@ onMounted(async () => {
                 {{ t('wallet.pnl_unrealized') }}
               </span>
             </div>
-            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'">
+            <div class="font-mono text-base sm:text-xl whitespace-nowrap" :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(grandTotal.value - grandTotal.cost)">
               {{ (grandTotal.value - grandTotal.cost) >= 0 ? '+' : '' }}{{ fmtFiat(grandTotal.value - grandTotal.cost) }}
               <span class="text-xs font-normal"
                     :class="(grandTotal.value - grandTotal.cost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
@@ -386,7 +397,7 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-sky-400">{{ t('wallet.current_price') }}</span>
             </div>
-            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap">{{ fiatSymbol }}{{ unitPrice.toFixed(8) }}</div>
+            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap" :title="unitPriceAlt != null ? unitPriceAlt.toFixed(10).replace(/\.?0+$/, '') + altFiatSymbol : undefined">{{ unitPrice.toFixed(10).replace(/\.?0+$/, '') }}{{ fiatSymbol }}</div>
           </div>
         </div>
       </div>
@@ -417,7 +428,7 @@ onMounted(async () => {
           </div>
 
           <!-- Fiat value -->
-          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5 whitespace-nowrap">
+          <div v-if="group.hasValue" class="font-mono text-sm text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtFiatAlt(group.totalValue)">
             {{ fmtFiat(group.totalValue) }}
           </div>
 
@@ -429,7 +440,8 @@ onMounted(async () => {
               {{ fmtPct((group.totalValue - group.totalCost) / group.totalCost * 100) }}
             </span>
             <span class="font-mono text-xs whitespace-nowrap"
-                  :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'">
+                  :class="(group.totalValue - group.totalCost) >= 0 ? 'text-green-400/80' : 'text-red-400/80'"
+                  :title="fmtFiatAlt(group.totalValue - group.totalCost)">
               {{ (group.totalValue - group.totalCost) >= 0 ? '+' : '' }}{{ fmtFiat(group.totalValue - group.totalCost) }}
             </span>
           </div>
@@ -469,11 +481,11 @@ onMounted(async () => {
             </div>
             <div v-if="selectedGroup.hasValue" class="text-right">
               <div class="text-xs text-gray-500">{{ t('wallet.value') }}</div>
-              <div class="font-mono text-sm">{{ fmtFiat(selectedGroup.totalValue) }}</div>
+              <div class="font-mono text-sm" :title="fmtFiatAlt(selectedGroup.totalValue)">{{ fmtFiat(selectedGroup.totalValue) }}</div>
             </div>
             <div v-if="selectedGroup.hasCost" class="text-right">
               <div class="text-xs text-gray-500">{{ t('wallet.pnl') }}</div>
-              <div class="font-mono text-sm" :class="(selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'">
+              <div class="font-mono text-sm" :class="(selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(selectedGroup.totalValue - selectedGroup.totalCost)">
                 {{ (selectedGroup.totalValue - selectedGroup.totalCost) >= 0 ? '+' : '' }}{{ fmtFiat(selectedGroup.totalValue - selectedGroup.totalCost) }}
                 <span class="text-xs">{{ fmtPct((selectedGroup.totalValue - selectedGroup.totalCost) / selectedGroup.totalCost * 100) }}</span>
               </div>
@@ -495,9 +507,10 @@ onMounted(async () => {
                 <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}<span class="ml-0.5 text-gray-500">QUBIC</span></span>
-                  <span v-if="walletValue(w) != null" class="text-xs font-mono text-gray-400">· {{ fmtFiat(walletValue(w)) }}</span>
+                  <span v-if="walletValue(w) != null" class="text-xs font-mono text-gray-400" :title="fmtFiatAlt(walletValue(w))">· {{ fmtFiat(walletValue(w)) }}</span>
                   <span v-if="walletPnl(w) != null" class="text-xs font-mono"
-                        :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'">
+                        :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'"
+                        :title="fmtFiatAlt(walletPnl(w))">
                     {{ walletPnl(w) >= 0 ? '+' : '' }}{{ fmtFiat(walletPnl(w)) }} ({{ fmtPct(walletPnlPct(w)) }})
                   </span>
                   <span v-if="w.function" class="text-xs text-gray-500">· {{ w.function }}</span>
@@ -520,7 +533,7 @@ onMounted(async () => {
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.value') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.pnl') }}</th>
                 <th class="th-right hidden lg:table-cell">{{ t('wallet.entries') }}</th>
-                <th class="th-right"></th>
+                <th class="th-right" :title="t('walletDetail.entries')"></th>
               </tr>
             </thead>
             <tbody>
@@ -556,12 +569,12 @@ onMounted(async () => {
                   </div>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
-                  <span v-if="walletValue(w) != null" class="text-gray-300">{{ fmtFiat(walletValue(w)) }}</span>
+                  <span v-if="walletValue(w) != null" class="text-gray-300" :title="fmtFiatAlt(walletValue(w))">{{ fmtFiat(walletValue(w)) }}</span>
                   <span v-else class="text-gray-600">—</span>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
                   <template v-if="walletPnl(w) != null">
-                    <div :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'">
+                    <div :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(walletPnl(w))">
                       {{ walletPnl(w) >= 0 ? '+' : '' }}{{ fmtFiat(walletPnl(w)) }}
                     </div>
                     <div class="text-xs" :class="walletPnl(w) >= 0 ? 'text-green-400/70' : 'text-red-400/70'">
@@ -574,7 +587,11 @@ onMounted(async () => {
                   {{ w.total_events != null ? w.total_events.toLocaleString(store.locale) : '—' }}
                 </td>
                 <td class="td text-right">
-                  <router-link :to="`/wallets/${w.id}`" class="btn-action text-xs" @click.stop>{{ t('walletDetail.entries') }}</router-link>
+                  <router-link :to="`/wallets/${w.id}`" class="icon-btn" :title="t('walletDetail.entries')" @click.stop>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/>
+                    </svg>
+                  </router-link>
                 </td>
               </tr>
             </tbody>

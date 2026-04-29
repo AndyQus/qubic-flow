@@ -1,4 +1,8 @@
+import { ref } from 'vue'
 import { useAppStore } from '../stores/app'
+
+export const copyToast = ref('')
+let _toastTimer = null
 
 export function useQubicUtils() {
   const store = useAppStore()
@@ -16,7 +20,22 @@ export function useQubicUtils() {
   }
 
   async function copyAddress(addr) {
-    if (addr) await navigator.clipboard.writeText(addr)
+    if (!addr) return
+    try {
+      await navigator.clipboard.writeText(addr)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = addr
+      el.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+    }
+    const s = String(addr)
+    copyToast.value = s.length > 14 ? `${s.slice(0, 6)}…${s.slice(-6)}` : s
+    clearTimeout(_toastTimer)
+    _toastTimer = setTimeout(() => { copyToast.value = '' }, 2000)
   }
 
   function shortAddr(a) {
