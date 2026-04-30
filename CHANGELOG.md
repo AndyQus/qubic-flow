@@ -4,6 +4,21 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.13] — 2026-04-30
+
+### Added
+- **Nodes page: Tabs** — Nodes page now has two tabs ("Nodes" / "Logs") matching the Wallets page style
+- **Logs tab** — in-memory ring buffer (last 500 entries) captures health check results, sync errors and warnings per service; shown in a table with timestamp, level (colour-coded), source and message; Refresh button reloads on demand
+- **Per-node health check button** — each node row in the table (desktop & mobile) now has a dedicated refresh icon button that triggers an immediate health check for that single node; icon spins while running
+- **Docker daily restart** — new `restarter` sidecar service in `docker-compose.yml` restarts the backend container automatically every night at 03:00 UTC, preventing connection hangs on Raspberry Pi after network interruptions
+
+### Fixed
+- **Logs route ordering** — `GET /nodes/logs` was declared after `{node_id}` routes causing FastAPI to never match it; moved to top of router
+- **Log level** — `logging.getLogger("app")` level was not explicitly set, suppressing INFO messages; now set to INFO in lifespan startup
+- **Log capture** — added direct `log_buffer.add()` calls in `health_monitor` and `sync_engine` as reliable fallback independent of the Python logging handler chain
+
+---
+
 ## [0.1.12] — 2026-04-29
 
 ### Added

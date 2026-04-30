@@ -5,6 +5,7 @@ from ..database import SessionLocal
 from ..models.node import Node
 from ..utils.time import now_utc_iso
 from ..websocket.manager import manager
+from ..utils.log_buffer import log_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,16 @@ async def check_nodes():
     try:
         nodes = db.query(Node).filter(Node.is_active == 1).all()
         for node in nodes:
+            await _check_node(db, node)
+    finally:
+        db.close()
+
+
+async def check_node_by_id(node_id: int):
+    db = SessionLocal()
+    try:
+        node = db.query(Node).filter(Node.id == node_id).first()
+        if node:
             await _check_node(db, node)
     finally:
         db.close()
@@ -46,11 +57,14 @@ async def _check_node(db, node: Node):
             node.health_status = "ONLINE" if elapsed < 3000 else "DEGRADED"
             node.fail_count = 0
             node.last_error = None
+            logger.info(f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
+            log_buffer.add("INFO", "health", f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
     except Exception as e:
         node.fail_count = (node.fail_count or 0) + 1
         node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"
         node.last_error = str(e)[:500]
         logger.warning(f"Node {node.url} health check failed: {e}")
+        log_buffer.add("WARNING", "health", f"Node {node.url} health check failed: {e}")
 
     node.last_checked = now_utc_iso()
     db.commit()
