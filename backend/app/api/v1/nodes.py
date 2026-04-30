@@ -7,12 +7,19 @@ from ...models.node import Node
 from ...schemas.node import NodeCreate, NodeOut
 from ...utils.time import now_utc_iso
 from ...services.sync_engine import get_active_sync_node_id, elect_active_sync_node
+from ...utils.log_buffer import log_buffer
+from ...services.health_monitor import check_node_by_id
 
 router = APIRouter()
 
 
 class NodeReorder(BaseModel):
     order: List[int]
+
+
+@router.get("/nodes/logs")
+async def get_logs(limit: int = 200):
+    return log_buffer.get(min(limit, 500))
 
 
 @router.get("/nodes", response_model=list[NodeOut])
@@ -78,10 +85,15 @@ def toggle_node(node_id: int, db: Session = Depends(get_db)):
     node.is_active = 0 if node.is_active else 1
     db.commit()
     db.refresh(node)
-    # Re-elect active sync node immediately so the pulsing indicator updates
-    # on the next /nodes request without waiting for the next sync cycle.
     elect_active_sync_node(db)
     return node
+
+
+@router.post("/nodes/{node_id}/check-now", status_code=202)
+async def check_node_now(node_id: int):
+    import asyncio
+    asyncio.create_task(check_node_by_id(node_id))
+    return {"queued": True}
 
 
 @router.delete("/nodes/{node_id}", status_code=204)

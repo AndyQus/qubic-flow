@@ -5,6 +5,7 @@ from .config import settings
 from .database import engine, Base
 from .api.v1 import wallets, events, nodes, stats, export, health, ws, labels, tax, backup
 from .services.scheduler import scheduler
+from .utils.log_buffer import install_buffer_handler
 import os
 from pathlib import Path
 
@@ -65,6 +66,7 @@ _seed_defaults()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    install_buffer_handler()
     scheduler.start()
     yield
     scheduler.shutdown()

@@ -54,6 +54,8 @@ export const api = {
     remove: (id) => req(`/nodes/${id}`, { method: 'DELETE' }),
     reorder: (order) => req('/nodes/reorder', { method: 'PUT', body: JSON.stringify({ order }) }),
     toggle:  (id) => req(`/nodes/${id}/toggle`, { method: 'PATCH' }),
+    logs: (limit = 200) => req(`/nodes/logs?limit=${limit}`),
+    checkNow: (id) => req(`/nodes/${id}/check-now`, { method: 'POST' }),
   },
   stats: {
     current:  (walletIds = []) => {

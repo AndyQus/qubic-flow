@@ -13,6 +13,7 @@ from .qubic_client import RPCClient, BOBClient
 from .coingecko import get_price_for_date
 from ..websocket.manager import manager
 from ..models.node import Node
+from ..utils.log_buffer import log_buffer
 
 import httpx
 
@@ -125,6 +126,7 @@ async def sync_all_wallets():
                 break
             except Exception as e:
                 logger.warning(f"Node {getattr(node, 'url', 'fallback')} get_tick failed: {e}, trying next")
+                log_buffer.add("WARNING", "sync", f"Node {getattr(node, 'url', 'fallback')} get_tick failed: {e}")
                 if node is not None:
                     node.fail_count = (node.fail_count or 0) + 1
                     node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"
@@ -139,8 +141,10 @@ async def sync_all_wallets():
                 current_tick = await rpc_fallback.get_current_tick()
                 client = rpc_fallback
                 logger.info("All configured nodes failed — using default RPC as fallback")
+                log_buffer.add("INFO", "sync", "All configured nodes failed — using default RPC as fallback")
             except Exception as e:
                 logger.error(f"Default RPC fallback also failed: {e} — sync skipped")
+                log_buffer.add("ERROR", "sync", f"Default RPC fallback also failed: {e} — sync skipped")
                 return
 
         event_client = await _get_event_client(db)
@@ -151,11 +155,13 @@ async def sync_all_wallets():
                 await sync_wallet(db, wallet.id, current_tick, event_client)
             except Exception as e:
                 logger.error(f"Event sync failed for wallet {wallet.id}: {e}", exc_info=True)
+                log_buffer.add("ERROR", "sync", f"Event sync failed for wallet {wallet.id}: {e}")
                 _set_sync_failed(db, wallet.id, str(e))
             try:
                 await sync_wallet_tx(db, wallet.id, current_tick, client)
             except Exception as e:
                 logger.error(f"TX sync failed for wallet {wallet.id}: {e}", exc_info=True)
+                log_buffer.add("ERROR", "sync", f"TX sync failed for wallet {wallet.id}: {e}")
     finally:
         db.close()
 
