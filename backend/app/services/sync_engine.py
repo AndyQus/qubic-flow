@@ -295,6 +295,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
     inserted = 0
     new_events = []
     price_cache: dict = {}
+    seen_ids: set = set()
 
     for log in logs:
         log_id = log.get("logId")
@@ -312,6 +313,10 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
                 real_tx_id = c
                 break
         effective_id = real_tx_id if real_tx_id else str(log_id)
+        # Dedup within the current batch (API can return same id with different log_type).
+        if effective_id in seen_ids:
+            continue
+        seen_ids.add(effective_id)
         # Dedup: an existing row may use either key (transactionHash from
         # new code, logId from older code). Skip if either matches.
         dedup_keys = {effective_id, str(log_id)}

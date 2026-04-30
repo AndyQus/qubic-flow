@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from './stores/app'
 import { useWebSocket } from './composables/useWebSocket'
 import { useDonationState } from './composables/useDonationState'
@@ -18,6 +18,15 @@ const { t } = useTranslation()
 const isLight = computed(() => store.theme === 'light')
 useWebSocket()
 
+async function checkLogErrors() {
+  try {
+    const res = await api.nodes.logErrorCheck()
+    store.setNodeLogError(res.has_error)
+  } catch { /* ignore */ }
+}
+
+let _logErrorInterval = null
+
 onMounted(async () => {
   store.setTheme(store.theme)
   document.documentElement.style.fontSize = store.fontSize + '%'
@@ -28,7 +37,11 @@ onMounted(async () => {
   } catch (e) {
     console.error('Initial load failed', e)
   }
+  await checkLogErrors()
+  _logErrorInterval = setInterval(checkLogErrors, 60_000)
 })
+
+onUnmounted(() => clearInterval(_logErrorInterval))
 </script>
 
 <template>

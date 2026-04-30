@@ -19,6 +19,9 @@ export const useAppStore = defineStore('app', () => {
   const nodes = ref([])
   const wsConnected = ref(false)
   const newEventIds = ref([])
+  const nodeLogError = ref(false)
+
+  function setNodeLogError(val) { nodeLogError.value = val }
 
   const locale = computed(() => lang.value === 'de' ? 'de-DE' : 'en-US')
 
@@ -85,9 +88,10 @@ export const useAppStore = defineStore('app', () => {
   return {
     animation, moneyAnim, moneySound, soundStyle,
     theme, lang, fontSize, hideAddresses, currency, walletFilter,
-    wallets, events, nodes, wsConnected, newEventIds,
+    wallets, events, nodes, wsConnected, newEventIds, nodeLogError,
     locale, filteredWallets, activeNode,
     setAnimation, setMoneyAnim, setMoneySound, setSoundStyle,
     setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
+    setNodeLogError,
   }
 })

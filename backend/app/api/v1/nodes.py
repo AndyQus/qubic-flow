@@ -17,9 +17,14 @@ class NodeReorder(BaseModel):
     order: List[int]
 
 
+@router.get("/nodes/logs/error-check")
+async def logs_error_check():
+    return {"has_error": any(e["level"] == "ERROR" for e in log_buffer.get(50))}
+
+
 @router.get("/nodes/logs")
-async def get_logs(limit: int = 200):
-    return log_buffer.get(min(limit, 500))
+async def get_logs():
+    return log_buffer.get(1000)
 
 
 @router.get("/nodes", response_model=list[NodeOut])
