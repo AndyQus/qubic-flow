@@ -4,6 +4,25 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.14] — 2026-04-30
+
+### Added
+- **Log error badge** — red dot appears on the "Nodes" nav item and the "Logs" tab whenever an ERROR is found in the last 50 log entries; tooltip explains the reason
+- **Automatic error check** — `GET /nodes/logs/error-check` lightweight endpoint polled every 60 seconds from App.vue; returns only `{has_error: bool}`, no full log transfer
+- **Log paging** — 50 entries per page with `« ‹ n/total › »` navigation; only shown when more than one page exists
+- **Log level filter** — ALL / ERROR / WARNING / INFO buttons above the log table; switching resets to page 1
+- **Log count + Refresh** — entry count and Refresh button placed inline with the filter buttons on the right side
+- **Mobile log view** — compact cards on small screens instead of a table
+
+### Changed
+- **Log buffer** — increased from 500 to 1000 entries
+- **Error check window** — checks last 50 log entries (previously 20)
+
+### Fixed
+- **Event dedup within batch** — API sometimes returns the same event twice with different `log_type` in one batch; added `seen_ids` set to skip intra-batch duplicates and prevent `UNIQUE constraint` errors
+
+---
+
 ## [0.1.13] — 2026-04-30
 
 ### Added

@@ -2,7 +2,7 @@ from collections import deque
 from datetime import datetime, timezone
 import logging
 
-_MAX = 500
+_MAX = 1000
 
 
 class _LogBuffer:

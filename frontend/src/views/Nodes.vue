@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '../stores/app'
 import { api } from '../api'
@@ -25,6 +25,25 @@ const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1 })
 const logs = ref([])
 const logsLoading = ref(false)
 const checkingNodeId = ref(null)
+const logLevelFilter = ref('ALL')
+const logsPage = ref(1)
+const LOGS_PER_PAGE = 50
+
+const LOG_LEVELS = ['ALL', 'ERROR', 'WARNING', 'INFO']
+
+const filteredLogs = computed(() => {
+  if (logLevelFilter.value === 'ALL') return logs.value
+  return logs.value.filter(e => e.level === logLevelFilter.value)
+})
+
+const logsTotalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / LOGS_PER_PAGE)))
+
+const pagedLogs = computed(() => {
+  const start = (logsPage.value - 1) * LOGS_PER_PAGE
+  return filteredLogs.value.slice(start, start + LOGS_PER_PAGE)
+})
+
+watch(logLevelFilter, () => { logsPage.value = 1 })
 
 watch(() => route.query, (q) => {
   activeTab.value = q.tab === 'logs' ? 'logs' : 'nodes'
@@ -52,8 +71,12 @@ async function reload() {
 
 async function loadLogs() {
   logsLoading.value = true
-  try { logs.value = await api.nodes.logs() }
-  finally { logsLoading.value = false }
+  try {
+    logs.value = await api.nodes.logs()
+    store.setNodeLogError(logs.value.slice(0, 50).some(e => e.level === 'ERROR'))
+  } finally {
+    logsLoading.value = false
+  }
 }
 
 async function triggerCheckNow(id) {
@@ -138,8 +161,13 @@ onMounted(reload)
     <div class="flex items-center gap-2">
       <button :class="['tab-btn', activeTab === 'nodes' && 'tab-btn-active']"
               @click="setActiveTab('nodes')">{{ t('node.tab_nodes') }}</button>
-      <button :class="['tab-btn', activeTab === 'logs' && 'tab-btn-active']"
-              @click="setActiveTab('logs')">{{ t('node.tab_logs') }}</button>
+      <button :class="['tab-btn relative', activeTab === 'logs' && 'tab-btn-active']"
+              @click="setActiveTab('logs')">
+        {{ t('node.tab_logs') }}
+        <span v-if="store.nodeLogError"
+              class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500"
+              :title="t('node.logs_error_badge')" />
+      </button>
     </div>
   </PageHeader>
 
@@ -287,40 +315,74 @@ onMounted(reload)
 
   <!-- LOGS TAB -->
   <template v-if="activeTab === 'logs'">
-    <div class="flex justify-between items-center">
-      <span class="text-xs text-gray-500">{{ logs.length }} {{ t('node.tab_logs') }}</span>
-      <button @click="loadLogs" class="btn">&#x27F3; Refresh</button>
-    </div>
-    <PageLoader v-if="logsLoading" />
-    <div v-else-if="logs.length === 0" class="card text-center text-gray-500 text-sm py-8">
-      {{ t('node.logs_empty') }}
-    </div>
-    <div v-else class="card overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="table-std">
-          <thead class="thead-std">
-            <tr>
-              <th class="th w-40">{{ t('node.logs_time') }}</th>
-              <th class="th w-20">{{ t('node.logs_level') }}</th>
-              <th class="th w-24">{{ t('node.logs_source') }}</th>
-              <th class="th">{{ t('node.logs_message') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(entry, i) in logs" :key="i" class="border-b border-qubic-border/30">
-              <td class="td font-mono text-gray-500 whitespace-nowrap">{{ entry.ts }}</td>
-              <td class="td">
-                <span :class="['text-xs font-mono font-semibold', logLevelClass(entry.level)]">{{ entry.level }}</span>
-              </td>
-              <td class="td">
-                <span class="pill text-xs">{{ entry.source }}</span>
-              </td>
-              <td class="td text-xs text-gray-300 break-all">{{ entry.message }}</td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- Filter row -->
+    <div class="flex flex-wrap items-center gap-2">
+      <button v-for="lvl in LOG_LEVELS" :key="lvl"
+              @click="logLevelFilter = lvl"
+              :class="['tab-btn text-xs', logLevelFilter === lvl ? 'tab-btn-active' : '']">
+        <span v-if="lvl !== 'ALL'" :class="logLevelClass(lvl)">●</span>
+        {{ lvl === 'ALL' ? t('node.logs_all') : lvl }}
+      </button>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="text-xs text-gray-500">{{ filteredLogs.length }} {{ t('node.logs_count') }}</span>
+        <button @click="loadLogs" class="btn">&#x27F3; Refresh</button>
       </div>
     </div>
+
+    <PageLoader v-if="logsLoading" />
+    <template v-else>
+      <div v-if="filteredLogs.length === 0" class="card text-center text-gray-500 text-sm py-8">
+        {{ t('node.logs_empty') }}
+      </div>
+      <template v-else>
+        <!-- Desktop table -->
+        <div class="card overflow-hidden hidden sm:block">
+          <div class="overflow-x-auto">
+            <table class="table-std">
+              <thead class="thead-std">
+                <tr>
+                  <th class="th w-40">{{ t('node.logs_time') }}</th>
+                  <th class="th w-20">{{ t('node.logs_level') }}</th>
+                  <th class="th w-24">{{ t('node.logs_source') }}</th>
+                  <th class="th">{{ t('node.logs_message') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(entry, i) in pagedLogs" :key="i" class="border-b border-qubic-border/30">
+                  <td class="td font-mono text-gray-500 whitespace-nowrap">{{ entry.ts }}</td>
+                  <td class="td"><span :class="['text-xs font-mono font-semibold', logLevelClass(entry.level)]">{{ entry.level }}</span></td>
+                  <td class="td"><span class="pill text-xs">{{ entry.source }}</span></td>
+                  <td class="td text-xs text-gray-300 break-all">{{ entry.message }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="sm:hidden space-y-2">
+          <div v-for="(entry, i) in pagedLogs" :key="i" class="card space-y-1 py-2">
+            <div class="flex items-center gap-2">
+              <span :class="['text-xs font-mono font-semibold', logLevelClass(entry.level)]">{{ entry.level }}</span>
+              <span class="pill text-xs">{{ entry.source }}</span>
+              <span class="text-xs text-gray-500 ml-auto font-mono">{{ entry.ts }}</span>
+            </div>
+            <p class="text-xs text-gray-300 break-all">{{ entry.message }}</p>
+          </div>
+        </div>
+
+        <!-- Paging -->
+        <div v-if="logsTotalPages > 1" class="flex justify-end">
+          <div class="flex items-center gap-1">
+            <button @click="logsPage = 1" :disabled="logsPage === 1" class="btn-ghost text-xs px-2 py-1 disabled:opacity-30">«</button>
+            <button @click="logsPage--" :disabled="logsPage === 1" class="btn-ghost text-xs px-2 py-1 disabled:opacity-30">‹</button>
+            <span class="text-xs text-gray-400 px-2">{{ logsPage }} / {{ logsTotalPages }}</span>
+            <button @click="logsPage++" :disabled="logsPage === logsTotalPages" class="btn-ghost text-xs px-2 py-1 disabled:opacity-30">›</button>
+            <button @click="logsPage = logsTotalPages" :disabled="logsPage === logsTotalPages" class="btn-ghost text-xs px-2 py-1 disabled:opacity-30">»</button>
+          </div>
+        </div>
+      </template>
+    </template>
   </template>
   </div>
 </template>
