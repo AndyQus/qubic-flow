@@ -10,10 +10,10 @@ from ...services.label_service import get_label
 
 from ...models.settings import AppSetting
 from ...models.donor_cache import DonorCache
-
-DONATION_ADDRESS = "CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI"
-DONATION_QU_PER_MONTH = 1_000_000
-DONATION_QU_FOREVER = 100_000_000
+from ...services.donation_utils import (
+    DONATION_ADDRESS, DONATION_QU_PER_MONTH, DONATION_QU_FOREVER,
+    TICKS_PER_DAY, parse_v2_transfers, fetch_all_transfer_pages,
+)
 
 router = APIRouter()
 
@@ -104,42 +104,6 @@ def update_event_note(event_id: str, body: EventNoteUpdate, db: Session = Depend
     db.commit()
 
 
-def _parse_v2_transfers(pages: list[dict]) -> list[tuple[int, str, str, int]]:
-    """Flatten the v2 /transfers response (tick-grouped, nested) into (tick, source, dest, amount) tuples."""
-    result = []
-    for page_data in pages:
-        for tick_group in (page_data.get("transactions") or []):
-            tick_number = int(tick_group.get("tickNumber") or 0)
-            for tx_data in (tick_group.get("transactions") or []):
-                if not tx_data.get("moneyFlew", False):
-                    continue
-                tx = tx_data.get("transaction") or tx_data
-                source = tx.get("sourceId") or tx.get("source") or ""
-                dest   = tx.get("destId")   or tx.get("destination") or ""
-                amount = int(tx.get("amount") or 0)
-                if source and dest and amount > 0:
-                    result.append((tick_number, source, dest, amount))
-    return result
-
-
-async def _fetch_all_transfer_pages(rpc, address: str, from_tick: int, to_tick: int) -> list[dict]:
-    pages = []
-    page = 1
-    while True:
-        try:
-            data = await rpc.get_transfer_transactions(address, from_tick, to_tick, page=page, page_size=100)
-        except Exception:
-            break
-        pages.append(data)
-        tick_groups = data.get("transactions") or []
-        if not tick_groups:
-            break
-        total_pages = data.get("pagination", {}).get("totalPages", 1)
-        if page >= total_pages:
-            break
-        page += 1
-    return pages
-
 
 def _save_suppression(db: Session, until: str):
     row = db.query(AppSetting).filter(AppSetting.key == "donation_suppressed_until").first()
@@ -185,29 +149,63 @@ async def donation_check(db: Session = Depends(get_db)):
         months_earned = total_qu // DONATION_QU_PER_MONTH
         forever = any(r.forever for r in cached_rows)
         best_row = max(cached_rows, key=lambda r: r.total_qu)
-        suppressed_until = "2099-12-31" if forever else best_row.suppressed_until
-        if suppressed_until:
-            _save_suppression(db, suppressed_until)
-        return {
-            "total_qu": total_qu,
-            "months_earned": int(months_earned),
-            "suppressed_until": suppressed_until,
-            "donation_address": DONATION_ADDRESS,
-            "forever": forever,
-            "last_payment_amount": best_row.total_qu,
-            "last_payment_date": best_row.last_date,
-            "from_cache": True,
-        }
 
-    # --- Fallback: live blockchain check for unknown donors ---
+        if forever:
+            suppressed_until = "2099-12-31"
+            _save_suppression(db, suppressed_until)
+            return {
+                "total_qu": total_qu,
+                "months_earned": int(months_earned),
+                "suppressed_until": suppressed_until,
+                "donation_address": DONATION_ADDRESS,
+                "forever": True,
+                "last_payment_amount": best_row.total_qu,
+                "last_payment_date": best_row.last_date,
+                "from_cache": True,
+            }
+
+        # Best suppressed_until from any individual wallet in cache
+        best_suppressed = max(
+            (r.suppressed_until for r in cached_rows if r.suppressed_until),
+            default=None,
+        )
+
+        if best_suppressed is not None:
+            # At least one wallet qualifies individually → serve from cache
+            _save_suppression(db, best_suppressed)
+            return {
+                "total_qu": total_qu,
+                "months_earned": int(months_earned),
+                "suppressed_until": best_suppressed,
+                "donation_address": DONATION_ADDRESS,
+                "forever": False,
+                "last_payment_amount": best_row.total_qu,
+                "last_payment_date": best_row.last_date,
+                "from_cache": True,
+            }
+
+        if months_earned == 0:
+            # Combined total doesn't reach threshold either → no suppression
+            return {
+                "total_qu": total_qu,
+                "months_earned": 0,
+                "suppressed_until": None,
+                "donation_address": DONATION_ADDRESS,
+            }
+
+        # months_earned > 0 but no individual wallet qualifies alone (multi-wallet edge case)
+        # → fall through to live blockchain check for accurate per-payment calculation
+
+    # --- Fallback: live blockchain check ---
     rpc = RPCClient()
     try:
         current_tick = await rpc.get_current_tick()
     except Exception:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
 
-    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
-    transfers = _parse_v2_transfers(pages)
+    from datetime import datetime, timezone, timedelta
+    pages = await fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
+    transfers = parse_v2_transfers(pages)
 
     payments: list[tuple[int, int]] = []
     for tick, source, dest, amount in transfers:
@@ -219,8 +217,7 @@ async def donation_check(db: Session = Depends(get_db)):
 
     payments.sort(key=lambda x: x[0])
     now = datetime.now(timezone.utc)
-    TICKS_PER_DAY = 86_400
-    suppressed_until_dt = now
+    suppressed_until_dt = None
 
     for tick, amount in payments:
         months = amount // DONATION_QU_PER_MONTH
@@ -229,7 +226,7 @@ async def donation_check(db: Session = Depends(get_db)):
         days_since_payment = max(0, (current_tick - tick) / TICKS_PER_DAY)
         payment_date = now - timedelta(days=days_since_payment)
         paid_until = payment_date + timedelta(days=30 * months)
-        if paid_until > suppressed_until_dt:
+        if suppressed_until_dt is None or paid_until > suppressed_until_dt:
             suppressed_until_dt = paid_until
 
     total_qu = sum(a for _, a in payments)
@@ -244,7 +241,11 @@ async def donation_check(db: Session = Depends(get_db)):
                 "donation_address": DONATION_ADDRESS, "forever": True,
                 "last_payment_amount": last_amount, "last_payment_date": last_payment_date}
 
-    suppressed_until = suppressed_until_dt.date().isoformat() if suppressed_until_dt > now else None
+    suppressed_until = (
+        suppressed_until_dt.date().isoformat()
+        if suppressed_until_dt is not None and suppressed_until_dt > now
+        else None
+    )
     last_tick, last_amount = max(payments, key=lambda x: x[0])
     days_since_last = max(0, (current_tick - last_tick) / TICKS_PER_DAY)
     last_payment_date = (now - timedelta(days=days_since_last)).date().isoformat()
@@ -290,11 +291,10 @@ async def donation_top(db: Session = Depends(get_db)):
     except Exception:
         return {"donors": [], "cache_updated_at": None}
 
-    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
-    transfers = _parse_v2_transfers(pages)
+    pages = await fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
+    transfers = parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
-    TICKS_PER_DAY = 86_400
     donors_map: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0})
 
     for tick, source, dest, amount in transfers:
@@ -332,11 +332,10 @@ async def donation_history(mine_only: bool = False, db: Session = Depends(get_db
         return {"transactions": [], "total_qu": 0}
 
     from_tick = 0
-    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
-    transfers = _parse_v2_transfers(pages)
+    pages = await fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    transfers = parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
-    TICKS_PER_DAY = 86_400
     result = []
     total_qu = 0
 

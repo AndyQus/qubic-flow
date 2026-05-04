@@ -5,53 +5,16 @@ from datetime import datetime, timezone, timedelta
 from ..database import SessionLocal
 from ..models.donor_cache import DonorCache
 from ..models.settings import AppSetting
+from .donation_utils import (
+    DONATION_ADDRESS, DONATION_QU_PER_MONTH, DONATION_QU_FOREVER,
+    TICKS_PER_DAY, parse_v2_transfers, fetch_all_transfer_pages,
+)
 
 logger = logging.getLogger(__name__)
 
-DONATION_ADDRESS = "CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI"
-DONATION_QU_PER_MONTH = 1_000_000
-DONATION_QU_FOREVER = 100_000_000
-TICKS_PER_DAY = 86_400
-
-
-def _parse_v2_transfers(pages: list[dict]) -> list[tuple[int, str, str, int]]:
-    result = []
-    for page_data in pages:
-        for tick_group in (page_data.get("transactions") or []):
-            tick_number = int(tick_group.get("tickNumber") or 0)
-            for tx_data in (tick_group.get("transactions") or []):
-                if not tx_data.get("moneyFlew", False):
-                    continue
-                tx = tx_data.get("transaction") or tx_data
-                source = tx.get("sourceId") or tx.get("source") or ""
-                dest   = tx.get("destId")   or tx.get("destination") or ""
-                amount = int(tx.get("amount") or 0)
-                if source and dest and amount > 0:
-                    result.append((tick_number, source, dest, amount))
-    return result
-
-
-async def _fetch_all_transfer_pages(rpc, address: str, from_tick: int, to_tick: int) -> list[dict]:
-    pages = []
-    page = 1
-    while True:
-        try:
-            data = await rpc.get_transfer_transactions(address, from_tick, to_tick, page=page, page_size=100)
-        except Exception:
-            break
-        pages.append(data)
-        tick_groups = data.get("transactions") or []
-        if not tick_groups:
-            break
-        total_pages = data.get("pagination", {}).get("totalPages", 1)
-        if page >= total_pages:
-            break
-        page += 1
-    return pages
-
 
 async def refresh_donation_cache() -> None:
-    from ..services.qubic_client import RPCClient
+    from .qubic_client import RPCClient
 
     rpc = RPCClient()
     try:
@@ -61,12 +24,12 @@ async def refresh_donation_cache() -> None:
         return
 
     try:
-        pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
+        pages = await fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
     except Exception as e:
         logger.warning(f"donation_cache: transfer fetch failed: {e}")
         return
 
-    transfers = _parse_v2_transfers(pages)
+    transfers = parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
     donors: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0, "payments": []})
@@ -77,6 +40,10 @@ async def refresh_donation_cache() -> None:
             donors[source]["payments"].append((tick, amount))
             if tick > donors[source]["last_tick"]:
                 donors[source]["last_tick"] = tick
+
+    if not donors:
+        logger.info("donation_cache: no transfers found, skipping DB update")
+        return
 
     db = SessionLocal()
     try:
@@ -90,12 +57,11 @@ async def refresh_donation_cache() -> None:
             days_since_last = max(0, (current_tick - last_tick) / TICKS_PER_DAY)
             last_date = (now - timedelta(days=days_since_last)).date().isoformat()
 
-            # Calculate suppressed_until
             forever = total_qu >= DONATION_QU_FOREVER
             if forever:
                 suppressed_until = "2099-12-31"
             else:
-                suppressed_until_dt = now
+                suppressed_until_dt = None
                 for tick, amount in sorted(payments, key=lambda x: x[0]):
                     months = amount // DONATION_QU_PER_MONTH
                     if months == 0:
@@ -103,11 +69,12 @@ async def refresh_donation_cache() -> None:
                     days_since_pay = max(0, (current_tick - tick) / TICKS_PER_DAY)
                     payment_date = now - timedelta(days=days_since_pay)
                     paid_until = payment_date + timedelta(days=30 * months)
-                    if paid_until > suppressed_until_dt:
+                    if suppressed_until_dt is None or paid_until > suppressed_until_dt:
                         suppressed_until_dt = paid_until
                 suppressed_until = (
                     suppressed_until_dt.date().isoformat()
-                    if suppressed_until_dt > now else None
+                    if suppressed_until_dt is not None and suppressed_until_dt > now
+                    else None
                 )
 
             row = db.query(DonorCache).filter(DonorCache.address == address).first()
@@ -129,11 +96,10 @@ async def refresh_donation_cache() -> None:
                     updated_at=updated_at,
                 ))
 
-        # Remove addresses that no longer appear (edge case)
+        # Only remove addresses that truly no longer appear (full fetch succeeded)
         known = set(donors.keys())
         db.query(DonorCache).filter(DonorCache.address.notin_(known)).delete(synchronize_session=False)
 
-        # Store last refresh timestamp
         setting = db.query(AppSetting).filter(AppSetting.key == "donation_cache_updated_at").first()
         if setting:
             setting.value = updated_at

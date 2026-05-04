@@ -156,8 +156,10 @@ onMounted(async () => {
   try {
     const res = await api.events.donationTop()
     topDonors.value = res.donors || []
-  } catch {}
-  finally { topDonorsLoading.value = false }
+  } catch {
+  } finally {
+    topDonorsLoading.value = false
+  }
   try {
     const res = await api.events.donationHistory(true)
     donationHistory.value = res.transactions || []
