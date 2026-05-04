@@ -9,6 +9,7 @@ from ...schemas.event import EventOut, EventNoteUpdate
 from ...services.label_service import get_label
 
 from ...models.settings import AppSetting
+from ...models.donor_cache import DonorCache
 
 DONATION_ADDRESS = "CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI"
 DONATION_QU_PER_MONTH = 1_000_000
@@ -164,43 +165,60 @@ async def donation_check(db: Session = Depends(get_db)):
     user_wallets = db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()
     all_addresses = {w.id for w in user_wallets}
 
-    # If the donation address itself is registered as a wallet → owner mode, no blockchain check needed
+    # If the donation address itself is registered → owner mode
     if DONATION_ADDRESS in all_addresses:
         _save_suppression(db, "2099-12-31")
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": "2099-12-31",
                 "donation_address": DONATION_ADDRESS, "forever": True}
 
-    user_addresses = all_addresses
-
-    if not user_addresses:
+    if not all_addresses:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
 
-    # Query blockchain: all transfers involving the donation address
+    # --- Fast path: check donor cache ---
+    cached_rows = (
+        db.query(DonorCache)
+        .filter(DonorCache.address.in_(all_addresses))
+        .all()
+    )
+    if cached_rows:
+        total_qu = sum(r.total_qu for r in cached_rows)
+        months_earned = total_qu // DONATION_QU_PER_MONTH
+        forever = any(r.forever for r in cached_rows)
+        best_row = max(cached_rows, key=lambda r: r.total_qu)
+        suppressed_until = "2099-12-31" if forever else best_row.suppressed_until
+        if suppressed_until:
+            _save_suppression(db, suppressed_until)
+        return {
+            "total_qu": total_qu,
+            "months_earned": int(months_earned),
+            "suppressed_until": suppressed_until,
+            "donation_address": DONATION_ADDRESS,
+            "forever": forever,
+            "last_payment_amount": best_row.total_qu,
+            "last_payment_date": best_row.last_date,
+            "from_cache": True,
+        }
+
+    # --- Fallback: live blockchain check for unknown donors ---
     rpc = RPCClient()
     try:
         current_tick = await rpc.get_current_tick()
     except Exception:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
 
-    from_tick = 0
-
-    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
     transfers = _parse_v2_transfers(pages)
 
-    # Filter: source must be a registered user wallet, destination must be donation address
-    payments: list[tuple[int, int]] = []  # (tick, amount)
+    payments: list[tuple[int, int]] = []
     for tick, source, dest, amount in transfers:
-        if source in user_addresses and dest == DONATION_ADDRESS:
+        if source in all_addresses and dest == DONATION_ADDRESS:
             payments.append((tick, amount))
 
     if not payments:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
 
-    # Calculate suppression: sort by tick, accumulate months from each payment date
     payments.sort(key=lambda x: x[0])
     now = datetime.now(timezone.utc)
-
-    # Ticks per day approximation (1 tick ≈ 1 second → 86400 ticks/day)
     TICKS_PER_DAY = 86_400
     suppressed_until_dt = now
 
@@ -217,7 +235,6 @@ async def donation_check(db: Session = Depends(get_db)):
     total_qu = sum(a for _, a in payments)
     months_earned = total_qu // DONATION_QU_PER_MONTH
 
-    # 100M QU = forever
     if total_qu >= DONATION_QU_FOREVER:
         _save_suppression(db, "2099-12-31")
         last_tick, last_amount = max(payments, key=lambda x: x[0])
@@ -228,7 +245,6 @@ async def donation_check(db: Session = Depends(get_db)):
                 "last_payment_amount": last_amount, "last_payment_date": last_payment_date}
 
     suppressed_until = suppressed_until_dt.date().isoformat() if suppressed_until_dt > now else None
-
     last_tick, last_amount = max(payments, key=lambda x: x[0])
     days_since_last = max(0, (current_tick - last_tick) / TICKS_PER_DAY)
     last_payment_date = (now - timedelta(days=days_since_last)).date().isoformat()
@@ -248,39 +264,53 @@ async def donation_check(db: Session = Depends(get_db)):
 
 
 @router.get("/events/donation-top")
-async def donation_top():
+async def donation_top(db: Session = Depends(get_db)):
     from datetime import datetime, timezone, timedelta
     from collections import defaultdict
     from ...services.qubic_client import RPCClient
 
+    rows = (
+        db.query(DonorCache)
+        .order_by(DonorCache.total_qu.desc())
+        .limit(50)
+        .all()
+    )
+    if rows:
+        cache_updated = db.query(AppSetting).filter(AppSetting.key == "donation_cache_updated_at").first()
+        donors = [
+            {"address": r.address, "total_qu": r.total_qu, "date": r.last_date}
+            for r in rows
+        ]
+        return {"donors": donors, "cache_updated_at": cache_updated.value if cache_updated else None}
+
+    # Cache still empty (first start) → live blockchain fallback
     rpc = RPCClient()
     try:
         current_tick = await rpc.get_current_tick()
     except Exception:
-        return {"donors": []}
+        return {"donors": [], "cache_updated_at": None}
 
-    from_tick = 0
-    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
+    pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, 0, current_tick)
     transfers = _parse_v2_transfers(pages)
 
     now = datetime.now(timezone.utc)
     TICKS_PER_DAY = 86_400
-    donors: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0})
+    donors_map: dict = defaultdict(lambda: {"total_qu": 0, "last_tick": 0})
 
     for tick, source, dest, amount in transfers:
         if dest == DONATION_ADDRESS and source:
-            donors[source]["total_qu"] += amount
-            if tick > donors[source]["last_tick"]:
-                donors[source]["last_tick"] = tick
+            donors_map[source]["total_qu"] += amount
+            if tick > donors_map[source]["last_tick"]:
+                donors_map[source]["last_tick"] = tick
 
     result = []
-    for address, d in donors.items():
+    for address, d in donors_map.items():
         days_since = max(0, (current_tick - d["last_tick"]) / TICKS_PER_DAY)
         date = (now - timedelta(days=days_since)).date().isoformat()
         result.append({"address": address, "total_qu": d["total_qu"], "date": date})
 
     result.sort(key=lambda x: x["total_qu"], reverse=True)
-    return {"donors": result[:50]}
+    return {"donors": result[:50], "cache_updated_at": None}
 
 
 @router.get("/events/donation-history")
