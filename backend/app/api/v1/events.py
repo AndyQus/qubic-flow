@@ -110,7 +110,7 @@ def _parse_v2_transfers(pages: list[dict]) -> list[tuple[int, str, str, int]]:
         for tick_group in (page_data.get("transactions") or []):
             tick_number = int(tick_group.get("tickNumber") or 0)
             for tx_data in (tick_group.get("transactions") or []):
-                if not tx_data.get("moneyFlew", True):
+                if not tx_data.get("moneyFlew", False):
                     continue
                 tx = tx_data.get("transaction") or tx_data
                 source = tx.get("sourceId") or tx.get("source") or ""
@@ -182,7 +182,7 @@ async def donation_check(db: Session = Depends(get_db)):
     except Exception:
         return {"total_qu": 0, "months_earned": 0, "suppressed_until": None, "donation_address": DONATION_ADDRESS}
 
-    from_tick = max(0, current_tick - 500_000)
+    from_tick = 0
 
     pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
     transfers = _parse_v2_transfers(pages)
@@ -259,7 +259,7 @@ async def donation_top():
     except Exception:
         return {"donors": []}
 
-    from_tick = max(0, current_tick - 500_000)
+    from_tick = 0
     pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
     transfers = _parse_v2_transfers(pages)
 
@@ -301,7 +301,7 @@ async def donation_history(mine_only: bool = False, db: Session = Depends(get_db
     except Exception:
         return {"transactions": [], "total_qu": 0}
 
-    from_tick = max(0, current_tick - 500_000)
+    from_tick = 0
     pages = await _fetch_all_transfer_pages(rpc, DONATION_ADDRESS, from_tick, current_tick)
     transfers = _parse_v2_transfers(pages)
 
