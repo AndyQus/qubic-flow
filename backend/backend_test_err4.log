@@ -1,0 +1,103 @@
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+WARNI [apscheduler.executors.default] Run time of job "backfill_missing_rates (trigger: interval[6:00:00], next run at: 2026-05-04 21:05:41 UTC)" was missed by 0:00:01.028785
+WARNI [apscheduler.executors.default] Run time of job "check_all_balances (trigger: interval[1:00:00], next run at: 2026-05-04 16:05:41 UTC)" was missed by 0:00:01.036912
+WARNI [apscheduler.executors.default] Run time of job "run_backfill_tx_epochs (trigger: interval[1:00:00], next run at: 2026-05-04 16:05:41 UTC)" was missed by 0:00:01.037580
+WARNI [apscheduler.executors.default] Run time of job "retry_sync_gaps (trigger: interval[0:15:00], next run at: 2026-05-04 15:20:41 UTC)" was missed by 0:00:01.038206
+WARNI [apscheduler.executors.default] Run time of job "refresh_donation_cache (trigger: interval[1:00:00], next run at: 2026-05-04 16:05:41 UTC)" was missed by 0:00:01.038547
+ERROR [apscheduler.executors.default] Job "daily_sync_labels (trigger: interval[1 day, 0:00:00], next run at: 2026-05-05 15:05:41 UTC)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\apscheduler\executors\base_py3.py", line 30, in run_coroutine_job
+    retval = await job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\qubic-flow\backend\app\services\scheduler.py", line 39, in daily_sync_labels
+    await sync_labels(db)
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\qubic-flow\backend\app\services\label_service.py", line 31, in sync_labels
+    r_cats = await client.get(_TOKEN_CATEGORIES_URL)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1768, in get
+    return await self.request(
+           ^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        pool_request.request
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_async\connection.py", line 101, in handle_async_request
+    raise exc
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_async\connection.py", line 78, in handle_async_request
+    stream = await self._connect(request)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_async\connection.py", line 124, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_backends\auto.py", line 31, in connect_tcp
+    return await self._backend.connect_tcp(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\httpcore\_backends\anyio.py", line 115, in connect_tcp
+    stream: anyio.abc.ByteStream = await anyio.connect_tcp(
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\anyio\_core\_sockets.py", line 215, in connect_tcp
+    gai_res = await getaddrinfo(
+              ^^^^^^^^^^^^^^^^^^
+        target_host, remote_port, family=family, type=socket.SOCK_STREAM
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\anyio\_core\_sockets.py", line 649, in getaddrinfo
+    gai_res = await get_async_backend().getaddrinfo(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        encoded_host, port, family=family, type=type, proto=proto, flags=flags
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\andyq\Documents\Claude\Projects\QubicFlow\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2748, in getaddrinfo
+    return await get_running_loop().getaddrinfo(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        host, port, family=family, type=type, proto=proto, flags=flags
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\andyq\AppData\Local\Programs\Python\Python313\Lib\asyncio\base_events.py", line 939, in getaddrinfo
+    return await self.run_in_executor(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        None, getaddr_func, host, port, family, type, proto, flags)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+asyncio.exceptions.CancelledError

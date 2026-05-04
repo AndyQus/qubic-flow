@@ -45,14 +45,17 @@ def test_engine():
 
     # Import all models so Base picks them up, then create tables
     from app.database import Base
-    import app.models.wallet       # noqa: F401
-    import app.models.event        # noqa: F401
-    import app.models.sync_state   # noqa: F401
-    import app.models.sync_gap     # noqa: F401
-    import app.models.price_cache  # noqa: F401
-    import app.models.node         # noqa: F401
-    import app.models.settings     # noqa: F401
-    import app.models.snapshot     # noqa: F401
+    import app.models.wallet          # noqa: F401
+    import app.models.event           # noqa: F401
+    import app.models.sync_state      # noqa: F401
+    import app.models.sync_gap        # noqa: F401
+    import app.models.price_cache     # noqa: F401
+    import app.models.node            # noqa: F401
+    import app.models.settings        # noqa: F401
+    import app.models.snapshot        # noqa: F401
+    import app.models.donor_cache     # noqa: F401
+    import app.models.address_label   # noqa: F401
+    import app.models.opening_position  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     yield engine

@@ -9,24 +9,24 @@ test.describe('Navigation', () => {
   })
 
   test('can navigate to Wallets page', async ({ page }) => {
-    await page.click('a[href*="wallet"], nav >> text=Wallets')
+    await page.locator('a[href*="wallet"]').first().click()
     await expect(page).toHaveURL(/wallet/)
     await expect(page.locator('h1, [class*="title"]').first()).toBeVisible()
   })
 
   test('can navigate to Settings page', async ({ page }) => {
-    await page.click('a[href*="setting"], nav >> text=Settings, nav >> text=Einstellungen')
+    await page.locator('a[href*="setting"]').first().click()
     await expect(page).toHaveURL(/setting/)
   })
 
   test('can navigate to Nodes page', async ({ page }) => {
-    await page.click('a[href*="node"], nav >> text=Nodes')
+    await page.locator('a[href*="node"]').first().click()
     await expect(page).toHaveURL(/node/)
   })
 
   test('can navigate back to Dashboard from Wallets', async ({ page }) => {
     await page.goto('/wallets')
-    await page.click('a[href="/"], nav >> text=Dashboard')
+    await page.locator('a[href="/"]').first().click()
     await expect(page).toHaveURL(/\/$|\/dashboard/)
   })
 })

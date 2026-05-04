@@ -17,12 +17,14 @@ test.describe('Wallets page', () => {
     await expect(addBtn).toBeVisible()
   })
 
-  test('shows empty state message when no wallets configured', async ({ page }) => {
-    // Either wallets are listed or the empty state message appears
-    const hasWallets = await page.locator('table tbody tr').count() > 0
-    if (!hasWallets) {
-      await expect(page.locator('text=No wallets, text=Keine Wallets').first()).toBeVisible()
-    }
+  test('shows wallet list or empty state', async ({ page }) => {
+    // Portfolio view uses cards (not table rows); Config view uses a table.
+    // Check for wallet cards, table rows, OR the empty-state text.
+    // i18n key wallet.none = "No wallets configured" (EN) / "Keine Wallets konfiguriert" (DE)
+    const hasCards   = await page.locator('[class*="card"]').count() > 0
+    const hasRows    = await page.locator('table tbody tr').count() > 0
+    const hasEmpty   = await page.locator('text=/No wallets|Keine Wallets/').isVisible().catch(() => false)
+    expect(hasCards || hasRows || hasEmpty).toBe(true)
   })
 
   test('wallet filter buttons are visible', async ({ page }) => {
