@@ -22,6 +22,19 @@ jobs:
         with:
           fetch-depth: 0   # needed to push tags
 
+      - name: Bump patch version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "$NEW_VERSION" > VERSION
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: bump version to ${NEW_VERSION} [skip ci]"
+          git push
+
       - name: Read version and create tag
         id: read
         run: |
@@ -101,6 +114,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/qubicflow-frontend:${{ needs.tag.outputs.version }}
             ${{ secrets.DOCKERHUB_USERNAME }}/qubicflow-frontend:latest
+          build-args: |
+            APP_VERSION=${{ needs.tag.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
