@@ -3,6 +3,7 @@ data/
 __pycache__/
 *.pyc
 .pytest_cache/
+backend_test*.log
 
 # Cython build artifacts
 *.so

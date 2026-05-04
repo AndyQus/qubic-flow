@@ -1,8 +1,0 @@
-INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
-INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
-WARNI [apscheduler.executors.default] Run time of job "backfill_missing_rates (trigger: interval[6:00:00], next run at: 2026-05-04 21:03:02 UTC)" was missed by 0:00:01.989008
-WARNI [apscheduler.executors.default] Run time of job "check_all_balances (trigger: interval[1:00:00], next run at: 2026-05-04 16:03:02 UTC)" was missed by 0:00:01.997361
-WARNI [apscheduler.executors.default] Run time of job "run_backfill_tx_epochs (trigger: interval[1:00:00], next run at: 2026-05-04 16:03:02 UTC)" was missed by 0:00:01.998810
-WARNI [apscheduler.executors.default] Run time of job "retry_sync_gaps (trigger: interval[0:15:00], next run at: 2026-05-04 15:18:02 UTC)" was missed by 0:00:02.001650
-WARNI [apscheduler.executors.default] Run time of job "refresh_donation_cache (trigger: interval[1:00:00], next run at: 2026-05-04 16:03:02 UTC)" was missed by 0:00:02.002584
-WARNI [apscheduler.executors.default] Run time of job "check_nodes (trigger: interval[0:00:30], next run at: 2026-05-04 15:04:32 UTC)" was missed by 0:00:01.315248
