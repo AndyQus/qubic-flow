@@ -210,6 +210,7 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
                     from_tick=gap_from,
                     to_tick=to_tick,
                     detected_at=now_utc_iso(),
+                    gap_type="EVENT",
                 ))
             logger.warning(f"Wallet {wallet_id}: validForTick={effective_tick} < to_tick={to_tick}, gap recorded")
         state.last_tick = effective_tick
@@ -223,6 +224,7 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
             from_tick=from_tick,
             to_tick=to_tick,
             detected_at=now_utc_iso(),
+            gap_type="EVENT",
         )
         db.add(gap)
         state.status = "FAILED"
@@ -500,6 +502,7 @@ async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=
                 from_tick=chunk_start,
                 to_tick=chunk_end,
                 detected_at=now_utc_iso(),
+                gap_type="TX",
             ))
             db.commit()
             logger.warning(f"TX chunk {chunk_start}-{chunk_end} failed for {wallet_id}: {e}")
@@ -639,3 +642,111 @@ def _set_sync_failed(db: Session, wallet_id: str, message: str):
         state.status = "FAILED"
         state.error_message = message[:500]
         db.commit()
+
+
+async def retry_sync_gaps():
+    """Scheduler job — retry all unresolved sync gaps (EVENT and TX).
+
+    Gaps are recorded whenever the archiver can't serve a tick range or an API
+    call fails mid-chunk.  This job picks them up and retries the exact range so
+    data is never permanently lost just because a node was temporarily offline.
+    On success the gap is marked resolved; on failure it stays open and will be
+    retried on the next run.
+    """
+    db = SessionLocal()
+    try:
+        gaps = (
+            db.query(SyncGap)
+            .filter(SyncGap.resolved_at.is_(None))
+            .order_by(SyncGap.detected_at)
+            .all()
+        )
+        if not gaps:
+            return
+
+        logger.info(f"Gap retry: {len(gaps)} unresolved gap(s) found")
+        log_buffer.add("INFO", "sync", f"Gap retry: {len(gaps)} unresolved gap(s) found")
+
+        client = _get_active_client(db)
+        try:
+            current_tick = await client.get_current_tick()
+        except Exception as e:
+            logger.warning(f"retry_sync_gaps: could not get current tick ({e}) — skipping")
+            log_buffer.add("WARNING", "sync", f"Gap retry skipped: could not get current tick ({e})")
+            return
+
+        event_client = await _get_event_client(db)
+        owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
+
+        resolved = 0
+        for gap in gaps:
+            gap_type = gap.gap_type or "EVENT"
+            effective_to = min(gap.to_tick, current_tick)
+            if gap.from_tick > effective_to:
+                # Gap is in the future — shouldn't happen, resolve silently.
+                gap.resolved_at = now_utc_iso()
+                db.commit()
+                continue
+            try:
+                if gap_type == "TX":
+                    await _sync_transactions(db, gap.wallet_id, gap.from_tick, effective_to, owned_addresses, client)
+                else:
+                    await _sync_window(db, gap.wallet_id, gap.from_tick, effective_to, owned_addresses, event_client)
+                gap.resolved_at = now_utc_iso()
+                db.commit()
+                resolved += 1
+                logger.info(
+                    f"Gap resolved: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to} ({gap_type})"
+                )
+                log_buffer.add(
+                    "INFO", "sync",
+                    f"Gap resolved: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to} ({gap_type})",
+                )
+            except Exception as e:
+                db.rollback()
+                logger.warning(
+                    f"Gap retry failed: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to} ({gap_type}): {e}"
+                )
+                log_buffer.add(
+                    "WARNING", "sync",
+                    f"Gap retry failed: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to}: {e}",
+                )
+
+        if resolved:
+            logger.info(f"Gap retry complete: {resolved}/{len(gaps)} resolved")
+            log_buffer.add("INFO", "sync", f"Gap retry complete: {resolved}/{len(gaps)} resolved")
+    finally:
+        db.close()
+
+
+async def _trigger_balance_resync(db: Session, wallet_id: str, since_tick: int, current_tick: int):
+    """Reset the event/TX sync pointers to re-fetch data from *since_tick*.
+
+    Called when the hourly balance check detects a mismatch between the
+    RPC-reported live balance and the balance computed from stored events.
+    Instead of a full reset (which would re-import everything), we only go
+    back to the wallet's balance baseline tick so the re-scan is minimal.
+    """
+    state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
+    if state is None:
+        return
+
+    new_event_tick = max(0, since_tick - 1)
+    new_tx_tick = max(0, since_tick - TX_WINDOW_SIZE)
+
+    if (state.last_tick or 0) <= new_event_tick and (state.last_tx_tick or 0) <= new_tx_tick:
+        return
+
+    logger.warning(
+        f"Balance mismatch for {wallet_id}: resetting event sync "
+        f"from tick {state.last_tick} → {new_event_tick}, "
+        f"TX sync from {state.last_tx_tick} → {new_tx_tick}"
+    )
+    log_buffer.add(
+        "WARNING", "sync",
+        f"Balance mismatch for {wallet_id}: re-sync triggered from tick {since_tick}",
+    )
+
+    state.last_tick = new_event_tick
+    state.last_tx_tick = new_tx_tick
+    db.commit()

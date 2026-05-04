@@ -11,3 +11,4 @@ class SyncGap(Base):
     to_tick = Column(Integer, nullable=False)
     detected_at = Column(Text, nullable=False)
     resolved_at = Column(Text, nullable=True)
+    gap_type = Column(Text, nullable=True)  # "EVENT" | "TX" | None (legacy = EVENT)
