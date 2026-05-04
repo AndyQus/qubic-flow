@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from .health_monitor import check_nodes
-from .sync_engine import sync_all_wallets, backfill_tx_epochs
+from .sync_engine import sync_all_wallets, backfill_tx_epochs, retry_sync_gaps
 from .snapshot_service import create_snapshot
 from .label_service import sync_labels
 from .coingecko import get_price_for_date
@@ -119,6 +119,17 @@ scheduler.add_job(
     "interval",
     hours=1,
     id="backfill_tx_epochs",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
+
+
+scheduler.add_job(
+    retry_sync_gaps,
+    "interval",
+    minutes=15,
+    id="retry_sync_gaps",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),
