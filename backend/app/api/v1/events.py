@@ -18,7 +18,7 @@ from ...services.donation_utils import (
 router = APIRouter()
 
 
-def _base_query(db, wallet_id=None, wallet_ids=None, epoch=None, month=None, year=None):
+def _base_query(db, wallet_id=None, wallet_ids=None, epoch=None, month=None, year=None, search=None):
     q = db.query(Event).join(Wallet, Wallet.id == Event.wallet_id).filter(Wallet.deleted_at.is_(None))
     if wallet_ids:
         q = q.filter(Event.wallet_id.in_(wallet_ids))
@@ -30,6 +30,16 @@ def _base_query(db, wallet_id=None, wallet_ids=None, epoch=None, month=None, yea
         q = q.filter(func.strftime('%Y-%m', Event.timestamp) == month)
     if year:
         q = q.filter(func.strftime('%Y', Event.timestamp) == str(year))
+    if search:
+        from sqlalchemy import or_, cast, String
+        term = f"%{search}%"
+        q = q.filter(or_(
+            Event.source_address.ilike(term),
+            Event.destination_addr.ilike(term),
+            cast(Event.amount_qubic, String).ilike(term),
+            cast(Event.epoch, String).ilike(term),
+            Event.note.ilike(term),
+        ))
     return q
 
 
@@ -63,9 +73,10 @@ def count_events(
     epoch: int | None = Query(None),
     month: str | None = Query(None),
     year: int | None = Query(None),
+    search: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return {"count": _base_query(db, wallet_id=wallet_id, wallet_ids=wallet_ids or None, epoch=epoch, month=month, year=year).count()}
+    return {"count": _base_query(db, wallet_id=wallet_id, wallet_ids=wallet_ids or None, epoch=epoch, month=month, year=year, search=search).count()}
 
 
 @router.get("/events", response_model=list[EventOut])
@@ -77,10 +88,11 @@ def list_events(
     epoch: int | None = Query(None),
     month: str | None = Query(None),
     year: int | None = Query(None),
+    search: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     events = (
-        _base_query(db, wallet_id=wallet_id, wallet_ids=wallet_ids or None, epoch=epoch, month=month, year=year)
+        _base_query(db, wallet_id=wallet_id, wallet_ids=wallet_ids or None, epoch=epoch, month=month, year=year, search=search)
         .order_by(desc(Event.tick_number))
         .offset(offset)
         .limit(limit)

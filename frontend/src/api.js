@@ -37,7 +37,13 @@ export const api = {
       const q = buildQuery(params)
       return req(`/events/count${q ? '?' + q : ''}`)
     },
-    filterOptions: (walletId) => req(`/events/filter-options?wallet_id=${walletId}`),
+    filterOptions: (walletId, walletIds = []) => {
+      if (walletIds.length) {
+        const q = buildQuery({ wallet_ids: walletIds })
+        return req(`/events/filter-options?${q}`)
+      }
+      return req(`/events/filter-options${walletId ? `?wallet_id=${walletId}` : ''}`)
+    },
     donationCheck: () => req('/events/donation-check'),
     donationSuppression: () => req('/events/donation-suppression'),
     donationTop: () => req('/events/donation-top'),

@@ -360,9 +360,9 @@ onMounted(async () => {
           <div v-else-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
-          <div v-else-if="topDonors.length > 0" class="overflow-x-auto max-h-[520px] overflow-y-auto">
+          <div v-else-if="topDonors.length > 0" class="overflow-x-auto">
             <table class="w-full text-xs">
-              <thead class="sticky top-0 bg-qubic-card">
+              <thead>
                 <tr class="text-gray-400 border-b border-qubic-border">
                   <th class="text-left pb-2 font-medium">#</th>
                   <th class="text-left pb-2 font-medium">Rang</th>
@@ -416,9 +416,9 @@ onMounted(async () => {
           <div v-if="effectiveDonationHistory.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.history_empty') }}
           </div>
-          <div v-else class="overflow-x-auto max-h-[520px] overflow-y-auto">
+          <div v-else class="overflow-x-auto">
             <table class="w-full text-xs">
-              <thead class="sticky top-0 bg-transparent">
+              <thead>
                 <tr class="text-gray-400 border-b border-emerald-500/30">
                   <th class="text-left pb-2 font-medium">{{ t('donation.history_sender') }}</th>
                   <th class="text-right pb-2 font-medium">{{ t('donation.history_amount') }}</th>

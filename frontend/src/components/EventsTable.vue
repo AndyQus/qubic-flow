@@ -159,7 +159,9 @@ const processedEvents = computed(() => props.events.map(ev => {
 <template>
   <div class="card overflow-hidden">
     <div v-if="title" class="px-3 pt-3 pb-1 text-sm text-gray-500 uppercase tracking-wide">{{ title }}</div>
-    <div v-if="loading" class="p-8 text-center text-gray-500 text-xs">{{ t('common.loading') }}</div>
+    <div v-if="loading" class="flex items-center justify-center py-10">
+      <div class="w-8 h-8 rounded-full border-2 border-qubic-border border-t-qubic-teal animate-spin" />
+    </div>
 
     <template v-else>
       <!-- Mobile: card list -->
