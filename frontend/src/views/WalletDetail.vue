@@ -50,6 +50,7 @@ watch(() => newPos.value.date, async (date) => {
 
 function fmtPrice(val) {
   if (val == null) return '—'
+  if (store.hideAddresses) return '••••••'
   return Number(val).toFixed(10).replace(/\.?0+$/, '') || '0'
 }
 
@@ -308,7 +309,7 @@ async function resyncTx() {
             <tr v-for="p in openingPositions" :key="p.id"
                 class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
               <td class="py-2 pr-3 whitespace-nowrap">{{ p.date }}</td>
-              <td class="py-2 pr-3 text-right font-mono">{{ Number(p.amount_qubic).toLocaleString(store.locale) }}</td>
+              <td class="py-2 pr-3 text-right font-mono">{{ store.hideAddresses ? '••••••' : Number(p.amount_qubic).toLocaleString(store.locale) }}</td>
               <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_eur) }}</td>
               <td class="py-2 pr-3 text-right font-mono">{{ fmtPrice(p.price_usd) }}</td>
               <td class="py-2 pr-3 text-gray-400">{{ p.note || '' }}</td>

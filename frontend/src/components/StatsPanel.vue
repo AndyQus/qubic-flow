@@ -30,6 +30,7 @@ const colors = {
 
 function fmt(n) {
   if (n == null) return '—'
+  if (store.hideAddresses) return '••••••'
   return Number(n).toLocaleString(store.locale)
 }
 </script>

@@ -93,11 +93,13 @@ async function refreshReport() {
 
 function fmtNum(val, dec = 2) {
   if (val === undefined || val === null) return '—'
+  if (store.hideAddresses) return '••••••'
   return Number(val).toLocaleString(store.locale, { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
 
 function fmtQu(val) {
   if (val === undefined || val === null) return '—'
+  if (store.hideAddresses) return '••••••'
   return Number(val).toLocaleString(store.locale, { maximumFractionDigits: 0 })
 }
 
@@ -372,15 +374,15 @@ function exportPDF() {
       <div v-if="mode === 'private'" class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label class="page-label block mb-1">{{ t('tax.name') }}</label>
-          <input v-model="taxSettings.name" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.name" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div>
           <label class="page-label block mb-1">{{ t('tax.tax_id') }}</label>
-          <input v-model="taxSettings.tax_id" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.tax_id" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div>
           <label class="page-label block mb-1">{{ t('tax.address') }}</label>
-          <input v-model="taxSettings.address" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.address" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
       </div>
 
@@ -388,23 +390,23 @@ function exportPDF() {
       <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label class="page-label block mb-1">{{ t('tax.company_name') }}</label>
-          <input v-model="taxSettings.company_name" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.company_name" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div>
           <label class="page-label block mb-1">{{ t('tax.company_tax_nr') }}</label>
-          <input v-model="taxSettings.company_tax_nr" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.company_tax_nr" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div>
           <label class="page-label block mb-1">{{ t('tax.company_vat') }}</label>
-          <input v-model="taxSettings.company_vat" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.company_vat" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div>
           <label class="page-label block mb-1">{{ t('tax.company_reg') }}</label>
-          <input v-model="taxSettings.company_reg" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.company_reg" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
         <div class="md:col-span-2">
           <label class="page-label block mb-1">{{ t('tax.company_address') }}</label>
-          <input v-model="taxSettings.company_address" type="text" class="input w-full text-sm" />
+          <input v-model="taxSettings.company_address" :type="store.hideAddresses ? 'password' : 'text'" class="input w-full text-sm" />
         </div>
       </div>
 

@@ -130,14 +130,19 @@ watch(selectedFunction, loadStats)
 onMounted(loadStats)
 
 // ── Formatierung ────────────────────────────────────────────────
-function fmt(n)    { return n == null ? '—' : Number(n).toLocaleString(store.locale) }
+function fmt(n)    {
+  if (n == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(n).toLocaleString(store.locale)
+}
 function fmtCurrency(n) {
   if (n == null) return '—'
+  if (store.hideAddresses) return '••••••'
   return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + currencySymbol.value
 }
 
 function fmtCurrencyAlt(n) {
-  if (n == null) return undefined
+  if (n == null || store.hideAddresses) return undefined
   return Number(n).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + altCurrencySymbol.value
 }
 
