@@ -19,12 +19,13 @@ const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const DEFAULT_BOB = 'https://bobnet.qubic.li'
-const isDev = import.meta.env.DEV
-const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1 })
+const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1, notes: '' })
 
 const logs = ref([])
 const logsLoading = ref(false)
 const checkingNodeId = ref(null)
+const syncing = ref(false)
+const diagnosing = ref(false)
 const logLevelFilter = ref('ALL')
 const logsPage = ref(1)
 const LOGS_PER_PAGE = 50
@@ -79,6 +80,31 @@ async function loadLogs() {
   }
 }
 
+async function triggerSyncNow() {
+  syncing.value = true
+  try {
+    await api.nodes.syncNow()
+    await new Promise(r => setTimeout(r, 3000))
+    await reload()
+  } finally {
+    syncing.value = false
+  }
+}
+
+async function triggerDiagnose() {
+  diagnosing.value = true
+  try {
+    await api.nodes.diagnose()
+    // Switch to logs tab and start auto-refresh
+    setActiveTab('logs')
+    await new Promise(r => setTimeout(r, 1500))
+    await loadLogs()
+  } finally {
+    diagnosing.value = false
+  }
+}
+
+
 async function triggerCheckNow(id) {
   checkingNodeId.value = id
   try {
@@ -100,7 +126,7 @@ function logLevelClass(level) {
 
 function startEdit(n) {
   editId.value  = n.id
-  form.value    = { url: n.url, node_type: n.node_type, label: n.label, priority: n.priority }
+  form.value    = { url: n.url, node_type: n.node_type, label: n.label, priority: n.priority, notes: n.notes || '' }
   showForm.value = true
 }
 
@@ -108,7 +134,7 @@ function cancelForm() {
   editId.value   = null
   showForm.value = false
   error.value    = ''
-  form.value     = { url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1 }
+  form.value     = { url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1, notes: '' }
 }
 
 async function submit() {
@@ -175,7 +201,31 @@ onMounted(reload)
 
   <!-- NODES TAB -->
   <template v-if="activeTab === 'nodes' && !loading">
-    <div class="flex justify-end">
+    <div class="flex justify-end gap-2">
+      <button class="btn-ghost text-sm flex items-center gap-1.5"
+              :disabled="diagnosing"
+              :title="t('node.diagnose_hint')"
+              @click="triggerDiagnose">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             :class="['w-3.5 h-3.5', diagnosing && 'animate-pulse']"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        {{ diagnosing ? t('node.diagnose_running') : t('node.diagnose') }}
+      </button>
+      <button class="btn-ghost text-sm flex items-center gap-1.5"
+              :disabled="syncing"
+              :title="t('node.sync_now_hint')"
+              @click="triggerSyncNow">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             :class="['w-3.5 h-3.5', syncing && 'animate-spin']"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        {{ syncing ? t('node.sync_now_running') : t('node.sync_now') }}
+      </button>
       <button class="btn" @click="editId = null; showForm = !showForm">+ {{ t('node.add') }}</button>
     </div>
 
@@ -188,10 +238,11 @@ onMounted(reload)
       </div>
       <select v-model="form.node_type" class="input w-full">
         <option value="RPC">RPC</option>
-        <option v-if="isDev" value="BOB_NODE">BOB_NODE</option>
+        <option value="BOB_NODE">BOB_NODE</option>
       </select>
       <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
-      <input v-model.number="form.priority" type="number" min="1" max="5" class="input w-full" />
+      <input v-model.number="form.priority" type="number" min="1" max="99" class="input w-full" />
+      <input v-model="form.notes" :placeholder="t('node.notes')" class="input w-full" />
       <p v-if="error" class="text-red-400 text-xs">{{ error }}</p>
       <div class="flex gap-2">
         <button class="btn" @click="submit">{{ t('common.save') }}</button>
@@ -217,6 +268,7 @@ onMounted(reload)
               <span v-if="n.label" class="text-xs text-gray-400">{{ n.label }}</span>
               <span class="text-xs text-gray-500">{{ t('node.priority') }}: {{ n.priority }}</span>
             </div>
+            <div v-if="n.notes" class="text-xs text-gray-500 mt-0.5 italic">{{ n.notes }}</div>
           </div>
           <button @click="toggle(n.id)"
                   :class="['relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none',
@@ -239,7 +291,7 @@ onMounted(reload)
           <button @click="startEdit(n)" class="btn-action" :title="t('wallet.edit')">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
-          <button @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
+          <button v-if="n.node_type !== 'RPC'" @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
         </div>
@@ -257,6 +309,7 @@ onMounted(reload)
               <th class="th">{{ t('node.url') }}</th>
               <th class="th">{{ t('node.type') }}</th>
               <th class="th">{{ t('node.label') }}</th>
+              <th class="th">{{ t('node.notes') }}</th>
               <th class="th">{{ t('node.tick') }}</th>
               <th class="th">{{ t('node.response') }}</th>
               <th class="th">{{ t('node.health') }}</th>
@@ -278,6 +331,7 @@ onMounted(reload)
               <td class="td font-mono">{{ n.url }}</td>
               <td class="td"><span class="pill">{{ n.node_type }}</span></td>
               <td class="td text-gray-300">{{ n.label || '—' }}</td>
+              <td class="td text-gray-500 italic text-xs">{{ n.notes || '—' }}</td>
               <td class="td font-mono">{{ n.tick || '—' }}</td>
               <td class="td">{{ n.response_time_ms ? `${n.response_time_ms} ms` : '—' }}</td>
               <td class="td">
@@ -302,7 +356,7 @@ onMounted(reload)
                 <button @click="startEdit(n)" class="btn-action" :title="t('wallet.edit')">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
-                <button @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
+                <button v-if="n.node_type !== 'RPC'" @click="remove(n.id)" class="btn-delete" :title="t('wallet.delete')">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 </button>
               </td>
@@ -344,6 +398,7 @@ onMounted(reload)
                   <th class="th w-40">{{ t('node.logs_time') }}</th>
                   <th class="th w-20">{{ t('node.logs_level') }}</th>
                   <th class="th w-24">{{ t('node.logs_source') }}</th>
+                  <th class="th w-48">{{ t('node.logs_node') }}</th>
                   <th class="th">{{ t('node.logs_message') }}</th>
                 </tr>
               </thead>
@@ -352,6 +407,7 @@ onMounted(reload)
                   <td class="td font-mono text-gray-500 whitespace-nowrap">{{ entry.ts }}</td>
                   <td class="td"><span :class="['text-xs font-mono font-semibold', logLevelClass(entry.level)]">{{ entry.level }}</span></td>
                   <td class="td"><span class="pill text-xs">{{ entry.source }}</span></td>
+                  <td class="td font-mono text-xs text-gray-400 truncate max-w-[12rem]" :title="entry.node">{{ entry.node || '—' }}</td>
                   <td class="td text-xs text-gray-300 break-all">{{ entry.message }}</td>
                 </tr>
               </tbody>
@@ -367,6 +423,7 @@ onMounted(reload)
               <span class="pill text-xs">{{ entry.source }}</span>
               <span class="text-xs text-gray-500 ml-auto font-mono">{{ entry.ts }}</span>
             </div>
+            <p v-if="entry.node" class="text-xs font-mono text-gray-500 truncate" :title="entry.node">{{ entry.node }}</p>
             <p class="text-xs text-gray-300 break-all">{{ entry.message }}</p>
           </div>
         </div>

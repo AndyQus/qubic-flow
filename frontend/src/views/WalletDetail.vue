@@ -92,10 +92,11 @@ async function deleteOpeningPosition(id) {
 }
 const PAGE_SIZE = 50
 
-const filterMode  = ref('all')   // 'all' | 'epoch' | 'month' | 'year'
-const filterEpoch = ref('')
-const filterMonth = ref('')
-const filterYear  = ref('')
+const filterMode       = ref('all')   // 'all' | 'epoch' | 'month' | 'year'
+const filterEpoch      = ref('')
+const filterMonth      = ref('')
+const filterYear       = ref('')
+const filterSourceType = ref('ALL')
 
 const availableYears  = ref([])
 const availableMonths = ref([])
@@ -129,7 +130,14 @@ function filterParams() {
   if (filterMode.value === 'epoch' && filterEpoch.value) p.epoch = Number(filterEpoch.value)
   if (filterMode.value === 'month' && filterMonth.value)  p.month = filterMonth.value
   if (filterMode.value === 'year'  && filterYear.value)   p.year  = Number(filterYear.value)
+  if (filterSourceType.value && filterSourceType.value !== 'ALL') p.source_type = filterSourceType.value
   return p
+}
+
+function onSourceTypeFilter(val) {
+  filterSourceType.value = val
+  page.value = 1
+  load()
 }
 
 async function load() {
@@ -351,7 +359,8 @@ async function resyncTx() {
     </div>
 
     <!-- Events-Tabelle -->
-    <EventsTable :events="events" :loading="loading" />
+    <EventsTable :events="events" :loading="loading" :showTypeFilter="true"
+                 @update:sourceTypeFilter="onSourceTypeFilter" />
 
     <!-- Paging -->
     <div v-if="totalPages > 1" class="flex items-center justify-center gap-4 py-2">

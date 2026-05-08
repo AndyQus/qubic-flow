@@ -10,7 +10,17 @@ const props = defineProps({
   loading:  { type: Boolean, default: false },
   title:    { type: String, default: null },
   readonly: { type: Boolean, default: false },
+  showTypeFilter: { type: Boolean, default: false },
 })
+
+const emit = defineEmits(['update:sourceTypeFilter'])
+const sourceTypeFilter = ref('ALL')
+function setSourceTypeFilter(v) {
+  sourceTypeFilter.value = v
+  emit('update:sourceTypeFilter', v)
+}
+
+const filteredEvents = computed(() => props.events)
 
 const editingNoteId = ref(null)
 const noteInput     = ref('')
@@ -143,7 +153,7 @@ function counterpart(ev) {
   return { addr: ev.source_address, name: ev.source_name }
 }
 
-const processedEvents = computed(() => props.events.map(ev => {
+const processedEvents = computed(() => filteredEvents.value.map(ev => {
   const _dir = ev.is_internal ? 'INTERNAL'
     : ownedIds.value.has(ev.destination_addr) ? 'IN'
     : ownedIds.value.has(ev.source_address) ? 'OUT'
@@ -158,7 +168,16 @@ const processedEvents = computed(() => props.events.map(ev => {
 
 <template>
   <div class="card overflow-hidden">
-    <div v-if="title" class="px-3 pt-3 pb-1 text-sm text-gray-500 uppercase tracking-wide">{{ title }}</div>
+    <div class="flex items-center justify-between gap-2 px-3 pt-3 pb-1" v-if="title || showTypeFilter">
+      <div v-if="title" class="text-sm text-gray-500 uppercase tracking-wide">{{ title }}</div>
+      <div v-if="showTypeFilter" class="flex gap-1 ml-auto">
+        <button v-for="opt in ['ALL', 'TX', 'EVENT']" :key="opt"
+                @click="setSourceTypeFilter(opt)"
+                :class="['tab-btn text-xs py-0.5 px-2', sourceTypeFilter === opt && 'tab-btn-active']">
+          {{ opt === 'ALL' ? t('event.filter_all') : opt === 'TX' ? t('event.filter_tx') : t('event.filter_event') }}
+        </button>
+      </div>
+    </div>
     <div v-if="loading" class="flex items-center justify-center py-10">
       <div class="w-8 h-8 rounded-full border-2 border-qubic-border border-t-qubic-teal animate-spin" />
     </div>
@@ -173,14 +192,18 @@ const processedEvents = computed(() => props.events.map(ev => {
                store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
                'p-3 flex items-start gap-3'
              ]">
-          <!-- Direction badge -->
-          <div class="flex-shrink-0 mt-0.5">
+          <!-- Direction + type badge -->
+          <div class="flex-shrink-0 mt-0.5 flex flex-col items-center gap-1">
             <span v-if="ev._dir === 'IN'"       class="text-green-400 text-xs font-bold">▲ IN</span>
             <span v-else-if="ev._dir === 'OUT'" class="text-red-400 text-xs font-bold">▼ OUT</span>
             <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
             <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 text-xs font-bold">⇄ INT</span>
             <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400 text-xs font-bold">⇄ INT</span>
             <span v-else class="text-gray-500 text-xs">—</span>
+            <span v-if="ev.source_type === 'EVENT'"
+                  class="text-xs px-1 rounded bg-violet-500/20 text-violet-300 leading-tight whitespace-nowrap">
+              {{ t('event.badge_event') }}
+            </span>
           </div>
           <!-- Main info -->
           <div class="flex-1 min-w-0">
@@ -298,12 +321,18 @@ const processedEvents = computed(() => props.events.map(ev => {
               <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
               <td class="px-3 py-2.5 text-gray-400 font-mono">{{ ev.epoch ?? '—' }}</td>
               <td class="px-3 py-2.5">
-                <span v-if="ev._dir === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
-                <span v-else-if="ev._dir === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
-                <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
-                <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
-                <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
-                <span v-else class="text-gray-500">—</span>
+                <div class="flex items-center gap-1.5">
+                  <span v-if="ev._dir === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
+                  <span v-else-if="ev._dir === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
+                  <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
+                  <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
+                  <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
+                  <span v-else class="text-gray-500">—</span>
+                  <span v-if="ev.source_type === 'EVENT'"
+                        class="text-xs px-1 rounded bg-violet-500/20 text-violet-300 leading-tight whitespace-nowrap">
+                    {{ t('event.badge_event') }}
+                  </span>
+                </div>
               </td>
               <!-- Betrag / Wert (kombiniert) -->
               <td class="px-3 py-2.5 text-right">

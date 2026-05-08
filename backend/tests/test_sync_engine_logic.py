@@ -158,9 +158,11 @@ class TestIsInternalDetection:
             f"Expected is_internal=0 for incoming transfer from external, got {event.is_internal}"
         )
 
-    def test_neither_owned_sets_is_internal_0(self, db, monkeypatch):
+    def test_transfer_not_involving_wallet_is_skipped(self, db, monkeypatch):
         """
-        When neither address is owned, is_internal=0.
+        Transfers where neither source nor destination is the synced wallet
+        must be filtered out. BOB/RPC responses can contain unfiltered
+        network-wide data; only events that actually touch wallet_id are stored.
         """
         _seed_wallets(db)
         _seed_sync_state(db, WALLET_A)
@@ -182,8 +184,9 @@ class TestIsInternalDetection:
         _run(engine_mod._persist_logs(db, WALLET_A, logs, owned))
 
         event = db.query(Event).filter(Event.id == "LOG_UNKNOWN_01").first()
-        assert event is not None
-        assert event.is_internal == 0
+        assert event is None, (
+            "Transfer between two external addresses must not be persisted for WALLET_A"
+        )
 
     def test_duplicate_log_id_not_inserted_twice(self, db, monkeypatch):
         """

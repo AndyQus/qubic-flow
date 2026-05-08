@@ -87,26 +87,67 @@ class RPCClient:
         return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
 
-def _map_bob_transfer(t: dict, timestamp: str = "0") -> dict:
-    """Map a BOB LogEvent to RPC-compatible eventLog format."""
-    msg = t.get("message") or {}
-    # QU_TRANSFER message fields — try multiple naming conventions
+_bob_rpc_id_counter = 0
+
+
+def _next_bob_rpc_id() -> int:
+    global _bob_rpc_id_counter
+    _bob_rpc_id_counter += 1
+    return _bob_rpc_id_counter
+
+
+def _ts_to_ms(ts_raw) -> str:
+    """Convert a raw BOB timestamp (Unix seconds or ms) to Unix-ms string."""
+    try:
+        ts = int(ts_raw)
+        if 0 < ts < 1_000_000_000_000:
+            ts *= 1000  # seconds → ms
+        return str(ts) if ts else "0"
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _map_bob_transfer(t: dict) -> dict:
+    """Map a BOB transfer entry to RPC-compatible eventLog format.
+
+    Handles the confirmed qubic_getTransfers / qubic_getLogs response shapes:
+      qubic_getTransfers: {body:{from,to,amount}, tick, epoch, txHash, timestamp, logId, type}
+      qubic_getLogs:      {source, destination, amount, tick, epoch, transactionHash, logId, logType}
+    """
+    # qubic_getTransfers wraps addresses in body:{from, to, amount}
+    body = t.get("body") or {}
     source = (
-        msg.get("sourceId") or msg.get("source_id") or
-        msg.get("source") or msg.get("from") or ""
+        body.get("from") or body.get("source") or
+        t.get("source") or t.get("from") or ""
     )
     dest = (
-        msg.get("destId") or msg.get("dest_id") or
-        msg.get("destination") or msg.get("to") or ""
+        body.get("to") or body.get("destination") or
+        t.get("destination") or t.get("to") or ""
     )
-    amount = msg.get("amount", 0)
-    log_id = str(t.get("logId", ""))
+    amount_raw = body.get("amount") or t.get("amount") or 0
+    try:
+        amount = int(amount_raw)
+    except (TypeError, ValueError):
+        amount = 0
+
+    log_id = (
+        t.get("txHash") or t.get("transactionHash") or
+        t.get("logDigest") or str(t.get("logId", ""))
+    )
+    tick = t.get("tick")
+    epoch = t.get("epoch")
+    log_type = t.get("type") or t.get("logType") or 0
+
+    # Timestamp: present in qubic_getTransfers (Unix seconds), absent in qubic_getLogs
+    ts_raw = t.get("timestamp")
+    timestamp = _ts_to_ms(ts_raw) if ts_raw else "0"
+
     return {
         "logId": log_id,
-        "epoch": t.get("epoch"),
-        "tickNumber": t.get("tick"),
+        "epoch": epoch,
+        "tickNumber": tick,
         "timestamp": timestamp,
-        "logType": t.get("logType", 0),
+        "logType": log_type,
         "logDigest": log_id,
         "categories": [],
         "quTransfer": {
@@ -118,128 +159,223 @@ def _map_bob_transfer(t: dict, timestamp: str = "0") -> dict:
 
 
 class BOBClient:
+    """Client for Qubic BOB nodes using JSON-RPC 2.0 over POST /qubic.
+
+    Implements the same interface as RPCClient so all sync paths work identically.
+    Transfer retrieval uses qubic_getTransfers with object-in-array params:
+      [{"address": identity, "startTick": N, "endTick": M}]
+    Fallback: qubic_getLogs with same params format.
+    Reference: https://github.com/qubic/Qubic.Net/tree/main/src/Qubic.Bob
+    """
+
     def __init__(self, url: str):
         self.base_url = url.rstrip('/')
-        # Cache transfers per (wallet_id, from_tick, to_tick) within one sync cycle
         self._cache: dict[tuple, list] = {}
-        # Cache tick timestamps to avoid duplicate lookups across wallets
         self._tick_ts_cache: dict[int, str] = {}
 
-    async def _request(self, method: str, path: str, **kwargs) -> dict:
+    async def _rpc(self, rpc_method: str, params=None) -> object:
+        """Execute a JSON-RPC 2.0 call on POST /qubic and return result."""
+        payload: dict = {"jsonrpc": "2.0", "id": _next_bob_rpc_id(), "method": rpc_method}
+        if params is not None:
+            payload["params"] = params
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
                 async with httpx.AsyncClient(verify=False) as client:
-                    r = await client.request(method, f"{self.base_url}{path}", timeout=30, **kwargs)
+                    r = await client.post(f"{self.base_url}/qubic", json=payload, timeout=30)
+                    r.raise_for_status()
+                    data = r.json()
+                    if data.get("error"):
+                        raise RuntimeError(f"BOB RPC error [{rpc_method}]: {data['error']}")
+                    return data.get("result")
+            except RuntimeError:
+                raise
+            except (httpx.HTTPError, httpx.TimeoutException) as e:
+                last_exc = e
+                wait = 2 ** attempt
+                logger.warning(f"BOB RPC {rpc_method} attempt {attempt+1} failed: {e}, retry in {wait}s")
+                await asyncio.sleep(wait)
+        raise last_exc if last_exc else RuntimeError(f"BOB RPC {rpc_method} failed")
+
+    async def _http_get(self, path: str) -> dict:
+        """HTTP GET with retry, SSL disabled."""
+        last_exc: Exception | None = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(verify=False) as client:
+                    r = await client.get(f"{self.base_url}{path}", timeout=15)
                     r.raise_for_status()
                     return r.json()
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 last_exc = e
-                wait = 2 ** attempt
-                logger.warning(f"BOB {path} attempt {attempt+1} failed: {e}, retry in {wait}s")
-                await asyncio.sleep(wait)
-        raise last_exc if last_exc else RuntimeError("BOB request failed")
+                await asyncio.sleep(2 ** attempt)
+        raise last_exc if last_exc else RuntimeError(f"BOB GET {path} failed")
+
+    # ------------------------------------------------------------------ tick
 
     async def get_tick_info(self) -> dict:
-        data = await self._request("GET", "/status")
-        tick = (
-            data.get("currentTick") or
-            data.get("currentFetchingTick") or
-            data.get("verifiedTick") or 0
-        )
-        return {"tickInfo": {"tick": int(tick)}}
-
-    async def _get_tick_timestamp(self, tick: int) -> str:
-        """Fetch the Unix-ms timestamp for a tick via GET /tick/{tick}."""
-        if tick in self._tick_ts_cache:
-            return self._tick_ts_cache[tick]
+        """Return tick info in RPC-compatible format."""
         try:
-            data = await self._request("GET", f"/tick/{tick}")
-            # New BOB format: {"tick": N, "tickdata": {day, month, hour, minute, second, ...}}
-            td = data.get("tickdata") if isinstance(data, dict) else None
-            if td and isinstance(td, dict) and td.get("month") and td.get("day"):
-                from datetime import datetime, timezone
-                year = datetime.now(timezone.utc).year
-                try:
-                    dt = datetime(year, int(td["month"]), int(td["day"]),
-                                  int(td.get("hour", 0)), int(td.get("minute", 0)),
-                                  int(td.get("second", 0)), tzinfo=timezone.utc)
-                    result = str(int(dt.timestamp() * 1000))
-                except (ValueError, TypeError):
-                    result = "0"
-            else:
-                # Legacy flat response shapes
-                ts_raw = (
-                    data.get("timestamp") or
-                    data.get("tick", {}).get("timestamp") or
-                    data.get("time") or
-                    data.get("tickTimestamp") or
-                    0
-                ) if isinstance(data, dict) else 0
-                ts = int(ts_raw)
-                if 0 < ts < 1_000_000_000_000:
-                    ts *= 1000
-                result = str(ts) if ts else "0"
+            tick = await self._rpc("qubic_getTickNumber")
+            return {"tickInfo": {"tick": int(tick or 0)}}
         except Exception as e:
-            logger.debug(f"BOB tick {tick} timestamp lookup failed: {e}")
-            result = "0"
-        self._tick_ts_cache[tick] = result
-        return result
+            logger.warning(f"BOB {self.base_url} qubic_getTickNumber failed: {e} — trying /status")
+        try:
+            data = await self._http_get("/status")
+            tick = (
+                data.get("currentTick") or data.get("currentFetchingTick") or
+                data.get("verifiedTick") or 0
+            )
+            return {"tickInfo": {"tick": int(tick)}}
+        except Exception as e:
+            raise RuntimeError(f"BOB {self.base_url}: cannot get tick: {e}")
 
     async def get_current_tick(self) -> int:
         info = await self.get_tick_info()
         return int(info.get("tickInfo", {}).get("tick", 0))
 
-    _BOB_CHUNK = 999  # BOB API: toTick - fromTick must be < 1000
+    # ------------------------------------------------------------------ balance
 
-    async def _fetch_transfers_chunked(self, wallet_id: str, from_tick: int, to_tick: int) -> list:
-        """Fetch all transfers, splitting the range into BOB-compatible chunks."""
-        raw: list = []
-        chunk_start = from_tick
-        while chunk_start <= to_tick:
-            chunk_end = min(chunk_start + self._BOB_CHUNK - 1, to_tick)
-            payload = {"fromTick": chunk_start, "toTick": chunk_end, "identity": wallet_id}
-            data = await self._request("POST", "/getQuTransfersForIdentity", json=payload)
-            raw.extend(data.get("transfers") or [])
-            chunk_start = chunk_end + 1
-        return raw
+    async def get_balance(self, wallet_id: str) -> int | None:
+        """Fetch QU balance — tries JSON-RPC then REST /balance/{id}."""
+        try:
+            result = await self._rpc("qubic_getBalance", [wallet_id])
+            if result and isinstance(result, dict):
+                raw = result.get("balance", 0)
+                return int(raw) if raw is not None else None
+        except Exception as e:
+            logger.warning(f"BOB qubic_getBalance failed: {e} — trying REST")
+        try:
+            data = await self._http_get(f"/balance/{wallet_id}")
+            return data.get("balance")
+        except Exception:
+            return None
+
+    # ------------------------------------------------------------------ timestamp
+
+    async def _get_tick_timestamp(self, tick: int) -> str:
+        """Resolve Unix-ms timestamp for a tick number."""
+        if tick in self._tick_ts_cache:
+            return self._tick_ts_cache[tick]
+        result = "0"
+        try:
+            data = await self._rpc("qubic_getTickByNumber", [tick])
+            if isinstance(data, dict) and data.get("timestamp"):
+                result = _ts_to_ms(data["timestamp"])
+        except Exception:
+            pass
+        if result == "0":
+            try:
+                data = await self._http_get(f"/tick/{tick}")
+                td = data.get("tickdata") if isinstance(data, dict) else None
+                if td and td.get("month") and td.get("day"):
+                    year = datetime.now(timezone.utc).year
+                    dt = datetime(year, int(td["month"]), int(td["day"]),
+                                  int(td.get("hour", 0)), int(td.get("minute", 0)),
+                                  int(td.get("second", 0)), tzinfo=timezone.utc)
+                    result = str(int(dt.timestamp() * 1000))
+                elif isinstance(data, dict):
+                    ts_raw = data.get("timestamp") or data.get("time") or 0
+                    result = _ts_to_ms(ts_raw)
+            except Exception as e:
+                logger.debug(f"BOB tick {tick} timestamp fallback failed: {e}")
+        self._tick_ts_cache[tick] = result
+        return result
+
+    # ------------------------------------------------------------------ transfers
+
+    def _transfer_involves_wallet(self, t: dict, wallet_id: str) -> bool:
+        """Return True if this transfer involves wallet_id as source or destination."""
+        body = t.get("body") or {}
+        source = body.get("from") or body.get("source") or t.get("source") or t.get("from") or ""
+        dest = body.get("to") or body.get("destination") or t.get("destination") or t.get("to") or ""
+        return source == wallet_id or dest == wallet_id
+
+    async def _fetch_raw(self, wallet_id: str, from_tick: int, to_tick: int) -> tuple[list, int | None]:
+        """Fetch raw transfers from BOB. Returns (transfers, actual_tick_served).
+
+        BOB ignores startTick/endTick and always returns data for the current live tick.
+        We return the actual tick BOB served so callers can report validForTick correctly.
+        """
+        try:
+            result = await self._rpc(
+                "qubic_getTransfers",
+                [{"address": wallet_id, "startTick": from_tick, "endTick": to_tick}],
+            )
+            if isinstance(result, dict):
+                transfers = [t for t in (result.get("transfers") or []) if isinstance(t, dict)]
+                # BOB returns fromTick=toTick equal to the actual live tick served
+                actual_tick = result.get("toTick") or result.get("fromTick")
+                return transfers, actual_tick
+            if isinstance(result, list):
+                return [t for t in result if isinstance(t, dict)], None
+        except Exception as e:
+            logger.warning(f"BOB qubic_getTransfers failed: {e} — trying qubic_getLogs")
+        try:
+            result = await self._rpc(
+                "qubic_getLogs",
+                [{"address": wallet_id, "startTick": from_tick, "endTick": to_tick}],
+            )
+            logs = [t for t in (result if isinstance(result, list) else []) if isinstance(t, dict)]
+            return logs, None
+        except Exception as e:
+            logger.warning(f"BOB qubic_getLogs also failed: {e}")
+        return [], None
+
+    async def _fetch_transfers(self, wallet_id: str, from_tick: int, to_tick: int) -> tuple[list, int]:
+        """Fetch transfers involving wallet_id and return (matching_transfers, valid_for_tick).
+
+        BOB serves only its current live tick — it cannot retrieve historical data.
+        valid_for_tick is the actual tick BOB served data for (or to_tick if unknown).
+        Callers should use valid_for_tick (not to_tick) to advance state.last_tick so
+        gaps are recorded instead of silently skipped.
+        """
+        raw, actual_tick = await self._fetch_raw(wallet_id, from_tick, to_tick)
+        matching = [t for t in raw if self._transfer_involves_wallet(t, wallet_id)]
+        valid_for_tick = actual_tick if actual_tick is not None else to_tick
+        logger.debug(
+            f"BOB fetch {from_tick}-{to_tick}: actual_tick={actual_tick}, "
+            f"total={len(raw)}, wallet={len(matching)}"
+        )
+        return matching, valid_for_tick
+
+    # ------------------------------------------------------------------ event_logs (QubicEventSource protocol)
 
     async def get_event_logs(self, wallet_id: str, from_tick: int, to_tick: int, offset: int = 0, size: int = 1000) -> dict:
         key = (wallet_id, from_tick, to_tick)
         if key not in self._cache:
-            raw = await self._fetch_transfers_chunked(wallet_id, from_tick, to_tick)
+            raw, valid_for_tick = await self._fetch_transfers(wallet_id, from_tick, to_tick)
 
-            # Fetch timestamps for all unique ticks (BOB transfers have no timestamp field)
-            unique_ticks = {t.get("tick") for t in raw if t.get("tick")}
+            # Resolve missing timestamps via qubic_getTickByNumber
+            needs_ts = {t.get("tick") for t in raw if t.get("tick") and not t.get("timestamp")}
             tick_ts: dict[int, str] = {}
-            for tick in unique_ticks:
+            for tick in needs_ts:
                 tick_ts[tick] = await self._get_tick_timestamp(tick)
 
             mapped = []
             for t in raw:
-                tick = t.get("tick")
-                ts = tick_ts.get(tick, "0") if tick else "0"
-                mapped.append(_map_bob_transfer(t, timestamp=ts))
+                entry = _map_bob_transfer(t)
+                if entry["timestamp"] == "0" and t.get("tick") in tick_ts:
+                    entry["timestamp"] = tick_ts[t["tick"]]
+                mapped.append(entry)
 
-            self._cache[key] = mapped
-            logger.debug(f"BOB: fetched {len(self._cache[key])} transfers for {wallet_id} ticks {from_tick}-{to_tick}")
+            self._cache[key] = (mapped, valid_for_tick)
 
-        all_logs = self._cache[key]
+        all_logs, valid_for_tick = self._cache[key]
         return {
             "hits": {"total": len(all_logs)},
-            "validForTick": to_tick,
+            "validForTick": valid_for_tick,
             "eventLogs": all_logs[offset: offset + size],
         }
 
     async def get_transfer_transactions(self, wallet_id: str, from_tick: int, to_tick: int, page: int = 1, page_size: int = 100) -> dict:
-        # Transfers are already captured via get_event_logs for BOB nodes
+        # Transfers are captured via get_event_logs for BOB nodes
         return {"transactions": [], "pagination": {"totalPages": 1}}
 
     async def supports_event_logs(self) -> bool:
-        """Return True if this BOB node has the getEventLogs endpoint.
+        """Probe whether this BOB node supports transfer retrieval.
 
-        Result is cached permanently on success, and retried once per day on failure.
-        Transient errors (timeout, 5xx) are not cached so the next sync cycle retries.
+        Cached permanently on success, retried after _BOB_CAPABILITY_RETRY_HOURS on failure.
         """
         from datetime import timedelta
         now = datetime.now(timezone.utc)
@@ -252,19 +388,20 @@ class BOBClient:
                 return False
 
         try:
-            async with httpx.AsyncClient(verify=False) as client:
-                r = await client.post(
-                    f"{self.base_url}/query/v1/getEventLogs",
-                    json={"should": [], "ranges": {}, "pagination": {"offset": 0, "size": 1}},
-                    timeout=10,
+            tick = await self._rpc("qubic_getTickNumber")
+            if tick:
+                result = await self._rpc(
+                    "qubic_getTransfers",
+                    [{"address": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                      "startTick": int(tick) - 10, "endTick": int(tick)}],
                 )
-            if r.status_code == 404:
-                _bob_capability_cache[self.base_url] = (False, now)
-                logger.info(f"BOB {self.base_url}: getEventLogs not available (404) — retry in {_BOB_CAPABILITY_RETRY_HOURS}h")
-                return False
-            _bob_capability_cache[self.base_url] = (True, now)
-            logger.info(f"BOB {self.base_url}: getEventLogs available — switching event source")
-            return True
+                # Any response (even empty transfers) means the endpoint works
+                _bob_capability_cache[self.base_url] = (True, now)
+                logger.info(f"BOB {self.base_url}: qubic_getTransfers available — using as event source")
+                return True
         except Exception as e:
-            logger.debug(f"BOB {self.base_url}: getEventLogs probe failed ({e}) — using RPC this cycle")
+            logger.info(f"BOB {self.base_url}: transfer probe failed ({e}) — not using as event source")
+            _bob_capability_cache[self.base_url] = (False, now)
             return False
+        _bob_capability_cache[self.base_url] = (False, now)
+        return False

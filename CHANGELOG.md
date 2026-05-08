@@ -4,6 +4,38 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.0] — 2026-05-08
+
+### Added
+- **Node Notes** — free-text notes field on each node (stored in DB via Alembic migration 013)
+- **BOB-Node full integration** — JSON-RPC 2.0 client (`qubic_getTransfers`, `qubic_getLogs`) with REST fallback; BOB serves as live event source, RPC as history source
+- **Node diagnostics** — `POST /nodes/diagnose` runs connectivity + sync checks and writes results to the log buffer
+- **Manual sync** — `POST /nodes/sync-now` triggers an immediate full wallet sync from the UI
+- **Event type filter** — TX / EVENT / ALL filter buttons in the events table; filter is applied server-side so pagination stays correct
+- **source_type filter** — `GET /events` and `GET /events/count` accept `source_type` query parameter
+
+### Changed
+- **BOB-Node health checks** — now correctly set `tick`, `health_status`, `response_time_ms`, and `fail_count` after every check (indentation bug fixed)
+- **Transfer filter** — only events that involve the synced wallet are persisted; unfiltered network-wide BOB/RPC data is silently dropped
+- **Sync engine** — BOB gap handling, `valid_for_tick` tracking, improved chunking and retry logic
+
+### Fixed
+- **`_run_diagnose` DB session** — now opens its own `SessionLocal()` instead of reusing the request session (prevented `DetachedInstanceError` after response end)
+- **`_fetch_raw` on RPCClient** — `isinstance(BOBClient)` guard prevents `AttributeError` when event source is RPC
+- **Duplicate sync/diagnose runs** — `_sync_running` / `_diagnose_running` flags return HTTP 429 on concurrent calls
+
+### Security
+- **SSRF protection** — `NodeCreate.url` validator blocks `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, `172.x`, and non-http(s) schemes
+- **node_type enum** — `node_type` field now validated as `Literal["RPC", "BOB_NODE"]`; arbitrary strings rejected with HTTP 422
+- **notes max_length** — `notes` field capped at 2000 characters
+
+### Tests
+- 46 new tests covering all 7 code-review/security-audit fixes (`test_review_fixes.py`)
+- `test_bob_client.py` updated to match new `_rpc`/`_http_get` interface (was patching removed `_request` method)
+- `test_sync_engine_logic.py` — updated `test_neither_owned_sets_is_internal_0` to reflect intentional wallet-filter behaviour
+
+---
+
 ## [0.1.16] — 2026-05-08
 
 ### Added

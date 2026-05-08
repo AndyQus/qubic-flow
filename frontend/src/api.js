@@ -63,6 +63,8 @@ export const api = {
     logs: () => req('/nodes/logs'),
     logErrorCheck: () => req('/nodes/logs/error-check'),
     checkNow: (id) => req(`/nodes/${id}/check-now`, { method: 'POST' }),
+    syncNow: () => req('/nodes/sync-now', { method: 'POST' }),
+    diagnose: () => req('/nodes/diagnose', { method: 'POST' }),
   },
   stats: {
     current:  (walletIds = []) => {

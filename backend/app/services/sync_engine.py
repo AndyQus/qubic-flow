@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select, update, func
@@ -14,6 +15,7 @@ from .coingecko import get_price_for_date
 from ..websocket.manager import manager
 from ..models.node import Node
 from ..utils.log_buffer import log_buffer
+from ..config import settings
 
 import httpx
 
@@ -23,6 +25,9 @@ MAX_WINDOW_RECORDS = 10000
 PAGE_SIZE = 1000
 
 _active_sync_node_id: int | None = None
+_last_event_source_log: float = 0.0   # Unix timestamp of last "event source" log entry
+_last_event_source_key: str = ""       # e.g. "BOB:https://bobnet.qubic.li"
+_EVENT_SOURCE_LOG_INTERVAL = 3600      # log at most once per hour unless source changes
 
 
 def get_active_sync_node_id() -> int | None:
@@ -52,12 +57,37 @@ def _get_ordered_clients(db):
     return result
 
 
-async def _get_event_client(db):
-    """Return the best available event client.
+def _get_rpc_client(db) -> RPCClient:
+    """Return the best available RPC client for historical/gap queries.
 
-    Prefers a BOB node once it announces support for getEventLogs (cached daily).
-    Falls back to an RPC node otherwise, or the default RPC if no nodes are configured.
-    If BOB is unreachable the probe raises and we silently fall through to RPC.
+    Priority:
+      1. User-configured RPC node (ONLINE preferred, DEGRADED accepted)
+      2. Default URL from settings (settings.qubic_rpc_url = rpc.qubic.org)
+
+    This means users can always change the fallback URL by adding/editing their
+    RPC node entry — no code release needed.
+    """
+    rpc_node = (
+        db.query(Node)
+        .filter(
+            Node.is_active == 1,
+            Node.node_type == "RPC",
+            Node.health_status.in_(["ONLINE", "DEGRADED"]),
+        )
+        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .first()
+    )
+    if rpc_node:
+        return RPCClient(rpc_node.url)
+    return RPCClient()  # falls back to settings.qubic_rpc_url
+
+
+async def _get_event_client(db):
+    """Return the best available event client for incremental (live) sync.
+
+    BOB nodes are preferred for live sync since they stream the current tick efficiently.
+    BOB cannot perform historical queries — use _get_rpc_client() for gap filling instead.
+    Falls back to RPC if no BOB node is available or reachable.
     """
     bob_node = (
         db.query(Node)
@@ -73,26 +103,12 @@ async def _get_event_client(db):
         bob = BOBClient(bob_node.url)
         try:
             if await bob.supports_event_logs():
-                logger.info(f"BOB {bob_node.url}: full event log support — using as primary event source")
-            else:
-                logger.debug(f"BOB {bob_node.url}: no getEventLogs endpoint — using QU transfer fallback")
+                logger.info(f"BOB {bob_node.url}: live-tick streaming active")
             return bob
         except Exception as e:
             logger.warning(f"BOB {bob_node.url} probe failed ({e}) — falling back to RPC")
 
-    rpc_node = (
-        db.query(Node)
-        .filter(
-            Node.is_active == 1,
-            Node.node_type == "RPC",
-            Node.health_status.in_(["ONLINE", "DEGRADED"]),
-        )
-        .order_by(Node.health_status != "ONLINE", Node.priority)
-        .first()
-    )
-    if rpc_node:
-        return RPCClient(rpc_node.url)
-    return RPCClient()
+    return _get_rpc_client(db)
 
 
 def elect_active_sync_node(db) -> int | None:
@@ -126,7 +142,7 @@ async def sync_all_wallets():
                 break
             except Exception as e:
                 logger.warning(f"Node {getattr(node, 'url', 'fallback')} get_tick failed: {e}, trying next")
-                log_buffer.add("WARNING", "sync", f"Node {getattr(node, 'url', 'fallback')} get_tick failed: {e}")
+                log_buffer.add("WARNING", "sync", f"get_tick failed: {e}", node=getattr(node, 'url', 'fallback'))
                 if node is not None:
                     node.fail_count = (node.fail_count or 0) + 1
                     node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"
@@ -141,32 +157,52 @@ async def sync_all_wallets():
                 current_tick = await rpc_fallback.get_current_tick()
                 client = rpc_fallback
                 logger.info("All configured nodes failed — using default RPC as fallback")
-                log_buffer.add("INFO", "sync", "All configured nodes failed — using default RPC as fallback")
+                log_buffer.add("INFO", "sync", "All configured nodes failed — using default RPC as fallback", node=settings.qubic_rpc_url)
             except Exception as e:
                 logger.error(f"Default RPC fallback also failed: {e} — sync skipped")
-                log_buffer.add("ERROR", "sync", f"Default RPC fallback also failed: {e} — sync skipped")
+                log_buffer.add("ERROR", "sync", f"Default RPC fallback also failed: {e} — sync skipped", node=settings.qubic_rpc_url)
                 return
 
         event_client = await _get_event_client(db)
+        rpc_client_for_history = _get_rpc_client(db)
+
+        # Log which source is fetching events — at most once per hour, immediately on change.
+        global _last_event_source_log, _last_event_source_key
+        _src_type = "BOB" if isinstance(event_client, BOBClient) else "RPC"
+        _src_url = getattr(event_client, 'base_url', settings.qubic_rpc_url)
+        _src_key = f"{_src_type}:{_src_url}"
+        _now = time.monotonic()
+        _now = time.monotonic()
+        if _src_key != _last_event_source_key or (_now - _last_event_source_log) >= _EVENT_SOURCE_LOG_INTERVAL:
+            msg = f"Event source active: {_src_type}"
+            logger.info(msg)
+            log_buffer.add("INFO", "sync", msg, node=_src_url)
+            _last_event_source_key = _src_key
+            _last_event_source_log = _now
 
         wallets = db.query(Wallet).filter(Wallet.active == 1, Wallet.deleted_at.is_(None)).all()
         for wallet in wallets:
             try:
-                await sync_wallet(db, wallet.id, current_tick, event_client)
+                await sync_wallet(db, wallet.id, current_tick, event_client, rpc_client_for_history)
             except Exception as e:
                 logger.error(f"Event sync failed for wallet {wallet.id}: {e}", exc_info=True)
-                log_buffer.add("ERROR", "sync", f"Event sync failed for wallet {wallet.id}: {e}")
+                log_buffer.add("ERROR", "sync", f"Event sync failed for wallet {wallet.id}: {e}", node=_src_url)
                 _set_sync_failed(db, wallet.id, str(e))
             try:
                 await sync_wallet_tx(db, wallet.id, current_tick, client)
             except Exception as e:
                 logger.error(f"TX sync failed for wallet {wallet.id}: {e}", exc_info=True)
-                log_buffer.add("ERROR", "sync", f"TX sync failed for wallet {wallet.id}: {e}")
+                log_buffer.add("ERROR", "sync", f"TX sync failed for wallet {wallet.id}: {e}", node=_src_url)
     finally:
         db.close()
 
 
-async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=None):
+async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=None, rpc_fallback=None):
+    """Sync a wallet's event log.
+
+    client: the preferred event source (may be BOBClient for live sync).
+    rpc_fallback: always an RPCClient; used for initial/historical sync since BOB cannot backfill.
+    """
     if client is None:
         client = RPCClient()
     state = db.query(SyncState).filter(SyncState.wallet_id == wallet_id).first()
@@ -182,13 +218,35 @@ async def sync_wallet(db: Session, wallet_id: str, current_tick: int, client=Non
     if from_tick > to_tick:
         return
 
+    # Always prefer BOB if available — BOB may already have the current tick's transfers ready.
+    # Only fall back to RPC if BOB returns no data (empty response or error).
+    # The _sync_window / _fetch_transfers logic handles gaps via validForTick automatically.
+    is_bob = isinstance(client, BOBClient)
+    if is_bob:
+        logger.info(f"Wallet {wallet_id}: gap {to_tick - from_tick} ticks, trying BOB first")
+    effective_client = client
+
     state.status = "SYNCING"
     state.last_sync = now_utc_iso()
     db.commit()
 
     try:
         owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
-        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, client, broadcast=not is_initial_sync)
+        max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, effective_client, broadcast=not is_initial_sync)
+
+        # BOB only serves its current live tick, so valid_for_tick may be >> from_tick,
+        # leaving the range [from_tick .. valid_for_tick-1] unfilled.
+        # Fill that historical gap via RPC before accepting BOB's tick as the new baseline.
+        if is_bob and max_valid_tick is not None and max_valid_tick > from_tick:
+            historical_to = max_valid_tick - 1
+            if historical_to >= from_tick:
+                logger.info(f"Wallet {wallet_id}: BOB served tick {max_valid_tick}, backfilling gap {from_tick}-{historical_to} via RPC")
+                rpc = rpc_fallback or _get_rpc_client(db)
+                await _sync_window(db, wallet_id, from_tick, historical_to, owned_addresses, rpc, broadcast=not is_initial_sync)
+        elif is_bob and (max_valid_tick is None or max_valid_tick < from_tick):
+            logger.info(f"Wallet {wallet_id}: BOB had no data for tick range {from_tick}-{to_tick}, falling back to RPC")
+            rpc = rpc_fallback or _get_rpc_client(db)
+            max_valid_tick = await _sync_window(db, wallet_id, from_tick, to_tick, owned_addresses, rpc, broadcast=not is_initial_sync)
 
         effective_tick = max_valid_tick if max_valid_tick is not None else to_tick
         if effective_tick < to_tick:
@@ -332,6 +390,11 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         source = qu.get("source")
         dest = qu.get("destination")
         amount = int(qu.get("amount", "0")) if qu.get("amount") else 0
+
+        # Only persist events that actually involve this wallet.
+        # BOB and some RPC responses may return unfiltered network-wide data.
+        if source != wallet_id and dest != wallet_id:
+            continue
 
         ts_iso = unix_ms_to_iso(log.get("timestamp", "0"))
         date_str = iso_to_date(ts_iso)
@@ -675,7 +738,9 @@ async def retry_sync_gaps():
             log_buffer.add("WARNING", "sync", f"Gap retry skipped: could not get current tick ({e})")
             return
 
-        event_client = await _get_event_client(db)
+        # Gap filling always uses RPC — BOB only streams the live tick and cannot backfill history
+        rpc_event_client = _get_rpc_client(db)
+        rpc_event_url = getattr(rpc_event_client, 'base_url', settings.qubic_rpc_url)
         owned_addresses = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
 
         resolved = 0
@@ -691,7 +756,7 @@ async def retry_sync_gaps():
                 if gap_type == "TX":
                     await _sync_transactions(db, gap.wallet_id, gap.from_tick, effective_to, owned_addresses, client)
                 else:
-                    await _sync_window(db, gap.wallet_id, gap.from_tick, effective_to, owned_addresses, event_client)
+                    await _sync_window(db, gap.wallet_id, gap.from_tick, effective_to, owned_addresses, rpc_event_client)
                 gap.resolved_at = now_utc_iso()
                 db.commit()
                 resolved += 1
@@ -701,6 +766,7 @@ async def retry_sync_gaps():
                 log_buffer.add(
                     "INFO", "sync",
                     f"Gap resolved: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to} ({gap_type})",
+                    node=rpc_event_url,
                 )
             except Exception as e:
                 db.rollback()
@@ -710,6 +776,7 @@ async def retry_sync_gaps():
                 log_buffer.add(
                     "WARNING", "sync",
                     f"Gap retry failed: wallet {gap.wallet_id} ticks {gap.from_tick}-{effective_to}: {e}",
+                    node=rpc_event_url,
                 )
 
         if resolved:
@@ -742,9 +809,12 @@ async def _trigger_balance_resync(db: Session, wallet_id: str, since_tick: int, 
         f"from tick {state.last_tick} → {new_event_tick}, "
         f"TX sync from {state.last_tx_tick} → {new_tx_tick}"
     )
+    active_client = _get_rpc_client(db)
+    active_node_url = getattr(active_client, 'base_url', settings.qubic_rpc_url)
     log_buffer.add(
         "WARNING", "sync",
         f"Balance mismatch for {wallet_id}: re-sync triggered from tick {since_tick}",
+        node=active_node_url,
     )
 
     state.last_tick = new_event_tick

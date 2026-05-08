@@ -9,12 +9,13 @@ class _LogBuffer:
     def __init__(self):
         self._entries = deque(maxlen=_MAX)
 
-    def add(self, level: str, source: str, message: str):
+    def add(self, level: str, source: str, message: str, node: str | None = None):
         self._entries.appendleft({
             "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "level": level,
             "source": source,
             "message": message,
+            "node": node,
         })
 
     def get(self, limit: int = 200):

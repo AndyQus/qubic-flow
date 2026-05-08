@@ -39,26 +39,46 @@ async def _check_node(db, node: Node):
     start = time.perf_counter()
     verify = node.node_type != "BOB_NODE"
     try:
-        async with httpx.AsyncClient(verify=verify) as client:
-            r = await client.get(url, timeout=10)
-            r.raise_for_status()
-            data = r.json()
-            if node.node_type == "BOB_NODE":
-                tick = int(
-                    data.get("currentTick") or
-                    data.get("currentFetchingTick") or
-                    data.get("verifiedTick") or 0
-                )
-            else:
+        if node.node_type == "BOB_NODE":
+            # Try JSON-RPC first (qubic_getTickNumber), fall back to REST /status
+            tick = 0
+            try:
+                async with httpx.AsyncClient(verify=False) as client:
+                    rpc_r = await client.post(
+                        f"{base}/qubic",
+                        json={"jsonrpc": "2.0", "id": 1, "method": "qubic_getTickNumber"},
+                        timeout=10,
+                    )
+                    rpc_r.raise_for_status()
+                    rpc_data = rpc_r.json()
+                    if not rpc_data.get("error") and rpc_data.get("result") is not None:
+                        tick = int(rpc_data["result"] or 0)
+            except Exception:
+                pass
+            if tick == 0:
+                async with httpx.AsyncClient(verify=False) as client:
+                    r = await client.get(url, timeout=10)
+                    r.raise_for_status()
+                    data = r.json()
+                    tick = int(
+                        data.get("currentTick") or
+                        data.get("currentFetchingTick") or
+                        data.get("verifiedTick") or 0
+                    )
+        else:
+            async with httpx.AsyncClient(verify=verify) as client:
+                r = await client.get(url, timeout=10)
+                r.raise_for_status()
+                data = r.json()
                 tick = int(data.get("tickInfo", {}).get("tick", 0))
-            elapsed = int((time.perf_counter() - start) * 1000)
-            node.tick = tick
-            node.response_time_ms = elapsed
-            node.health_status = "ONLINE" if elapsed < 3000 else "DEGRADED"
-            node.fail_count = 0
-            node.last_error = None
-            logger.info(f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
-            log_buffer.add("INFO", "health", f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
+        elapsed = int((time.perf_counter() - start) * 1000)
+        node.tick = tick
+        node.response_time_ms = elapsed
+        node.health_status = "ONLINE" if elapsed < 3000 else "DEGRADED"
+        node.fail_count = 0
+        node.last_error = None
+        logger.info(f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
+        log_buffer.add("INFO", "health", f"Node {node.url}: {node.health_status} ({elapsed} ms, tick {tick})")
     except Exception as e:
         node.fail_count = (node.fail_count or 0) + 1
         node.health_status = "OFFLINE" if node.fail_count >= 3 else "DEGRADED"

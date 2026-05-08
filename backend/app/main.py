@@ -47,15 +47,30 @@ def _seed_defaults():
     from .models.node import Node
     db = SessionLocal()
     try:
-        if db.query(Node).count() == 0:
+        changed = False
+        if not db.query(Node).filter(Node.url == "https://bobnet.qubic.li").first():
+            db.add(Node(
+                url="https://bobnet.qubic.li",
+                node_type="BOB_NODE",
+                label="Qubic BOB",
+                priority=10,
+                is_active=1,
+                health_status="ONLINE",
+                notes="live sync",
+            ))
+            changed = True
+        if not db.query(Node).filter(Node.url == "https://rpc.qubic.org").first():
             db.add(Node(
                 url="https://rpc.qubic.org",
                 node_type="RPC",
                 label="Qubic RPC",
-                priority=10,
+                priority=99,
                 is_active=1,
                 health_status="ONLINE",
+                notes="history / fallback",
             ))
+            changed = True
+        if changed:
             db.commit()
     finally:
         db.close()
