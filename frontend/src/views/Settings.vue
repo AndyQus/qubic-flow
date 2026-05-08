@@ -136,8 +136,6 @@ async function handleDbRestore(e) {
   }
 }
 
-const isDebug = import.meta.env.DEV
-
 // Import from Qubic Ledger
 const ledgerImporting = ref(false)
 const ledgerImportResult = ref(null)
@@ -377,11 +375,28 @@ function simulate() {
       </div>
     </div>
 
-    <!-- Import aus Qubic Ledger Panel (nur im Debug/Dev-Modus sichtbar) -->
-    <div v-if="isDebug" class="card space-y-4 border border-yellow-500/40">
+    <!-- Resync / Re-fetch Panel -->
+    <div class="card space-y-4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.resync_section') }}</h3>
+      <div class="space-y-2">
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.resync_desc') }}</p>
+        <button class="btn text-sm" :disabled="resyncing" @click="resyncAllData">
+          <span v-if="resyncing">↻ {{ t('common.loading') }}</span>
+          <span v-else>↻ {{ t('settings.resync_btn') }}</span>
+        </button>
+        <p v-if="resyncResult && !resyncResult.error" class="text-xs text-green-400">
+          {{ t('settings.resync_queued').replace('{count}', resyncResult.count) }}
+        </p>
+        <p v-if="resyncResult?.error" class="text-xs text-red-400">
+          {{ t('common.error_prefix') }}{{ resyncResult.error }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Import aus Qubic Ledger Panel -->
+    <div class="card space-y-4">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.ledger_section') }}</h3>
-        <span class="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/40">DEBUG ONLY</span>
       </div>
 
       <div class="space-y-2">
@@ -402,24 +417,6 @@ function simulate() {
         </p>
         <p v-if="ledgerImportResult?.error" class="text-xs text-red-400">
           {{ t('common.error_prefix') }}{{ ledgerImportResult.error }}
-        </p>
-      </div>
-    </div>
-
-    <!-- Resync / Re-fetch Panel -->
-    <div class="card space-y-4">
-      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.resync_section') }}</h3>
-      <div class="space-y-2">
-        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.resync_desc') }}</p>
-        <button class="btn text-sm" :disabled="resyncing" @click="resyncAllData">
-          <span v-if="resyncing">↻ {{ t('common.loading') }}</span>
-          <span v-else>↻ {{ t('settings.resync_btn') }}</span>
-        </button>
-        <p v-if="resyncResult && !resyncResult.error" class="text-xs text-green-400">
-          {{ t('settings.resync_queued').replace('{count}', resyncResult.count) }}
-        </p>
-        <p v-if="resyncResult?.error" class="text-xs text-red-400">
-          {{ t('common.error_prefix') }}{{ resyncResult.error }}
         </p>
       </div>
     </div>
