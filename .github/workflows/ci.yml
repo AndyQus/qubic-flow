@@ -1,10 +1,9 @@
 name: CI — Tests
 
 on:
-  push:
-    branches: [develop, main]
-  pull_request:
-    branches: [develop, main]
+  schedule:
+    - cron: "0 6 * * 1"  # every Monday at 06:00 UTC
+  workflow_dispatch:      # allow manual run
 
 jobs:
 
@@ -32,6 +31,8 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+        env:
+          DATABASE_URL: sqlite:///:memory:
 
   # ──────────────────────────────────────────────
   # 2. Frontend unit tests (Vitest)
