@@ -63,8 +63,11 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
   - Steuerberater-Format (GESCHÄFTLICH-Wallets, semikolongetrennt, UTF-8 BOM)
   - Aufgelöste Adress-Namen im Kommentarfeld
 - **Interne Transfers** — Wallet-zu-Wallet-Transfers werden beim Export steuerlich neutral behandelt
+- **Datenschutz-Modus** — Auge-Symbol im Header blendet alle sensiblen Werte app-weit aus: Wallet-Adressen, Kontostände, Portfolio-Werte, Gewinn/Verlust, Steuerbeträge, EUR/USD-Summen sowie persönliche Datenfelder im Steuerformular
+- **Dashboard-Suche & Paginierung** — Volltextsuche mit Entprellung über alle Events; einstellbare Seitengröße (10–1000), wird in localStorage gespeichert
+- **Ledger-Import** — Wallet-Historie aus [myledger.qubic.tools](https://myledger.qubic.tools/) als JSON direkt in Einstellungen → Daten importieren
 - **Deutsch / Englisch** Benutzeroberfläche, Dunkel- / Hellmodus
-- **Einstellungen in Reitern** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Sicherung/Wiederherstellung, Ledger-Import, Resync); aktiver Reiter wird per URL-Abfrageparameter (`?tab=…`) gespiegelt
+- **Einstellungen in Reitern** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Sicherung/Wiederherstellung, Resync, Ledger-Import); aktiver Reiter wird per URL-Abfrageparameter (`?tab=…`) gespiegelt
 - **Vollständig containerisiert** — ein `docker-compose up --build` genügt
 - **Footer** — Haftungsausschluss-Banner und fixer Footer mit Copyright, Links (Qubic.org, Nutzungsbedingungen, Datenschutz) und Versionsnummer
 

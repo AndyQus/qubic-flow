@@ -64,8 +64,11 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
   - Tax advisor format (BUSINESS wallets, semicolon-separated, UTF-8 BOM)
   - Resolved address names in the comment field
 - **Internal transfers** — wallet-to-wallet transfers are treated as tax-neutral in exports
+- **Privacy mode** — eye icon in the header masks all sensitive values app-wide: wallet addresses, balances, portfolio values, P&L, tax amounts, EUR/USD totals, and personal data fields in the tax form
+- **Dashboard search & pagination** — full-text search with debounce across all events; configurable page size (10–1000) persisted in localStorage
+- **Ledger import** — import wallet history from [myledger.qubic.tools](https://myledger.qubic.tools/) JSON export directly in Settings → Data
 - **German / English** UI, dark / light mode
-- **Tabbed settings** — `Appearance` (currency, font, theme, language, animations), `Tax` (country/method, personal/business data), `Data` (export, backup/restore, ledger import, resync); active tab is reflected in the URL query parameter (`?tab=…`)
+- **Tabbed settings** — `Appearance` (currency, font, theme, language, animations), `Tax` (country/method, personal/business data), `Data` (export, backup/restore, resync, ledger import); active tab is reflected in the URL query parameter (`?tab=…`)
 - **Fully containerized** — a single `docker compose up --build` is all you need
 - **Footer** — disclaimer banner and fixed footer with copyright, links (Qubic.org, terms, privacy) and version number
 

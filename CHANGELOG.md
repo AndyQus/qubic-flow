@@ -4,6 +4,20 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.1.16] — 2026-05-08
+
+### Added
+- **Privacy eye — extended coverage** — the hide/show toggle in the header now masks all financial values across the entire app: QUBIC volumes, event/TX counts in Dashboard panels (StatsPanel), epoch totals and wallet panels in Statistics, all tax amounts (gains, income, holdings, disposals) in Tax, and opening-position prices in WalletDetail
+- **Privacy eye — tax input fields** — personal and business data fields on the Tax page (name, tax ID, address, company name, company tax number, VAT ID, registration number, company address) are masked as password fields when privacy mode is active
+- **Dashboard search** — full-text search field in the Dashboard events table with 350 ms debounce; clears with ✕ button
+- **Dashboard pagination** — configurable page size (10 / 25 / 50 / 100 / 250 / 500 / 1000) with persistent `localStorage` setting; entry count shown inline
+
+### Changed
+- **Ledger import** — "Import from Qubic Ledger" section in Settings → Data is now visible in production (was previously restricted to debug/dev mode only)
+- **Settings → Data tab** — "Import from Qubic Ledger" moved to last position, after "Re-fetch data"
+
+---
+
 ## [0.1.14] — 2026-04-30
 
 ### Added
