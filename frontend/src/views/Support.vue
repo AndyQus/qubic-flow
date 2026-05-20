@@ -169,7 +169,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto space-y-8">
+  <div class="max-w-screen-2xl mx-auto space-y-8">
 
     <!-- Header (full width) -->
     <div class="text-center space-y-1">
@@ -360,7 +360,7 @@ onMounted(async () => {
           <div v-else-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
-          <div v-else-if="topDonors.length > 0" class="overflow-x-auto">
+          <div v-else-if="topDonors.length > 0">
             <table class="w-full text-xs">
               <thead>
                 <tr class="text-gray-400 border-b border-qubic-border">
