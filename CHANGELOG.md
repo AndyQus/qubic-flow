@@ -4,6 +4,16 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.3] — 2026-05-26
+
+### Changed
+- **Supporter Ranks** — Diamond Node description updated to "The backbone of the network"; rank descriptions aligned across EN/DE
+- **Supporter Ranks explanation** — `tiers_note` now explicitly states that rank is determined by total QU donated (cumulative)
+- **Top 50 supporters label** — updated to reflect rank-based sorting
+- **Debug scenarios** — corrected QU thresholds for Avenger (50M), Guardian (100M), added Diamond Node scenario (500M), Legend corrected to 1B
+
+---
+
 ## [0.2.0] — 2026-05-08
 
 ### Added

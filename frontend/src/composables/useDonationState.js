@@ -29,7 +29,7 @@ export const DONATION_RANKS = [
   { icon: '🗡️', name: 'Qubic Knight',   color: '#38bdf8', minQu: 10_000_000,    descDe: 'Ein Kämpfer für das Ökosystem',      descEn: 'A warrior for the ecosystem' },
   { icon: '⚔️', name: 'Crypto Avenger', color: '#4EE0FC', minQu: 50_000_000,    descDe: 'Verteidiger der Dezentralisierung',  descEn: 'Defending decentralization' },
   { icon: '🛡️', name: 'Block Guardian', color: '#4ade80', minQu: 100_000_000,   descDe: 'Beschützer des Netzwerks',           descEn: 'Protecting the network' },
-  { icon: '💎', name: 'Diamond Node',   color: '#67e8f9', minQu: 500_000_000,   descDe: 'Selten und unzerstörbar',            descEn: 'Rare and indestructible' },
+  { icon: '💎', name: 'Diamond Node',   color: '#67e8f9', minQu: 500_000_000,   descDe: 'Das Rückgrat des Netzwerks',         descEn: 'The backbone of the network' },
   { icon: '👑', name: 'Chain Legend',   color: '#FFD700', minQu: 1_000_000_000, descDe: 'Für immer verewigt',                 descEn: 'Forever immortalized' },
 ]
 
