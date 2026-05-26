@@ -43,16 +43,7 @@ const DEBUG_SCENARIOS = {
     totalQu: 10_000_000,
   },
   avenger: {
-    label: '⚔️ Crypto Avenger · 25 Mio',
-    status: { total_qu: 25_000_000, months_earned: 25, suppressed_until: '2028-05-26', forever: false,
-              last_payment_amount: 25_000_000, last_payment_date: '2026-04-26' },
-    history: [
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 25_000_000, tick: 17500000, date: '2026-04-26' },
-    ],
-    totalQu: 25_000_000,
-  },
-  guardian: {
-    label: '🛡️ Block Guardian · 50 Mio',
+    label: '⚔️ Crypto Avenger · 50 Mio',
     status: { total_qu: 50_000_000, months_earned: 50, suppressed_until: '2030-06-26', forever: false,
               last_payment_amount: 50_000_000, last_payment_date: '2026-04-26' },
     history: [
@@ -60,16 +51,33 @@ const DEBUG_SCENARIOS = {
     ],
     totalQu: 50_000_000,
   },
-  legend: {
-    label: '👑 Chain Legend · Forever',
-    status: { total_qu: 150_000_000, months_earned: 150, suppressed_until: '2099-12-31', forever: true,
-              last_payment_amount: 50_000_000, last_payment_date: '2026-04-01' },
+  guardian: {
+    label: '🛡️ Block Guardian · 100 Mio',
+    status: { total_qu: 100_000_000, months_earned: 100, suppressed_until: '2099-12-31', forever: true,
+              last_payment_amount: 100_000_000, last_payment_date: '2026-04-26' },
     history: [
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 17450000, date: '2026-04-01' },
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 16000000, date: '2026-02-15' },
-      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 50_000_000, tick: 14500000, date: '2025-12-20' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 100_000_000, tick: 17500000, date: '2026-04-26' },
     ],
-    totalQu: 150_000_000,
+    totalQu: 100_000_000,
+  },
+  diamond: {
+    label: '💎 Diamond Node · 500 Mio',
+    status: { total_qu: 500_000_000, months_earned: 500, suppressed_until: '2099-12-31', forever: true,
+              last_payment_amount: 500_000_000, last_payment_date: '2026-04-01' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 500_000_000, tick: 17450000, date: '2026-04-01' },
+    ],
+    totalQu: 500_000_000,
+  },
+  legend: {
+    label: '👑 Chain Legend · 1 Mrd',
+    status: { total_qu: 1_000_000_000, months_earned: 1000, suppressed_until: '2099-12-31', forever: true,
+              last_payment_amount: 500_000_000, last_payment_date: '2026-04-01' },
+    history: [
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 500_000_000, tick: 17450000, date: '2026-04-01' },
+      { address: 'ANDYQUSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', amount: 500_000_000, tick: 14500000, date: '2025-12-20' },
+    ],
+    totalQu: 1_000_000_000,
   },
   multi: {
     label: '3 Zahlungen · 4 Mio · aktiv bis Jun 10',
@@ -169,7 +177,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto space-y-8">
+  <div class="max-w-screen-2xl mx-auto space-y-8">
 
     <!-- Header (full width) -->
     <div class="text-center space-y-1">
@@ -360,7 +368,7 @@ onMounted(async () => {
           <div v-else-if="topDonors.length === 0" class="text-sm text-gray-500 italic text-center py-4">
             {{ t('donation.supporters_empty') }}
           </div>
-          <div v-else-if="topDonors.length > 0" class="overflow-x-auto">
+          <div v-else-if="topDonors.length > 0">
             <table class="w-full text-xs">
               <thead>
                 <tr class="text-gray-400 border-b border-qubic-border">

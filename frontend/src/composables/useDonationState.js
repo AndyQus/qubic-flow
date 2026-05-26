@@ -25,11 +25,12 @@ export function setDebugTotalQu(value) {
 }
 
 export const DONATION_RANKS = [
-  { icon: '⚡', name: 'Quantum Spark',  color: '#a78bfa', minQu: 1_000_000,   descDe: 'Jeder Funke entzündet ein Feuer',    descEn: 'Every spark starts a fire' },
-  { icon: '🗡️', name: 'Qubic Knight',   color: '#38bdf8', minQu: 10_000_000,  descDe: 'Ein Kämpfer für das Ökosystem',      descEn: 'A warrior for the ecosystem' },
-  { icon: '⚔️', name: 'Crypto Avenger', color: '#4EE0FC', minQu: 25_000_000,  descDe: 'Verteidiger der Dezentralisierung',  descEn: 'Defending decentralization' },
-  { icon: '🛡️', name: 'Block Guardian', color: '#4ade80', minQu: 50_000_000,  descDe: 'Beschützer des Netzwerks',           descEn: 'Protecting the network' },
-  { icon: '👑', name: 'Chain Legend',   color: '#FFD700', minQu: 100_000_000, descDe: 'Für immer verewigt',                 descEn: 'Forever immortalized' },
+  { icon: '⚡', name: 'Quantum Spark',  color: '#a78bfa', minQu: 1_000_000,     descDe: 'Jeder Funke entzündet ein Feuer',    descEn: 'Every spark starts a fire' },
+  { icon: '🗡️', name: 'Qubic Knight',   color: '#38bdf8', minQu: 10_000_000,    descDe: 'Ein Kämpfer für das Ökosystem',      descEn: 'A warrior for the ecosystem' },
+  { icon: '⚔️', name: 'Crypto Avenger', color: '#4EE0FC', minQu: 50_000_000,    descDe: 'Verteidiger der Dezentralisierung',  descEn: 'Defending decentralization' },
+  { icon: '🛡️', name: 'Block Guardian', color: '#4ade80', minQu: 100_000_000,   descDe: 'Beschützer des Netzwerks',           descEn: 'Protecting the network' },
+  { icon: '💎', name: 'Diamond Node',   color: '#67e8f9', minQu: 500_000_000,   descDe: 'Das Rückgrat des Netzwerks',         descEn: 'The backbone of the network' },
+  { icon: '👑', name: 'Chain Legend',   color: '#FFD700', minQu: 1_000_000_000, descDe: 'Für immer verewigt',                 descEn: 'Forever immortalized' },
 ]
 
 export function getDonorRank(qu) {
