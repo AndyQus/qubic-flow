@@ -22,7 +22,7 @@ export const en = {
     privacy: 'Privacy Policy',
   },
   export: { cointracking: 'CoinTracking CSV', steuerberater: 'Tax Advisor CSV', year: 'Year', download: 'Download' },
-  common: { save: 'Save', cancel: 'Cancel', confirm: 'Confirm', loading: 'Loading...', time: 'Time', error_prefix: 'Error: ', back: 'Back' },
+  common: { save: 'Save', cancel: 'Cancel', confirm: 'Confirm', loading: 'Loading...', time: 'Time', error_prefix: 'Error: ', back: 'Back', copied: 'Copied to clipboard', copied_value: 'Value copied' },
   tax: {
     title: 'Tax Report',
     year: 'Tax Year',

@@ -83,7 +83,7 @@ onUnmounted(() => clearInterval(_logErrorInterval))
         <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
-        {{ copyToast }}
+        <span class="not-italic">{{ copyToast }}</span>
       </div>
     </Transition>
   </div>

@@ -20,7 +20,7 @@ function ownerIconType(ownerName) {
 
 const store = useAppStore()
 const { t } = useTranslation()
-const { explorerUrl, copyAddress, maskLabel } = useQubicUtils()
+const { explorerUrl, copyAddress, copyValue, fmtDecimal, fmtRateLocale, maskLabel } = useQubicUtils()
 const router = useRouter()
 const route = useRoute()
 
@@ -432,7 +432,11 @@ onMounted(async () => {
               </svg>
               <span class="text-xs uppercase tracking-wide text-sky-400">{{ t('wallet.current_price') }}</span>
             </div>
-            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap" :title="unitPriceAlt != null ? unitPriceAlt.toFixed(10).replace(/\.?0+$/, '') + altFiatSymbol : undefined">{{ unitPrice.toFixed(10).replace(/\.?0+$/, '') }}{{ fiatSymbol }}</div>
+            <div class="font-mono text-base sm:text-xl text-sky-400 whitespace-nowrap cursor-copy select-none"
+                 :title="unitPriceAlt != null ? fmtRateLocale(unitPriceAlt) + altFiatSymbol : undefined"
+                 @dblclick.prevent="copyValue(unitPrice)">
+              {{ fmtRateLocale(unitPrice) }}{{ fiatSymbol }}
+            </div>
           </div>
         </div>
       </div>
@@ -599,17 +603,23 @@ onMounted(async () => {
                 </td>
                 <td class="td text-right">
                   <div class="flex items-center justify-end gap-1.5">
-                    <span class="font-mono text-xs whitespace-nowrap" :class="w.balance == null ? 'text-gray-500 italic' : 'text-gray-300'">{{ fmtBalance(w) }}</span>
+                    <span class="font-mono text-xs whitespace-nowrap cursor-copy select-none"
+                          :class="w.balance == null ? 'text-gray-500 italic' : 'text-gray-300'"
+                          @dblclick.prevent.stop="w.balance != null && copyValue(w.balance)">{{ fmtBalance(w) }}</span>
                     <span v-if="w.balance != null" :class="['text-xs', balanceSyncClass(w)]" :title="balanceSyncTitle(w)">●</span>
                   </div>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
-                  <span v-if="walletValue(w) != null" class="text-gray-300" :title="fmtFiatAlt(walletValue(w))">{{ fmtFiat(walletValue(w)) }}</span>
+                  <span v-if="walletValue(w) != null" class="text-gray-300 cursor-copy select-none"
+                        :title="fmtFiatAlt(walletValue(w))"
+                        @dblclick.prevent.stop="copyValue(walletValue(w))">{{ fmtFiat(walletValue(w)) }}</span>
                   <span v-else class="text-gray-600">—</span>
                 </td>
                 <td class="td text-right hidden lg:table-cell font-mono text-xs whitespace-nowrap">
                   <template v-if="walletPnl(w) != null">
-                    <div :class="walletPnl(w) >= 0 ? 'text-green-400' : 'text-red-400'" :title="fmtFiatAlt(walletPnl(w))">
+                    <div :class="walletPnl(w) >= 0 ? 'text-green-400 cursor-copy select-none' : 'text-red-400 cursor-copy select-none'"
+                         :title="fmtFiatAlt(walletPnl(w))"
+                         @dblclick.prevent.stop="copyValue(walletPnl(w))">
                       {{ walletPnl(w) >= 0 ? '+' : '' }}{{ fmtFiat(walletPnl(w)) }}
                     </div>
                     <div class="text-xs" :class="walletPnl(w) >= 0 ? 'text-green-400/70' : 'text-red-400/70'">

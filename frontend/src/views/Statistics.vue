@@ -22,7 +22,7 @@ const { t } = useTranslation()
 const store = useAppStore()
 const router = useRouter()
 const route = useRoute()
-const { maskLabel } = useQubicUtils()
+const { maskLabel, copyValue } = useQubicUtils()
 
 const periodIcons = {
   hour:  'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -450,7 +450,8 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.incoming_qubic') }}</span>
               </div>
-              <div class="font-mono text-base sm:text-xl text-green-400 whitespace-nowrap">▲ {{ fmt(currentEpochFilteredTotals.in_qubic) }}</div>
+              <div class="font-mono text-base sm:text-xl text-green-400 whitespace-nowrap cursor-copy select-none"
+                   @dblclick.prevent="copyValue(currentEpochFilteredTotals.in_qubic)">▲ {{ fmt(currentEpochFilteredTotals.in_qubic) }}</div>
             </div>
 
             <!-- 3: Incoming breakdown TX / EV -->
@@ -475,7 +476,8 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-red-400">{{ t('stats.outgoing_qubic') }}</span>
               </div>
-              <div class="font-mono text-base sm:text-xl text-red-400 whitespace-nowrap">▼ {{ fmt(currentEpochFilteredTotals.out_qubic) }}</div>
+              <div class="font-mono text-base sm:text-xl text-red-400 whitespace-nowrap cursor-copy select-none"
+                   @dblclick.prevent="copyValue(currentEpochFilteredTotals.out_qubic)">▼ {{ fmt(currentEpochFilteredTotals.out_qubic) }}</div>
             </div>
 
             <!-- 5: Outgoing breakdown TX / EV -->
@@ -500,7 +502,9 @@ const currentEpochFilteredTotals = computed(() => {
                 </svg>
                 <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('stats.incoming') }} {{ store.currency }}</span>
               </div>
-              <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap" :title="fmtCurrencyAlt(currentEpochFilteredTotals[altInFiatKey])">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
+              <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap cursor-copy select-none"
+                   :title="fmtCurrencyAlt(currentEpochFilteredTotals[altInFiatKey])"
+                   @dblclick.prevent="copyValue(currentEpochFilteredTotals[inFiatKey])">{{ fmtCurrency(currentEpochFilteredTotals[inFiatKey]) }}</div>
             </div>
           </div>
         </div>
@@ -542,16 +546,18 @@ const currentEpochFilteredTotals = computed(() => {
               <!-- Incoming column (hidden only when outgoing-only and not extended) -->
               <div v-if="extended || r.in_qubic > 0" class="space-y-0.5 cq-panel min-w-0 overflow-hidden">
                 <InfoLabel :label="`${t('stats.label_incoming')} QUBIC`" :tooltip="t('stats.tt_incoming')" />
-                <div class="font-mono value-fit-lg whitespace-nowrap"
-                     :class="r.in_qubic > 0 ? 'text-green-400' : 'text-gray-600'">
+                <div class="font-mono value-fit-lg whitespace-nowrap cursor-copy select-none"
+                     :class="r.in_qubic > 0 ? 'text-green-400' : 'text-gray-600'"
+                     @dblclick.prevent="r.in_qubic > 0 && copyValue(r.in_qubic)">
                   <template v-if="r.in_qubic > 0">▲ {{ fmt(r.in_qubic) }}</template>
                   <template v-else>—</template>
                 </div>
                 <template v-if="extended || r.in_qubic > 0">
                   <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')" />
-                  <div class="font-mono text-xs whitespace-nowrap"
+                  <div class="font-mono text-xs whitespace-nowrap cursor-copy select-none"
                        :class="r.in_qubic > 0 ? 'text-gray-400' : 'text-gray-600'"
-                       :title="r.in_qubic > 0 ? fmtCurrencyAlt(r[altInFiatKey]) : undefined">
+                       :title="r.in_qubic > 0 ? fmtCurrencyAlt(r[altInFiatKey]) : undefined"
+                       @dblclick.prevent="r.in_qubic > 0 && copyValue(r[inFiatKey])">
                     <template v-if="r.in_qubic > 0">{{ fmtCurrency(r[inFiatKey]) }}</template>
                     <template v-else>—</template>
                   </div>
@@ -586,17 +592,19 @@ const currentEpochFilteredTotals = computed(() => {
                             (extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'text-right' : '']">
                 <InfoLabel :label="`${t('stats.label_outgoing')} QUBIC`" :tooltip="t('stats.tt_outgoing')"
                            :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
-                <div class="font-mono value-fit-lg whitespace-nowrap"
-                     :class="r.out_qubic > 0 ? 'text-red-400' : 'text-gray-600'">
+                <div class="font-mono value-fit-lg whitespace-nowrap cursor-copy select-none"
+                     :class="r.out_qubic > 0 ? 'text-red-400' : 'text-gray-600'"
+                     @dblclick.prevent="r.out_qubic > 0 && copyValue(r.out_qubic)">
                   <template v-if="r.out_qubic > 0">▼ {{ fmt(r.out_qubic) }}</template>
                   <template v-else>—</template>
                 </div>
                 <template v-if="extended || r.out_qubic > 0">
                   <InfoLabel :label="`${t('stats.label_fiat')} ${store.currency}`" :tooltip="t('stats.tt_fiat')"
                              :class="(extended || (r.in_qubic > 0 && r.out_qubic > 0)) ? 'justify-end' : ''" />
-                  <div class="font-mono text-xs whitespace-nowrap"
+                  <div class="font-mono text-xs whitespace-nowrap cursor-copy select-none"
                        :class="r.out_qubic > 0 ? 'text-gray-400' : 'text-gray-600'"
-                       :title="r.out_qubic > 0 ? fmtCurrencyAlt(r[altOutFiatKey]) : undefined">
+                       :title="r.out_qubic > 0 ? fmtCurrencyAlt(r[altOutFiatKey]) : undefined"
+                       @dblclick.prevent="r.out_qubic > 0 && copyValue(r[outFiatKey])">
                     <template v-if="r.out_qubic > 0">{{ fmtCurrency(r[outFiatKey]) }}</template>
                     <template v-else>—</template>
                   </div>
@@ -670,7 +678,8 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('stats.events_total') }}</span>
         </div>
-        <div class="text-base sm:text-xl font-bold text-violet-400 whitespace-nowrap">{{ fmt(totals.events) }}</div>
+        <div class="text-base sm:text-xl font-bold text-violet-400 whitespace-nowrap cursor-copy select-none"
+             @dblclick.prevent="copyValue(totals.events)">{{ fmt(totals.events) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -679,7 +688,8 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-amber-400">{{ t('stats.tx_total') }}</span>
         </div>
-        <div class="text-base sm:text-xl font-bold text-amber-400 whitespace-nowrap">{{ fmt(totals.tx) }}</div>
+        <div class="text-base sm:text-xl font-bold text-amber-400 whitespace-nowrap cursor-copy select-none"
+             @dblclick.prevent="copyValue(totals.tx)">{{ fmt(totals.tx) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -688,7 +698,8 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-qubic-teal">{{ t('stats.volume_qubic') }}</span>
         </div>
-        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(totals.qubic) }}</div>
+        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap cursor-copy select-none"
+             @dblclick.prevent="copyValue(totals.qubic)">{{ fmt(totals.qubic) }}</div>
       </div>
       <div class="card !p-3">
         <div class="flex items-center gap-1 mb-1">
@@ -697,7 +708,8 @@ const currentEpochFilteredTotals = computed(() => {
           </svg>
           <span class="text-xs uppercase tracking-wide text-green-400">{{ t('stats.volume') }} {{ store.currency }}</span>
         </div>
-        <div class="text-base sm:text-xl font-bold text-green-400 whitespace-nowrap">{{ fmtCurrency(totals.eur) }}</div>
+        <div class="text-base sm:text-xl font-bold text-green-400 whitespace-nowrap cursor-copy select-none"
+             @dblclick.prevent="copyValue(totals.eur)">{{ fmtCurrency(totals.eur) }}</div>
       </div>
     </div>
 
@@ -715,15 +727,21 @@ const currentEpochFilteredTotals = computed(() => {
             {{ p.trend.up ? '↑' : '↓' }} {{ p.trend.pct }}%
           </span>
         </div>
-        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap">{{ fmt(p.cur.volume_qubic) }}</div>
-        <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtCurrencyAlt(p.cur[altVolumeKey])">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
+        <div class="text-base sm:text-xl font-bold text-qubic-teal whitespace-nowrap cursor-copy select-none"
+             @dblclick.prevent="copyValue(p.cur.volume_qubic)">{{ fmt(p.cur.volume_qubic) }}</div>
+        <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap cursor-copy select-none"
+             :title="fmtCurrencyAlt(p.cur[altVolumeKey])"
+             @dblclick.prevent="copyValue(p.cur[volumeKey])">{{ fmtCurrency(p.cur[volumeKey]) }}</div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-violet-400">{{ fmt(p.cur.event_count) }} Events</span>
           <span class="text-xs font-semibold text-amber-400">{{ fmt(p.cur.tx_count) }} TX</span>
         </div>
         <div class="mt-2 pt-2 border-t border-qubic-border">
-          <div class="text-sm font-semibold text-gray-400 whitespace-nowrap">{{ fmt(p.prev.volume_qubic) }}</div>
-          <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap" :title="fmtCurrencyAlt(p.prev[altVolumeKey])">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
+          <div class="text-sm font-semibold text-gray-400 whitespace-nowrap cursor-copy select-none"
+               @dblclick.prevent="copyValue(p.prev.volume_qubic)">{{ fmt(p.prev.volume_qubic) }}</div>
+          <div class="text-xs text-gray-400 mb-0.5 whitespace-nowrap cursor-copy select-none"
+               :title="fmtCurrencyAlt(p.prev[altVolumeKey])"
+               @dblclick.prevent="copyValue(p.prev[volumeKey])">{{ fmtCurrency(p.prev[volumeKey]) }}</div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-violet-400/70">{{ fmt(p.prev.event_count) }} Events</span>
             <span class="text-xs text-amber-400/70">{{ fmt(p.prev.tx_count) }} TX</span>
