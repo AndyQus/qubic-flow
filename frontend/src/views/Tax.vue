@@ -7,9 +7,11 @@ import WalletFilter from '../components/WalletFilter.vue'
 import PageHeader from '../components/PageHeader.vue'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useQubicUtils } from '../composables/useQubicUtils'
 
 const { t } = useTranslation()
 const store = useAppStore()
+const { copyValue } = useQubicUtils()
 
 const year = ref(new Date().getFullYear())
 const mode = ref('private')
@@ -511,10 +513,11 @@ function exportPDF() {
               <tr v-for="(d, i) in report.disposals" :key="i"
                   class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
                 <td class="py-2 pr-3 text-gray-300 whitespace-nowrap">{{ fmtDate(d.date) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap">{{ fmtQu(d.amount_qubic) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap">{{ fmtNum(d.cost_basis) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap">{{ fmtNum(d.proceeds) }}</td>
-                <td :class="['py-2 pr-3 text-right font-mono whitespace-nowrap font-semibold', d.gain >= 0 ? 'text-green-400' : 'text-red-400']">
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap cursor-copy select-none" @dblclick.prevent="copyValue(d.amount_qubic)">{{ fmtQu(d.amount_qubic) }}</td>
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap cursor-copy select-none" @dblclick.prevent="copyValue(d.cost_basis)">{{ fmtNum(d.cost_basis) }}</td>
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap cursor-copy select-none" @dblclick.prevent="copyValue(d.proceeds)">{{ fmtNum(d.proceeds) }}</td>
+                <td :class="['py-2 pr-3 text-right font-mono whitespace-nowrap font-semibold cursor-copy select-none', d.gain >= 0 ? 'text-green-400' : 'text-red-400']"
+                    @dblclick.prevent="copyValue(d.gain)">
                   {{ fmtNum(d.gain) }}
                 </td>
                 <td class="py-2 pr-3 text-right text-gray-400 whitespace-nowrap">
@@ -548,8 +551,8 @@ function exportPDF() {
               <tr v-for="(item, i) in report.income" :key="i"
                   class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
                 <td class="py-2 pr-3 text-gray-300 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap">{{ fmtQu(item.amount_qubic) }}</td>
-                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap text-qubic-teal">{{ fmtNum(item.value) }} {{ ccy }}</td>
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap cursor-copy select-none" @dblclick.prevent="copyValue(item.amount_qubic)">{{ fmtQu(item.amount_qubic) }}</td>
+                <td class="py-2 pr-3 text-right font-mono whitespace-nowrap text-qubic-teal cursor-copy select-none" @dblclick.prevent="copyValue(item.value)">{{ fmtNum(item.value) }} {{ ccy }}</td>
                 <td class="py-2 text-gray-400">{{ item.source_type === 'EVENT' ? t('tax.income_reward') : item.source_type }}</td>
               </tr>
             </tbody>
@@ -574,8 +577,8 @@ function exportPDF() {
               <td class="py-2 pr-3 text-gray-300 font-mono text-xs">
                 {{ store.hideAddresses ? '••••••••••••' : (store.wallets.find(w => w.id === h.wallet_id)?.label || h.wallet_id.slice(0, 16) + '…') }}
               </td>
-              <td class="py-2 pr-3 text-right font-mono">{{ fmtQu(h.amount_qubic) }}</td>
-              <td class="py-2 text-right font-mono">{{ fmtNum(h.cost_basis_eur) }} {{ ccy }}</td>
+              <td class="py-2 pr-3 text-right font-mono cursor-copy select-none" @dblclick.prevent="copyValue(h.amount_qubic)">{{ fmtQu(h.amount_qubic) }}</td>
+              <td class="py-2 text-right font-mono cursor-copy select-none" @dblclick.prevent="copyValue(h.cost_basis_eur)">{{ fmtNum(h.cost_basis_eur) }} {{ ccy }}</td>
             </tr>
           </tbody>
         </table>

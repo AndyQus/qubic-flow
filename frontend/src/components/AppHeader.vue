@@ -12,6 +12,15 @@ const { isSuppressed, suppressedUntil, donorRank } = useDonationState()
 
 const logoUrl = computed(() => store.theme === 'light' ? logoLight : logoDark)
 const isLight = computed(() => store.theme === 'light')
+
+// Display name for the active sync node: prefer the user-defined label,
+// otherwise the bare host (URL without protocol / trailing slash).
+const activeNodeName = computed(() => {
+  const n = store.activeNode
+  if (!n) return ''
+  if (n.label && n.label.trim()) return n.label.trim()
+  return (n.url || '').replace(/^https?:\/\//, '').replace(/\/+$/, '')
+})
 </script>
 
 <template>
@@ -32,9 +41,10 @@ const isLight = computed(() => store.theme === 'light')
             <span class="w-2 h-2 rounded-full mr-1.5"
                   :class="store.activeNode ? 'bg-green-500' : 'bg-red-500'"></span>
             {{ store.activeNode ? t('status.connected') : t('status.no_node') }}
-            <span v-if="store.activeNode" class="ml-1.5 text-[10px] pl-1.5"
+            <span v-if="store.activeNode" class="ml-1.5 pl-1.5 inline-flex items-center gap-1.5"
                   :class="isLight ? 'text-[#9acd32] border-l border-[#9acd32]/50' : 'text-gray-400 border-l border-gray-600'">
-              {{ store.activeNode.node_type }}
+              <span class="font-medium">{{ activeNodeName }}</span>
+              <span class="opacity-70">{{ store.activeNode.node_type }}</span>
             </span>
           </span>
           <!-- Adressen verbergen / anzeigen -->

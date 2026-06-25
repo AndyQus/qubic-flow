@@ -30,7 +30,13 @@ export const useAppStore = defineStore('app', () => {
     return wallets.value.filter(w => w.wallet_type === walletFilter.value.toUpperCase())
   })
 
-  const activeNode = computed(() => nodes.value.find(n => n.is_active && n.health_status === 'ONLINE'))
+  // The node actually feeding live sync (backend-elected via is_sync_active).
+  // Falls back to the first active ONLINE node if the backend hasn't reported
+  // a sync node yet (e.g. before the first sync cycle).
+  const activeNode = computed(() =>
+    nodes.value.find(n => n.is_sync_active) ||
+    nodes.value.find(n => n.is_active && n.health_status === 'ONLINE')
+  )
 
   function setAnimation(a)  { animation.value  = a; localStorage.setItem('animation',  a) }
   function setMoneyAnim(a)   { moneyAnim.value   = a; localStorage.setItem('moneyAnim',   a) }

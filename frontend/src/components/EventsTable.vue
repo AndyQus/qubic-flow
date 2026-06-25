@@ -51,7 +51,7 @@ async function saveNote(ev) {
 
 const store = useAppStore()
 const { t } = useTranslation()
-const { explorerUrl, txUrl, tickUrl, copyAddress, shortAddr } = useQubicUtils()
+const { explorerUrl, txUrl, tickUrl, copyAddress, copyValue, fmtDecimal, fmtRateLocale, shortAddr } = useQubicUtils()
 
 const ownedIds = computed(() => new Set(store.wallets.map(w => w.id)))
 
@@ -96,28 +96,34 @@ function fmtValue(ev) {
   const isUsd = store.currency === 'USD'
   const rate = isUsd ? ev.qubic_usd_rate : ev.qubic_eur_rate
   if (!ev.amount_qubic || !rate) return '—'
-  return (ev.amount_qubic * rate).toFixed(2) + (isUsd ? '$' : '€')
+  return fmtDecimal(ev.amount_qubic * rate, 2) + (isUsd ? '$' : '€')
 }
 
 function fmtRate(ev) {
   const isUsd = store.currency === 'USD'
   const rate = isUsd ? ev.qubic_usd_rate : ev.qubic_eur_rate
   if (!rate) return '—'
-  return rate.toFixed(10).replace(/\.?0+$/, '') + (isUsd ? '$' : '€')
+  return fmtRateLocale(rate) + (isUsd ? '$' : '€')
 }
 
 function fmtValueAlt(ev) {
   const isUsd = store.currency === 'USD'
   const rate = isUsd ? ev.qubic_eur_rate : ev.qubic_usd_rate
   if (!ev.amount_qubic || !rate) return undefined
-  return (ev.amount_qubic * rate).toFixed(2) + (isUsd ? '€' : '$')
+  return fmtDecimal(ev.amount_qubic * rate, 2) + (isUsd ? '€' : '$')
 }
 
 function fmtRateAlt(ev) {
   const isUsd = store.currency === 'USD'
   const rate = isUsd ? ev.qubic_eur_rate : ev.qubic_usd_rate
   if (!rate) return undefined
-  return rate.toFixed(10).replace(/\.?0+$/, '') + (isUsd ? '€' : '$')
+  return fmtRateLocale(rate) + (isUsd ? '€' : '$')
+}
+
+function rawRateStr(rate) {
+  if (!rate) return null
+  // raw value for clipboard (always with dot, locale-independent)
+  return String(rate)
 }
 
 function shortTx(id) {
@@ -208,8 +214,14 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
           <!-- Main info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between gap-2">
-              <span :class="['font-mono text-xs font-medium', signClass(ev)]"><span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU</span>
-              <span class="text-xs text-gray-400" :title="fmtValueAlt(ev)">{{ fmtValue(ev) }}</span>
+              <span :class="['font-mono text-xs font-medium cursor-copy select-none', signClass(ev)]"
+                    @dblclick.prevent="copyValue(ev.amount_qubic)">
+                <span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU
+              </span>
+              <span class="text-xs text-gray-400 cursor-copy select-none" :title="fmtValueAlt(ev)"
+                    @dblclick.prevent="copyValue(ev.amount_qubic && (store.currency === 'USD' ? ev.qubic_usd_rate : ev.qubic_eur_rate) ? ev.amount_qubic * (store.currency === 'USD' ? ev.qubic_usd_rate : ev.qubic_eur_rate) : null)">
+                {{ fmtValue(ev) }}
+              </span>
             </div>
             <div class="text-xs text-gray-500 mt-0.5">{{ fmtDate(ev.timestamp) }} · Ep. {{ ev.epoch ?? '—' }}</div>
             <!-- Counterpart address -->
@@ -336,20 +348,36 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
               </td>
               <!-- Betrag / Wert (kombiniert) -->
               <td class="px-3 py-2.5 text-right">
-                <div :class="['font-mono whitespace-nowrap', signClass(ev)]">
+                <div :class="['font-mono whitespace-nowrap cursor-copy select-none', signClass(ev)]"
+                     @dblclick.prevent="copyValue(ev.amount_qubic)">
                   <span class="mr-0.5">{{ ev._sign }}</span>{{ Number(ev.amount_qubic || 0).toLocaleString(store.locale) }} QU
                 </div>
-                <div class="font-mono whitespace-nowrap text-xs">{{ fmtValue(ev) }}</div>
+                <div class="font-mono whitespace-nowrap text-xs cursor-copy select-none"
+                     @dblclick.prevent="copyValue(ev.amount_qubic && (store.currency === 'USD' ? ev.qubic_usd_rate : ev.qubic_eur_rate) ? ev.amount_qubic * (store.currency === 'USD' ? ev.qubic_usd_rate : ev.qubic_eur_rate) : null)">
+                  {{ fmtValue(ev) }}
+                </div>
               </td>
               <!-- Kurs: gewählte Währung zuerst -->
               <td class="px-3 py-2.5 text-right font-mono text-xs">
                 <template v-if="store.currency === 'USD'">
-                  <div class="whitespace-nowrap">{{ ev.qubic_usd_rate ? ev.qubic_usd_rate.toFixed(10).replace(/\.?0+$/, '') + '$' : '—' }}</div>
-                  <div class="whitespace-nowrap text-gray-500">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(10).replace(/\.?0+$/, '') + '€' : '—' }}</div>
+                  <div class="whitespace-nowrap cursor-copy select-none"
+                       @dblclick.prevent="copyValue(ev.qubic_usd_rate)">
+                    {{ ev.qubic_usd_rate ? fmtRateLocale(ev.qubic_usd_rate) + '$' : '—' }}
+                  </div>
+                  <div class="whitespace-nowrap text-gray-500 cursor-copy select-none"
+                       @dblclick.prevent="copyValue(ev.qubic_eur_rate)">
+                    {{ ev.qubic_eur_rate ? fmtRateLocale(ev.qubic_eur_rate) + '€' : '—' }}
+                  </div>
                 </template>
                 <template v-else>
-                  <div class="whitespace-nowrap">{{ ev.qubic_eur_rate ? ev.qubic_eur_rate.toFixed(10).replace(/\.?0+$/, '') + '€' : '—' }}</div>
-                  <div class="whitespace-nowrap text-gray-500">{{ ev.qubic_usd_rate ? ev.qubic_usd_rate.toFixed(10).replace(/\.?0+$/, '') + '$' : '—' }}</div>
+                  <div class="whitespace-nowrap cursor-copy select-none"
+                       @dblclick.prevent="copyValue(ev.qubic_eur_rate)">
+                    {{ ev.qubic_eur_rate ? fmtRateLocale(ev.qubic_eur_rate) + '€' : '—' }}
+                  </div>
+                  <div class="whitespace-nowrap text-gray-500 cursor-copy select-none"
+                       @dblclick.prevent="copyValue(ev.qubic_usd_rate)">
+                    {{ ev.qubic_usd_rate ? fmtRateLocale(ev.qubic_usd_rate) + '$' : '—' }}
+                  </div>
                 </template>
               </td>
               <!-- Sender / Empfänger (kombiniert) -->

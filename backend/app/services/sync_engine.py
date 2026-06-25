@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 MAX_WINDOW_RECORDS = 10000
 PAGE_SIZE = 1000
 
+# A BOB node is only used for live sync if it is no more than this many ticks
+# behind the network (RPC) tip. Beyond this it is considered "stalled" and we
+# fall back to RPC so live data keeps flowing.
+MAX_BOB_LAG = 1000
+
 _active_sync_node_id: int | None = None
 _last_event_source_log: float = 0.0   # Unix timestamp of last "event source" log entry
 _last_event_source_key: str = ""       # e.g. "BOB:https://bobnet.qubic.li"
@@ -82,32 +87,107 @@ def _get_rpc_client(db) -> RPCClient:
     return RPCClient()  # falls back to settings.qubic_rpc_url
 
 
-async def _get_event_client(db):
-    """Return the best available event client for incremental (live) sync.
+def _select_best_bob(db, rpc_tick: int | None):
+    """Pick the active BOB node best suited for live sync.
 
-    BOB nodes are preferred for live sync since they stream the current tick efficiently.
-    BOB cannot perform historical queries — use _get_rpc_client() for gap filling instead.
-    Falls back to RPC if no BOB node is available or reachable.
+    Selection is tick-based, not priority-based: among all active ONLINE/DEGRADED
+    BOB nodes we choose the one with the *highest* tick (furthest advanced).
+    A BOB node that lags more than MAX_BOB_LAG ticks behind the RPC tip is
+    considered stalled and skipped, so a stuck primary node no longer blocks
+    live sync. Priority is only used as a tiebreaker between nodes at (nearly)
+    the same tick.
+
+    Returns the chosen Node, or None if no suitable BOB node exists.
     """
-    bob_node = (
+    bob_nodes = (
         db.query(Node)
         .filter(
             Node.is_active == 1,
             Node.node_type == "BOB_NODE",
             Node.health_status.in_(["ONLINE", "DEGRADED"]),
         )
-        .order_by(Node.health_status != "ONLINE", Node.priority)
-        .first()
+        .all()
     )
+    if not bob_nodes:
+        return None
+
+    # Best = highest tick, then lowest priority number as tiebreaker.
+    bob_nodes.sort(key=lambda n: (-(n.tick or 0), n.priority))
+    best = bob_nodes[0]
+
+    # If we know where the network stands, reject the best BOB when it lags too far.
+    if rpc_tick is not None and (best.tick or 0) > 0:
+        lag = rpc_tick - (best.tick or 0)
+        if lag > MAX_BOB_LAG:
+            logger.warning(
+                f"Best BOB {best.url} lags {lag} ticks behind RPC "
+                f"(bob={best.tick}, rpc={rpc_tick}) — falling back to RPC for live sync"
+            )
+            log_buffer.add(
+                "WARNING", "sync",
+                f"Best BOB lags {lag} ticks behind network (> {MAX_BOB_LAG}) — using RPC for live sync",
+                node=best.url,
+            )
+            return None
+    return best
+
+
+async def _set_active_sync_node(db, node_id: int | None):
+    """Update the active sync node id and notify the UI on change.
+
+    Broadcasts a `sync.node` event whenever the elected live-sync node changes,
+    so the header can show which node is really feeding data without polling.
+    """
+    global _active_sync_node_id
+    if node_id == _active_sync_node_id:
+        _active_sync_node_id = node_id
+        return
+    _active_sync_node_id = node_id
+    node = db.query(Node).filter(Node.id == node_id).first() if node_id else None
+    await manager.broadcast("sync.node", {
+        "node_id": node_id,
+        "url": node.url if node else None,
+        "label": node.label if node else None,
+        "node_type": node.node_type if node else None,
+        "tick": node.tick if node else None,
+    })
+
+
+async def _get_event_client(db, rpc_tick: int | None = None):
+    """Return the best available event client for incremental (live) sync.
+
+    BOB nodes are preferred for live sync since they stream the current tick
+    efficiently, but only the BOB node with the highest tick is used, and only
+    if it is not stalled relative to the RPC tip (see _select_best_bob).
+    BOB cannot perform historical queries — use _get_rpc_client() for gap filling.
+    Falls back to RPC if no suitable BOB node is available or reachable.
+
+    Also records the chosen node in _active_sync_node_id (and notifies the UI
+    on change) so the header can show which node is really feeding live data.
+    """
+    bob_node = _select_best_bob(db, rpc_tick)
     if bob_node:
         bob = BOBClient(bob_node.url)
         try:
             if await bob.supports_event_logs():
-                logger.info(f"BOB {bob_node.url}: live-tick streaming active")
+                logger.info(f"BOB {bob_node.url}: live-tick streaming active (tick {bob_node.tick})")
+            await _set_active_sync_node(db, bob_node.id)
             return bob
         except Exception as e:
             logger.warning(f"BOB {bob_node.url} probe failed ({e}) — falling back to RPC")
 
+    # RPC fallback — reflect the RPC node as the active sync node in the UI.
+    rpc_node = (
+        db.query(Node)
+        .filter(
+            Node.is_active == 1,
+            Node.node_type == "RPC",
+            Node.health_status.in_(["ONLINE", "DEGRADED"]),
+        )
+        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .first()
+    )
+    await _set_active_sync_node(db, rpc_node.id if rpc_node else None)
     return _get_rpc_client(db)
 
 
@@ -163,7 +243,22 @@ async def sync_all_wallets():
                 log_buffer.add("ERROR", "sync", f"Default RPC fallback also failed: {e} — sync skipped", node=settings.qubic_rpc_url)
                 return
 
-        event_client = await _get_event_client(db)
+        # Determine the network tip (RPC) as reference for BOB lag detection.
+        # Prefer the freshly stored RPC node tick from the health monitor (no
+        # extra network call); fall back to current_tick from the sync probe.
+        rpc_node = (
+            db.query(Node)
+            .filter(
+                Node.is_active == 1,
+                Node.node_type == "RPC",
+                Node.health_status.in_(["ONLINE", "DEGRADED"]),
+            )
+            .order_by(Node.health_status != "ONLINE", Node.priority)
+            .first()
+        )
+        rpc_tick = (rpc_node.tick if rpc_node and rpc_node.tick else None) or current_tick
+
+        event_client = await _get_event_client(db, rpc_tick)
         rpc_client_for_history = _get_rpc_client(db)
 
         # Log which source is fetching events — at most once per hour, immediately on change.

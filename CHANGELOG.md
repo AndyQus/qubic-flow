@@ -4,6 +4,20 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.5] — 2026-06-25
+
+### Changed
+- **Tick-based BOB-node selection** — the live-sync source is no longer chosen by priority alone. Among all active ONLINE/DEGRADED BOB nodes, the one with the **highest tick** is used (priority is only a tiebreaker). A stalled or lagging primary BOB node no longer blocks live sync.
+- **Stall detection** — if even the best BOB node lags more than `MAX_BOB_LAG` (1000) ticks behind the RPC network tip, QubicFlow falls back to RPC for live sync and logs a warning in the Logs tab.
+
+### Added
+- **Active sync node in header** — the connection pill (top right) now shows which node is actually feeding live sync, by label or — if no label is set — by host. Updates live via a new `sync.node` WebSocket event when the elected node changes.
+
+### Notes
+- No data-loss risk from node switching: incremental sync always resumes from the persisted `last_tick`, with RPC backfill and gap recording covering any range a node could not serve.
+
+---
+
 ## [0.2.3] — 2026-05-26
 
 ### Changed

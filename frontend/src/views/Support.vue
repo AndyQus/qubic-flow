@@ -5,6 +5,9 @@ import QRCode from 'qrcode'
 import { api } from '../api'
 import { useAppStore } from '../stores/app'
 import { setDebugSuppression, setDebugTotalQu, DONATION_RANKS, getDonorRank } from '../composables/useDonationState'
+import { useQubicUtils } from '../composables/useQubicUtils'
+
+const { copyValue } = useQubicUtils()
 
 const { t } = useTranslation()
 const store = useAppStore()
@@ -281,7 +284,7 @@ onMounted(async () => {
           <div class="space-y-2">
             <div class="flex justify-between text-sm">
               <span class="text-gray-400">{{ t('donation.check_total') }}</span>
-              <span class="text-emerald-400 font-mono">{{ effectiveDonationStatus.total_qu.toLocaleString() }} QU</span>
+              <span class="text-emerald-400 font-mono cursor-copy select-none" @dblclick.prevent="copyValue(effectiveDonationStatus.total_qu)">{{ effectiveDonationStatus.total_qu.toLocaleString() }} QU</span>
             </div>
             <div v-if="!effectiveDonationStatus.forever" class="flex justify-between text-sm">
               <span class="text-gray-400">{{ t('donation.check_months') }}</span>
@@ -289,7 +292,7 @@ onMounted(async () => {
             </div>
             <div v-if="effectiveDonationStatus.last_payment_amount" class="flex justify-between text-sm">
               <span class="text-gray-400">{{ t('donation.check_last_amount') }}</span>
-              <span class="text-emerald-400 font-mono">{{ effectiveDonationStatus.last_payment_amount.toLocaleString() }} QU</span>
+              <span class="text-emerald-400 font-mono cursor-copy select-none" @dblclick.prevent="copyValue(effectiveDonationStatus.last_payment_amount)">{{ effectiveDonationStatus.last_payment_amount.toLocaleString() }} QU</span>
             </div>
             <div v-if="effectiveDonationStatus.last_payment_date" class="flex justify-between text-sm">
               <span class="text-gray-400">{{ t('donation.check_last_date') }}</span>
@@ -396,7 +399,7 @@ onMounted(async () => {
                       {{ donor.address.slice(0, 5) }}
                     </span>
                   </td>
-                  <td class="py-1.5 text-right font-mono text-amber-400">{{ donor.total_qu.toLocaleString() }}</td>
+                  <td class="py-1.5 text-right font-mono text-amber-400 cursor-copy select-none" @dblclick.prevent="copyValue(donor.total_qu)">{{ donor.total_qu.toLocaleString() }}</td>
                   <td class="py-1.5 text-right text-gray-400">{{ donor.date }}</td>
                 </tr>
               </tbody>
@@ -418,7 +421,7 @@ onMounted(async () => {
           <!-- Total -->
           <div class="flex justify-between items-center bg-emerald-500/10 rounded-lg px-4 py-2 border border-emerald-500/30">
             <span class="text-sm text-gray-400">{{ t('donation.history_total') }}</span>
-            <span class="font-mono text-emerald-400 font-semibold">{{ effectiveDonationTotalQu.toLocaleString() }} QU</span>
+            <span class="font-mono text-emerald-400 font-semibold cursor-copy select-none" @dblclick.prevent="copyValue(effectiveDonationTotalQu)">{{ effectiveDonationTotalQu.toLocaleString() }} QU</span>
           </div>
 
           <div v-if="effectiveDonationHistory.length === 0" class="text-sm text-gray-500 italic text-center py-4">
@@ -442,7 +445,7 @@ onMounted(async () => {
                       {{ shortAddr(tx.address) }}
                     </a>
                   </td>
-                  <td class="py-1.5 text-right font-mono text-emerald-400">{{ tx.amount.toLocaleString() }}</td>
+                  <td class="py-1.5 text-right font-mono text-emerald-400 cursor-copy select-none" @dblclick.prevent="copyValue(tx.amount)">{{ tx.amount.toLocaleString() }}</td>
                   <td class="py-1.5 text-right text-gray-400">{{ tx.date }}</td>
                 </tr>
               </tbody>
