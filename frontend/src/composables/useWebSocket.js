@@ -22,6 +22,13 @@ export function useWebSocket() {
           const idx = store.nodes.findIndex(n => n.id === msg.payload.node_id)
           if (idx >= 0) Object.assign(store.nodes[idx], msg.payload)
         }
+        else if (msg.type === 'sync.node') {
+          // The backend elected a (new) live-sync node. Reflect is_sync_active
+          // across the node list so the header updates without a reload.
+          for (const n of store.nodes) {
+            n.is_sync_active = (n.id === msg.payload.node_id)
+          }
+        }
       } catch (err) {
         console.warn('WS message parse error', err)
       }

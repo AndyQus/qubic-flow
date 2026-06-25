@@ -199,7 +199,7 @@ npm run dev
 ## Node Configuration
 
 Nodes are managed via the UI under **Settings → Nodes**.  
-QubicFlow automatically selects the highest-priority ONLINE node during sync.
+For live sync QubicFlow automatically selects the BOB node with the **highest tick** (furthest advanced), falling back to RPC if every BOB node is stalled. The node actually feeding live sync is shown in the connection pill (top right) and marked with a pulsing dot in the node list.
 
 ### Node Types
 
@@ -245,12 +245,14 @@ QubicFlow detects the type automatically via `node_type = BOB_NODE` and uses the
 
 ### Node failover
 
-The sync job (`sync_all_wallets`, every 60 s) selects the node using the following logic:
+The sync job (`sync_all_wallets`, every 60 s) selects the **live-sync** node using the following logic:
 
-1. Only `is_active = 1` nodes are considered
-2. ONLINE nodes take priority over DEGRADED nodes
-3. In case of a tie, **priority** decides (lower number = higher priority)
+1. Only `is_active = 1` nodes with status ONLINE or DEGRADED are considered
+2. Among the BOB nodes, the one with the **highest tick** wins (furthest advanced); **priority** is only a tiebreaker when ticks are (nearly) equal
+3. If even the best BOB node lags more than `MAX_BOB_LAG` (1000) ticks behind the RPC network tip, it is treated as stalled and RPC is used for live sync (logged as a warning)
 4. If no node is available, the system falls back to `QUBIC_RPC_URL` from `.env`
+
+> Data is never lost when the active node changes: incremental sync always resumes from the persisted `last_tick`, and any range a node could not serve is backfilled via RPC or recorded as a gap and retried.
 
 ---
 

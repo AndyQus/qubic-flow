@@ -198,7 +198,7 @@ npm run dev
 ## Nodes konfigurieren
 
 Nodes werden über die Oberfläche unter **Einstellungen → Nodes** verwaltet.  
-QubicFlow wählt beim Sync automatisch den höchstpriorisierten ONLINE-Node.
+Für den Live-Sync wählt QubicFlow automatisch die BOB-Node mit dem **höchsten Tick** (am weitesten fortgeschritten) und fällt auf RPC zurück, falls alle BOB-Nodes hängen. Welche Node aktuell den Live-Sync speist, zeigt das Verbindungs-Pill (oben rechts) sowie ein pulsierender Punkt in der Node-Liste.
 
 ### Node-Typen
 
@@ -244,12 +244,14 @@ QubicFlow erkennt den Typ automatisch anhand von `node_type = BOB_NODE` und verw
 
 ### Node-Ausfallsicherung
 
-Der Sync-Job (`sync_all_wallets`, alle 60 s) wählt den Node nach folgender Logik:
+Der Sync-Job (`sync_all_wallets`, alle 60 s) wählt die **Live-Sync**-Node nach folgender Logik:
 
-1. Nur `is_active = 1`-Nodes werden berücksichtigt
-2. ONLINE-Nodes haben Vorrang vor DEGRADED-Nodes
-3. Bei Gleichstand entscheidet die **Priorität** (niedrigere Zahl = höhere Priorität)
+1. Nur `is_active = 1`-Nodes mit Status ONLINE oder DEGRADED werden berücksichtigt
+2. Unter den BOB-Nodes gewinnt die mit dem **höchsten Tick** (am weitesten fortgeschritten); die **Priorität** entscheidet nur als Tiebreaker bei (nahezu) gleichem Tick
+3. Hängt selbst die beste BOB-Node mehr als `MAX_BOB_LAG` (1000) Ticks hinter dem RPC-Netzwerk-Tick zurück, gilt sie als „stehengeblieben" und RPC übernimmt den Live-Sync (wird als Warnung geloggt)
 4. Ist kein Node verfügbar, fällt das System auf `QUBIC_RPC_URL` aus `.env` zurück
+
+> Beim Wechsel der aktiven Node gehen keine Daten verloren: Der inkrementelle Sync setzt immer beim persistierten `last_tick` an; jeder Bereich, den eine Node nicht liefern konnte, wird per RPC nachgefüllt oder als Gap aufgezeichnet und erneut versucht.
 
 ---
 
