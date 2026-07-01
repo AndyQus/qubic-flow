@@ -11,6 +11,25 @@ function _showToast(msg) {
   _toastTimer = setTimeout(() => { copyToast.value = '' }, 2000)
 }
 
+// Converts a numeric value to a plain decimal string matching the value as
+// displayed in the UI: no scientific notation, locale-aware decimal separator
+// (',' for German, '.' for English — exactly what the user sees), rounded to
+// the same precision the UI shows (max 10 fraction digits, matching
+// fmtRateLocale). Thousands grouping is dropped so the copied value stays
+// machine-parseable. Non-numeric input is returned as-is.
+// Example (de): 3.5555508908043315e-7 -> "0,0000003556"
+// Example (en): 3.5555508908043315e-7 -> "0.0000003556"
+export function toPlainDecimal(val, locale = 'en-US') {
+  if (val == null) return ''
+  if (typeof val !== 'number') return String(val)
+  if (!isFinite(val)) return String(val)
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 10,
+    useGrouping: false,
+  }).format(val)
+}
+
 export function useQubicUtils() {
   const store = useAppStore()
 
@@ -46,7 +65,7 @@ export function useQubicUtils() {
   // Copies a raw numeric/string value and shows a translated "Value copied" snackbar
   async function copyValue(val) {
     if (val == null) return
-    const raw = String(val)
+    const raw = toPlainDecimal(val, store.locale)
     try {
       await navigator.clipboard.writeText(raw)
     } catch {
