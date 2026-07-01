@@ -4,6 +4,13 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.7] — 2026-07-01
+
+### Fixed
+- **Copy numeric values as displayed** — double-clicking a numeric field (rate, amount, value) now copies exactly what is shown in the UI. Small values are no longer copied in scientific notation (e.g. `3.5555508908043315e-7`); they are copied as the rounded, locale-aware decimal (`0,0000003556` in German, `0.0000003556` in English), matching the on-screen precision.
+
+---
+
 ## [0.2.5] — 2026-06-25
 
 ### Changed
