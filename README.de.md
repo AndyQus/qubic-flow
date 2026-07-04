@@ -652,7 +652,7 @@ main     →  GitHub Actions startet automatisch  →  Docker Hub + Umbrel Store
 
 - Auf `develop` wird entwickelt — beliebig viele Commits, kein Build
 - Jeder Merge zu `main` löst den vollständigen Release-Prozess aus
-- Die Version wird aus der Datei `VERSION` gelesen (reines Semver, z. B. `0.2.10`)
+- Die Datei `VERSION` enthält die **zuletzt veröffentlichte** Version — die Pipeline erhöht die Patch-Nummer selbst vor dem Taggen. **`VERSION` niemals manuell anheben**, sonst wird eine Versionsnummer übersprungen (Doppel-Bump).
 
 ### GitHub Actions Workflow (`.github/workflows/docker-publish.yml`)
 
@@ -660,10 +660,11 @@ Der Workflow besteht aus 4 aufeinanderfolgenden Jobs:
 
 | Job | Beschreibung |
 |-----|--------------|
-| `tag` | Liest die `VERSION`-Datei und erstellt den Git-Tag `v{VERSION}` (übersprungen, falls vorhanden) |
+| `tag` | Erhöht die Patch-Version in `VERSION`, committet sie und erstellt den Git-Tag `v{VERSION}` (übersprungen, falls vorhanden) |
 | `build-backend` | Multi-Arch Docker Image für das Backend → Docker Hub |
 | `build-frontend` | Vue-Build + nginx Docker Image → Docker Hub |
 | `update-umbrel-store` | Aktualisiert automatisch die Versionsnummern im Store-Repo |
+| `sync-develop` | Pusht den Versions-Bump-Commit zurück nach `develop` |
 
 Der `workflow_dispatch`-Trigger erlaubt manuelle Neustarts über die GitHub-Actions-Oberfläche, falls ein Build fehlschlägt.
 
@@ -680,19 +681,18 @@ Im `qubic-flow` Repository unter Settings → Secrets and variables → Actions:
 ### Release auslösen
 
 ```bash
-# 1. Version anheben (der Frontend-Footer liest VERSION beim Build automatisch)
-echo "0.2.10" > VERSION
-# Außerdem Eintrag in CHANGELOG.md ergänzen
-
-# 2. Commit + Push nach develop
-git add VERSION CHANGELOG.md
-git commit -m "chore: bump version to v0.2.10"
+# 1. Eintrag in CHANGELOG.md ergänzen (VERSION NICHT anfassen — die Pipeline erhöht sie selbst)
+git add CHANGELOG.md
+git commit -m "docs: changelog for next release"
 git push origin develop
 
-# 3. Merge nach main → löst die Pipeline automatisch aus
+# 2. Merge nach main → löst die Pipeline automatisch aus
 git checkout main
 git merge develop
 git push origin main
+
+# 3. Danach develop pullen — CI pusht den Versions-Bump-Commit zurück
+git checkout develop && git pull
 ```
 
 ### Umbrel Installation

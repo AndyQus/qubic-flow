@@ -4,7 +4,7 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
-## [0.2.10] — 2026-07-04
+## [0.2.11] — 2026-07-04
 
 ### Added
 - **🇩🇰 Danish tax model** — new country profile DK with mandatory FIFO and separate reporting of gains and deductible losses (no netting, per Danish Spekulationsbeskatning). The Settings UI locks the cost-basis method to FIFO when DK is selected. (Community request)

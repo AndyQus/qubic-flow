@@ -654,7 +654,7 @@ main     →  GitHub Actions starts automatically  →  Docker Hub + Umbrel Stor
 
 - Development happens on `develop` — unlimited commits, no build triggered
 - Every merge to `main` triggers the full release process
-- The version is read from the `VERSION` file (plain semver, e.g. `0.1.7`)
+- The `VERSION` file holds the **last released** version — the pipeline bumps the patch number itself before tagging. **Never bump `VERSION` manually**, or a release number gets skipped (double bump).
 
 ### GitHub Actions Workflow (`.github/workflows/docker-publish.yml`)
 
@@ -662,10 +662,11 @@ The workflow consists of 4 sequential jobs:
 
 | Job                  | Description                                                                 |
 |----------------------|-----------------------------------------------------------------------------|
-| `tag`                | Reads `VERSION` file, creates git tag `v{VERSION}` (skipped if already exists) |
+| `tag`                | Bumps the patch version in `VERSION`, commits it, creates git tag `v{VERSION}` (skipped if it already exists) |
 | `build-backend`      | Multi-arch Docker image for backend → Docker Hub                            |
 | `build-frontend`     | Vue build + nginx Docker image → Docker Hub                                 |
 | `update-umbrel-store`| Automatically updates version numbers in the store repo                     |
+| `sync-develop`       | Pushes the version bump commit back to `develop`                            |
 
 The `workflow_dispatch` trigger allows manual re-runs from the GitHub Actions UI if a build fails.
 
@@ -682,19 +683,18 @@ In the `qubic-flow` repository under Settings → Secrets and variables → Acti
 ### Triggering a release
 
 ```bash
-# 1. Update version (the frontend footer reads VERSION automatically at build time)
-echo "0.2.10" > VERSION
-# Also add an entry to CHANGELOG.md
-
-# 2. Commit and push to develop
-git add VERSION CHANGELOG.md
-git commit -m "chore: bump version to v0.2.10"
+# 1. Add an entry to CHANGELOG.md (do NOT touch VERSION — the pipeline bumps it)
+git add CHANGELOG.md
+git commit -m "docs: changelog for next release"
 git push origin develop
 
-# 3. Merge to main → triggers the pipeline automatically
+# 2. Merge to main → triggers the pipeline automatically
 git checkout main
 git merge develop
 git push origin main
+
+# 3. Afterwards: pull develop — CI pushes the version bump commit back
+git checkout develop && git pull
 ```
 
 ### Umbrel Installation

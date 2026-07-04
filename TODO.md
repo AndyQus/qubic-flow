@@ -27,6 +27,6 @@ Scheduled backups instead of manual export only — a tax app should never lose 
 
 ## ✅ Completed
 
-- 🇩🇰 **Danish FIFO tax model** — shipped in v0.2.10 (mandatory FIFO, separate gain/loss reporting)
+- 🇩🇰 **Danish FIFO tax model** — shipped in v0.2.11 (mandatory FIFO, separate gain/loss reporting)
 
 See [CHANGELOG.md](CHANGELOG.md) for all released features.
