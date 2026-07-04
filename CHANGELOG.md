@@ -4,6 +4,24 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.10] — 2026-07-04
+
+### Added
+- **🇩🇰 Danish tax model** — new country profile DK with mandatory FIFO and separate reporting of gains and deductible losses (no netting, per Danish Spekulationsbeskatning). The Settings UI locks the cost-basis method to FIFO when DK is selected. (Community request)
+- **Portfolio value chart** — "Portfolio value over time" line chart (balance × daily rate) on Statistics → Overview, with the QU balance on a second axis; respects the wallet/function filter (`GET /stats/portfolio-history`)
+- **Koinly & Blockpit CSV export** — two new export formats for PRIVATE wallets, available on the Tax page (`GET /export/koinly`, `GET /export/blockpit`)
+- **Webhook notifications** — optional notifications for new incoming transfers with generic JSON, Discord, or ntfy format, minimum-amount filter and test button; configured under Settings → Data → Notifications. Only live events are reported, never historical imports
+- **Token & asset holdings** — the wallet detail page now shows live token/asset balances (e.g. QX shares) from the RPC assets endpoint, enriched with names from the assets registry (`GET /wallets/{id}/assets`)
+- **Timestamp backfill job** — 6-hourly job resolves events stored without a usable timestamp (old BOB imports showing 1970-01-01) via the archiver tick-data endpoint and fills the EUR/USD rate in the same pass
+
+### Fixed
+- **Tax report: income events no longer double-taxed** — QU received as income (dividends, rewards) now enter the lot queue at their market value at receipt instead of zero cost basis; previously the full proceeds were taxed again on disposal
+- **Tax report: year-end holdings** — disposals in later years no longer reduce the reported year-end holdings of the selected tax year
+- **Tax report: honest report currency** — countries whose local currency has no tracked rate (CH, GB, DK, SE, NO, …) are now calculated **and labelled** in EUR instead of silently showing EUR numbers under the local currency name; the effective currency and method are exposed in `meta`
+- **Price cache** — incomplete CoinGecko responses (only one of EUR/USD present) are no longer cached as 0.0, which permanently poisoned cost-basis calculations for that date; the missing rate is retried by the backfill job
+
+---
+
 ## [0.2.7] — 2026-07-01
 
 ### Fixed

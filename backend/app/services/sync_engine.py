@@ -267,7 +267,6 @@ async def sync_all_wallets():
         _src_url = getattr(event_client, 'base_url', settings.qubic_rpc_url)
         _src_key = f"{_src_type}:{_src_url}"
         _now = time.monotonic()
-        _now = time.monotonic()
         if _src_key != _last_event_source_key or (_now - _last_event_source_log) >= _EVENT_SOURCE_LOG_INTERVAL:
             msg = f"Event source active: {_src_type}"
             logger.info(msg)
@@ -554,6 +553,10 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         if broadcast:
             for ev in new_events:
                 await manager.broadcast("event.new", ev)
+            # Webhook notifications (best-effort, only for live events —
+            # initial/backfill syncs run with broadcast=False and stay silent)
+            from .notification_service import notify_incoming
+            await notify_incoming(db, new_events)
 
 
 TX_WINDOW_SIZE = 500_000  # max ticks per API call
@@ -617,6 +620,71 @@ async def backfill_tx_epochs(db: Session) -> int:
         db.commit()
         logger.info(f"backfill_tx_epochs: updated {updated} TX records")
     return updated
+
+
+async def _tick_timestamp_from_api(tick_number: int, cache: dict, http_client, base_url: str) -> str | None:
+    """Fetch the Unix-ms timestamp for a tick from the archiver, with cache."""
+    if tick_number in cache:
+        return cache[tick_number]
+    ts = None
+    try:
+        r = await http_client.get(f"{base_url}/v1/ticks/{tick_number}/tick-data", timeout=10)
+        if r.status_code == 200:
+            raw = r.json().get("tickData", {}).get("timestamp")
+            if raw and int(raw) > 0:
+                ts = str(raw)
+    except Exception:
+        pass
+    cache[tick_number] = ts
+    return ts
+
+
+async def backfill_missing_timestamps(limit: int = 500) -> int:
+    """Scheduler job — fix events stored without a usable timestamp.
+
+    Old BOB imports (before tick-timestamp resolution existed) persisted
+    events with timestamp 0 → 1970-01-01, which breaks price lookup and the
+    tax engine's holding-period logic. Resolve the real timestamp via the
+    archiver's tick-data endpoint and fill the EUR/USD rate in the same pass.
+    """
+    db = SessionLocal()
+    try:
+        rows = db.query(Event).filter(
+            Event.tick_number.isnot(None),
+            (Event.timestamp.is_(None))
+            | (Event.timestamp < "2020")
+            | (Event.timestamp_raw == "0"),
+        ).limit(limit).all()
+        if not rows:
+            return 0
+
+        base_url = _get_rpc_client(db).base_url
+        tick_cache: dict = {}
+        price_cache: dict = {}
+        updated = 0
+        async with httpx.AsyncClient() as http_client:
+            for ev in rows:
+                raw_ms = await _tick_timestamp_from_api(ev.tick_number, tick_cache, http_client, base_url)
+                if raw_ms is None:
+                    continue
+                ts_iso = unix_ms_to_iso(raw_ms)
+                ev.timestamp_raw = raw_ms
+                ev.timestamp = ts_iso
+                date_str = iso_to_date(ts_iso)
+                if date_str not in price_cache:
+                    price_cache[date_str] = await get_price_for_date(db, date_str)
+                price = price_cache[date_str]
+                if price.get("eur") is not None:
+                    ev.qubic_eur_rate = price.get("eur")
+                    ev.qubic_usd_rate = price.get("usd")
+                updated += 1
+        if updated:
+            db.commit()
+            logger.info(f"backfill_missing_timestamps: fixed {updated} events")
+            log_buffer.add("INFO", "sync", f"Timestamp backfill: fixed {updated} events", node=base_url)
+        return updated
+    finally:
+        db.close()
 
 
 async def sync_wallet_tx(db: Session, wallet_id: str, current_tick: int, client=None):

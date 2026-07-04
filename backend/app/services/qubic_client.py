@@ -86,6 +86,32 @@ class RPCClient:
         }
         return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
+    async def get_owned_assets(self, wallet_id: str) -> list[dict]:
+        """Fetch token/asset holdings for an identity.
+
+        Returns a flat list of {name, issuer, units, managing_contract} entries
+        mapped from /v1/assets/{identity}/owned.
+        """
+        data = await self._request("GET", f"/v1/assets/{wallet_id}/owned")
+        result = []
+        for entry in data.get("ownedAssets", []):
+            d = entry.get("data", {}) if isinstance(entry, dict) else {}
+            issued = d.get("issuedAsset", {}) or {}
+            try:
+                units = int(d.get("numberOfUnits") or 0)
+            except (TypeError, ValueError):
+                units = 0
+            if units <= 0:
+                continue
+            result.append({
+                "name": issued.get("name") or "?",
+                "issuer": issued.get("issuerIdentity"),
+                "units": units,
+                "decimals": issued.get("numberOfDecimalPlaces", 0),
+                "managing_contract": d.get("managingContractIndex"),
+            })
+        return result
+
 
 _bob_rpc_id_counter = 0
 

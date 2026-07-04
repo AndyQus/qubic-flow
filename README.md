@@ -4,7 +4,7 @@
 [![Open Source](https://img.shields.io/badge/open%20source-%E2%9D%A4-brightgreen.svg)](https://github.com/AndyQus/qubic-flow)
 
 Self-hosted, **open-source** Qubic wallet tracker for tax documentation.  
-Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live events via WebSocket, tax reporting (FIFO/LIFO/HIFO/AVCO, country-specific rules) and CSV export for CoinTracking and tax advisors.
+Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live events via WebSocket, tax reporting (FIFO/LIFO/HIFO/AVCO, country-specific rules incl. 🇩🇰 Denmark) and CSV export for CoinTracking, Koinly, Blockpit and tax advisors.
 
 **GitHub:** https://github.com/AndyQus/qubic-flow  
 **German README:** [README.de.md](README.de.md)
@@ -55,14 +55,21 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 - **Live updates** via WebSocket (events + node status)
 - **Tax reporting**:
   - FIFO, LIFO, HIFO and AVCO cost-basis methods
-  - Country-specific rules (DE, AT, CH, and more) — including 1-year holding-period tax exemption
+  - Country-specific rules (DE, AT, CH, DK, and more) — including the 1-year holding-period tax exemption (DE) and the Danish model (mandatory FIFO, gains and deductible losses reported separately without netting)
+  - Income events (dividends, rewards) are taxed at receipt and enter the lot queue at market value — no double taxation on later disposal
+  - Honest report currency: countries without tracked local rates (CHF, GBP, DKK, …) are calculated **and labelled** in EUR
   - Opening positions for pre-tracked balances
   - Price lookup per date directly in the UI
   - CSV and PDF export of the tax report
 - **CSV export**:
   - CoinTracking format (PRIVATE wallets, comma-separated, UTF-8 BOM)
+  - Koinly universal format (PRIVATE wallets)
+  - Blockpit generic import format (PRIVATE wallets)
   - Tax advisor format (BUSINESS wallets, semicolon-separated, UTF-8 BOM)
   - Resolved address names in the comment field
+- **Portfolio value chart** — daily QU balance × daily rate as a line chart on the statistics page (with balance on a second axis)
+- **Webhook notifications** — new incoming transfers can trigger a webhook (generic JSON, Discord or ntfy format) with a minimum-amount filter and test button (Settings → Data)
+- **Token & asset holdings** — live token balances (e.g. QX shares) per wallet on the wallet detail page, resolved via the Qubic assets registry
 - **Internal transfers** — wallet-to-wallet transfers are treated as tax-neutral in exports
 - **Privacy mode** — eye icon in the header masks all sensitive values app-wide: wallet addresses, balances, portfolio values, P&L, tax amounts, EUR/USD totals, and personal data fields in the tax form
 - **Dashboard search & pagination** — full-text search with debounce across all events; configurable page size (10–1000) persisted in localStorage
@@ -238,7 +245,7 @@ QubicFlow detects the type automatically via `node_type = BOB_NODE` and uses the
 
 #### Known limitations (BOB)
 
-- **Timestamps missing** in transfer entries — transaction data shows no correct date. An improvement via `GET /tick/{tickNumber}` is planned.
+- **Timestamps** are missing in raw BOB transfer entries — QubicFlow resolves them automatically via `qubic_getTickByNumber` / `GET /tick/{tickNumber}` during sync; events imported before this existed are repaired by the 6-hourly timestamp backfill job.
 - The public BOB node (`bobnet.qubic.li:40420`) is a community service with no guaranteed availability. For production use, running your own BOB node is recommended.
 
 > Full BOB API documentation: [`docs/bob_node.md`](docs/bob_node.md)
@@ -291,13 +298,15 @@ qubic-flow/
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/          # REST endpoints
-│   │   │   ├── wallets.py   # Wallet CRUD
-│   │   │   ├── events.py    # Event list with pagination
-│   │   │   ├── nodes.py     # Node CRUD + ordering
-│   │   │   ├── stats.py     # Statistics panels
-│   │   │   ├── export.py    # CSV download
+│   │   │   ├── wallets.py   # Wallet CRUD, resync, asset holdings
+│   │   │   ├── events.py    # Event list, filters, notes, donation endpoints
+│   │   │   ├── nodes.py     # Node CRUD, logs, diagnose, sync-now
+│   │   │   ├── stats.py     # Statistics panels, epochs, portfolio history
+│   │   │   ├── export.py    # CSV downloads (CoinTracking, Koinly, Blockpit, tax advisor)
+│   │   │   ├── backup.py    # Full JSON backup export/restore
+│   │   │   ├── notifications.py # Webhook notification settings + test
 │   │   │   ├── labels.py    # Address name resolution
-│   │   │   ├── health.py    # System status
+│   │   │   ├── health.py    # System status + metrics
 │   │   │   ├── tax.py       # Tax reporting (settings, report, opening positions)
 │   │   │   └── ws.py        # WebSocket endpoint
 │   │   ├── models/          # SQLAlchemy ORM models
@@ -310,34 +319,32 @@ qubic-flow/
 │   │   │   ├── address_label.py
 │   │   │   ├── snapshot.py
 │   │   │   ├── settings.py
-│   │   │   ├── wallet_balance.py    # Wallet balance
+│   │   │   ├── donor_cache.py       # Donation/supporter cache
 │   │   │   └── opening_position.py  # Opening positions for tax
 │   │   ├── services/        # Business logic
-│   │   │   ├── sync_engine.py      # Tick sync with window technique (event + TX); dynamic node selection
-│   │   │   ├── qubic_client.py     # RPCClient + BOBClient (3× retry, BOB response mapping)
+│   │   │   ├── sync_engine.py      # Tick sync with window technique (event + TX); dynamic node selection; timestamp/epoch/rate backfill
+│   │   │   ├── qubic_client.py     # RPCClient + BOBClient (3× retry, BOB response mapping, asset lookup)
 │   │   │   ├── coingecko.py        # Rate fetching with rate limiting
 │   │   │   ├── label_service.py    # Address name sync
-│   │   │   ├── export_service.py   # CSV generation
+│   │   │   ├── export_service.py   # CSV generation (4 formats)
+│   │   │   ├── notification_service.py # Webhook notifications (JSON/Discord/ntfy)
 │   │   │   ├── health_monitor.py   # Node status checking
 │   │   │   ├── snapshot_service.py # Weekly snapshots
 │   │   │   ├── balance_service.py  # Wallet balance updates
-│   │   │   ├── tax_engine.py       # Tax calculation (FIFO/LIFO/HIFO/AVCO, country-specific)
+│   │   │   ├── donation_cache_service.py # Supporter/donation detection
+│   │   │   ├── tax_engine.py       # Tax calculation (FIFO/LIFO/HIFO/AVCO, country-specific incl. DK)
 │   │   │   └── scheduler.py        # APScheduler jobs
 │   │   ├── websocket/
 │   │   │   └── manager.py   # WebSocket connection management
 │   │   ├── utils/
-│   │   │   └── time.py      # UTC helper functions
+│   │   │   ├── time.py      # UTC helper functions
+│   │   │   └── log_buffer.py # In-memory log ring buffer (Logs tab)
 │   │   ├── config.py        # Pydantic settings
 │   │   ├── database.py      # SQLAlchemy engine + session
 │   │   └── main.py          # FastAPI app + lifespan
-│   ├── tests/               # pytest suite (test_tax_engine.py, test_coingecko.py)
+│   ├── tests/               # pytest suite (13 files, 212 tests)
 │   ├── alembic/
-│   │   └── versions/        # Database migrations
-│   │       ├── 001_composite_pk_events.py
-│   │       ├── 002_add_last_tx_tick.py
-│   │       ├── 003_address_labels.py
-│   │       ├── 004_wallet_balance.py
-│   │       └── 005_opening_positions.py
+│   │   └── versions/        # Database migrations (001 … 013)
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env.example
@@ -376,24 +383,42 @@ All endpoints under `/api/v1/`. Interactive docs: `http://localhost:8000/docs`
 | Method | Path                                  | Description                                           |
 |--------|---------------------------------------|-------------------------------------------------------|
 | GET    | `/health`                             | Backend status                                        |
+| GET    | `/metrics`                            | Basic runtime metrics                                 |
 | GET    | `/wallets`                            | All active wallets                                    |
 | POST   | `/wallets`                            | Create wallet                                         |
 | PUT    | `/wallets/{id}`                       | Update wallet                                         |
 | DELETE | `/wallets/{id}`                       | Soft-delete wallet                                    |
+| GET    | `/wallets/{id}/assets`                | Live token/asset holdings (RPC proxy)                 |
 | POST   | `/wallets/{id}/resync-tx`             | Restart TX sync for a wallet                          |
 | POST   | `/wallets/resync-all`                 | Resync all wallets (missing records only)             |
-| GET    | `/events`                             | Events (filter: wallet_id, paginated)                 |
+| GET    | `/events`                             | Events (filters: wallet, epoch, month, year, source_type; paginated) |
+| GET    | `/events/count`                       | Event count for the current filter                    |
+| GET    | `/events/filter-options`              | Available years/months/epochs for filters             |
+| PATCH  | `/events/{id}/note`                   | Save a note on an event                               |
 | GET    | `/labels`                             | Address labels (optional `?address=`)                 |
 | GET    | `/nodes`                              | List nodes                                            |
 | POST   | `/nodes`                              | Create node                                           |
 | PUT    | `/nodes/{id}`                         | Update node                                           |
 | DELETE | `/nodes/{id}`                         | Delete node                                           |
+| PATCH  | `/nodes/{id}/toggle`                  | Enable/disable node                                   |
+| POST   | `/nodes/{id}/check-now`               | Immediate health check                                |
+| POST   | `/nodes/sync-now`                     | Trigger an immediate full sync                        |
+| POST   | `/nodes/diagnose`                     | Connectivity + sync diagnostics                       |
+| GET    | `/nodes/logs`                         | In-memory log buffer (Logs tab)                       |
 | GET    | `/stats/current`                      | Statistics panels (current + previous period)         |
 | GET    | `/stats/history`                      | Weekly/monthly time series                            |
 | GET    | `/stats/snapshots`                    | Stored weekly snapshots                               |
 | GET    | `/stats/epochs`                       | All epoch breakdowns per wallet (in/out, TX/event split, dividends as EVENTs) |
-| GET    | `/export/cointracking`                | CoinTracking CSV (`?year=2024`)                       |
-| GET    | `/export/steuerberater`               | Tax advisor CSV (`?year=2024`)                        |
+| GET    | `/stats/portfolio-history`            | Daily portfolio value (balance × rate)                |
+| GET    | `/export/cointracking`                | CoinTracking CSV (`?year=2026`)                       |
+| GET    | `/export/koinly`                      | Koinly universal CSV (`?year=2026`)                   |
+| GET    | `/export/blockpit`                    | Blockpit import CSV (`?year=2026`)                    |
+| GET    | `/export/steuerberater`               | Tax advisor CSV (`?year=2026`)                        |
+| GET    | `/backup`                             | Full JSON backup (wallets, nodes, events, tax settings) |
+| POST   | `/backup/restore`                     | Restore from a backup file (deduplicated)             |
+| GET    | `/notifications/settings`             | Read webhook notification settings                    |
+| PUT    | `/notifications/settings`             | Save webhook notification settings                    |
+| POST   | `/notifications/test`                 | Send a test notification                              |
 | GET    | `/tax/settings`                       | Read tax settings                                     |
 | PUT    | `/tax/settings`                       | Save tax settings                                     |
 | GET    | `/tax/countries`                      | Available countries + tax rules                       |
@@ -402,7 +427,7 @@ All endpoints under `/api/v1/`. Interactive docs: `http://localhost:8000/docs`
 | DELETE | `/tax/opening-positions/{id}`         | Delete opening position                               |
 | GET    | `/tax/report`                         | Calculate tax report                                  |
 | GET    | `/tax/price`                          | EUR/USD rate for a date (`?date=`)                    |
-| WS     | `/ws`                                 | WebSocket (event.new, node.health)                    |
+| WS     | `/ws`                                 | WebSocket (event.new, node.health, sync.node)         |
 
 ### Wallet address format
 
@@ -420,14 +445,26 @@ Example: `AAAAABBBBBCCCCCDDDDDEEEEEFFFFFGGGGGHHHHHIIIIIIJJJJJKKKKKLLLLL`
 - Internal transfers (wallet → wallet) are **automatically excluded**
 - `is_internal` is calculated dynamically at export time — retroactively correct when new wallets are added
 - Comment field contains resolved address names: `"Source name → Destination name"`
-- Download: `GET /api/v1/export/cointracking?year=2024`
+- Download: `GET /api/v1/export/cointracking?year=2026`
+
+### Koinly (PRIVATE wallets)
+
+- Koinly universal CSV format (Date, Sent/Received Amount + Currency, Net Worth, Label, TxHash)
+- Reward income is labelled `reward`; internal transfers excluded
+- Download: `GET /api/v1/export/koinly?year=2026`
+
+### Blockpit (PRIVATE wallets)
+
+- Blockpit generic import format (Date (UTC), Integration Name, Label, Outgoing/Incoming Asset + Amount, Trx. ID)
+- Incoming rewards are labelled `Staking`, transfers `Deposit`/`Withdrawal`; internal transfers excluded
+- Download: `GET /api/v1/export/blockpit?year=2026`
 
 ### Tax advisor (BUSINESS wallets)
 
 - Format: semicolon-separated, UTF-8 BOM
 - Contains: all transfers including internal (with type flag)
 - Comment field contains resolved address names: `"Source name → Destination name"`
-- Download: `GET /api/v1/export/steuerberater?year=2024`
+- Download: `GET /api/v1/export/steuerberater?year=2026`
 
 Both exports include EUR values rounded to 2 decimal places.
 
@@ -448,8 +485,11 @@ Under **Settings → Tax**:
 
 ### Supported countries
 
-Available countries and their rules are provided by `GET /api/v1/tax/countries`.  
-For Germany (DE): gains from disposals held for more than 12 months are tax-free.
+Available countries and their rules are provided by `GET /api/v1/tax/countries`.
+
+- **Germany (DE):** gains from disposals held for more than 12 months are tax-free; €1,000 Freigrenze
+- **Denmark (DK):** FIFO is mandatory (the method selector is locked); gains and losses are **not netted** — taxable gains and deductible losses are reported separately (Spekulationsbeskatning)
+- **Report currency:** rates are tracked in EUR and USD only. The US is calculated in USD, everything else in EUR — countries with another local currency (CHF, GBP, DKK, …) are labelled honestly as EUR. Income events enter the lot queue at market value at receipt, so they are not taxed twice.
 
 ### Opening positions
 
@@ -484,12 +524,18 @@ The report can be downloaded directly in the UI as **CSV** or **PDF**.
 
 ## Background Jobs
 
-| Job                | Interval             | Description                                                               |
-|--------------------|----------------------|---------------------------------------------------------------------------|
-| `sync_all_wallets` | every 60 seconds     | Event sync + TX sync + balance update; dynamically selects the best available node |
-| `health_monitor`   | every 30 seconds     | Check node status (`/v1/tick-info` for RPC, `/status` for BOB), WebSocket broadcast |
-| `sync_labels`      | every 24 hours       | Address name sync (address_labels, tokens, issuances)                    |
-| `weekly_snapshot`  | Wed 12:00 UTC (cron) | Save weekly aggregation snapshot                                          |
+| Job                       | Interval             | Description                                                               |
+|---------------------------|----------------------|---------------------------------------------------------------------------|
+| `sync_all_wallets`        | every 60 seconds     | Event sync + TX sync + balance update; dynamically selects the best available node |
+| `health_monitor`          | every 30 seconds     | Check node status (`/v1/tick-info` for RPC, `/status` for BOB), WebSocket broadcast |
+| `retry_sync_gaps`         | every 15 minutes     | Retry unresolved sync gaps (EVENT + TX) via RPC                           |
+| `check_balances`          | every hour           | Compare live RPC balance vs. computed balance; trigger targeted resync on drift |
+| `backfill_tx_epochs`      | every hour           | Fill missing epoch numbers on TX records                                  |
+| `refresh_donation_cache`  | every hour           | Update supporter/donation cache                                           |
+| `backfill_rates`          | every 6 hours        | Fetch EUR/USD rates for events without a rate                             |
+| `backfill_timestamps`     | every 6 hours        | Resolve events without a usable timestamp (old BOB imports) via tick data |
+| `sync_labels`             | every 24 hours       | Address name sync (address_labels, tokens, issuances)                    |
+| `weekly_snapshot`         | Wed 12:00 UTC (cron) | Save weekly aggregation snapshot                                          |
 
 Jobs run with `max_instances=1` and `coalesce=True` — no parallel duplicate runs.
 
@@ -507,10 +553,20 @@ pip install -r requirements.txt
 python -m pytest tests/ -v
 ```
 
-| File                       | Tests | Description                                                          |
-|----------------------------|-------|----------------------------------------------------------------------|
-| `tests/test_tax_engine.py` | 27    | Lot matching (FIFO/LIFO/HIFO/AVCO), holding period, tax rules, date parser |
-| `tests/test_coingecko.py`  | 6     | Rate cache hit/miss, network errors, side-effect-free               |
+| File                              | Tests | Description                                                          |
+|-----------------------------------|-------|----------------------------------------------------------------------|
+| `tests/test_tax_engine.py`        | 27    | Lot matching (FIFO/LIFO/HIFO/AVCO), holding period, tax rules, date parser |
+| `tests/test_tax_report_fixes.py`  | 8     | Income cost basis, year-end holdings, report currency, Danish model |
+| `tests/test_export_service.py`    | 25    | CSV exports (classification, formats, internal transfers)            |
+| `tests/test_review_fixes.py`      | 46    | API regressions (nodes, sync guard, diagnose)                        |
+| `tests/test_bob_client.py`        | 25    | BOB JSON-RPC client, response mapping, timestamp resolution          |
+| `tests/test_wallets_api.py`       | 23    | Wallet CRUD + resync endpoints                                       |
+| `tests/test_time_utils.py`        | 15    | UTC helpers                                                          |
+| `tests/test_donation_utils.py`    | 13    | Supporter rank / donation logic                                      |
+| `tests/test_bob_selection.py`     | 8     | Tick-based BOB node election + lag fallback                          |
+| `tests/test_sync_engine_logic.py` | 8     | Sync window / persistence logic                                      |
+| `tests/test_sync_gap_type.py`     | 7     | Gap recording (EVENT vs. TX)                                         |
+| `tests/test_coingecko.py`         | 6     | Rate cache hit/miss, network errors, side-effect-free                |
 
 ### Frontend — Unit tests (Vitest)
 
@@ -626,14 +682,13 @@ In the `qubic-flow` repository under Settings → Secrets and variables → Acti
 ### Triggering a release
 
 ```bash
-# 1. Update version
-echo "0.1.8" > VERSION
-# Also update APP_VERSION in frontend/src/components/AppFooter.vue
-# Also add entry to CHANGELOG.md
+# 1. Update version (the frontend footer reads VERSION automatically at build time)
+echo "0.2.10" > VERSION
+# Also add an entry to CHANGELOG.md
 
 # 2. Commit and push to develop
-git add VERSION frontend/src/components/AppFooter.vue CHANGELOG.md
-git commit -m "chore: bump version to v0.1.8"
+git add VERSION CHANGELOG.md
+git commit -m "chore: bump version to v0.2.10"
 git push origin develop
 
 # 3. Merge to main → triggers the pipeline automatically

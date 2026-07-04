@@ -52,6 +52,7 @@ const stats          = ref(null)
 const snaps          = ref([])
 const history        = ref([])
 const epochsData     = ref([])
+const portfolio      = ref([])
 const mode           = ref('count')
 const selectedWallets = ref([])
 const selectedEpochWallets = ref([])
@@ -116,12 +117,15 @@ async function loadStats() {
       const fnIds = new Set(store.wallets.filter(w => w.function === selectedFunction.value).map(w => w.id))
       ids = ids.length ? ids.filter(id => fnIds.has(id)) : [...fnIds]
     }
-    ;[stats.value, snaps.value, history.value, epochsData.value] = await Promise.all([
+    let portfolioResp
+    ;[stats.value, snaps.value, history.value, epochsData.value, portfolioResp] = await Promise.all([
       api.stats.current(ids),
       ids.length ? Promise.resolve([]) : api.stats.snapshots(),
       api.stats.history('week', ids),
       api.stats.epochs(),
+      api.stats.portfolioHistory(ids),
     ])
+    portfolio.value = portfolioResp?.points || []
   } finally { loading.value = false }
 }
 
@@ -232,6 +236,42 @@ const lineData = computed(() => {
       { label: t('stats.volume_qubic'), data: items.map(s => s.volume_qubic || 0),
         borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)', fill: true, tension: 0.4 },
     ],
+  }
+})
+
+// ── Portfolio-Wertverlauf ───────────────────────────────────────
+const portfolioValueKey = computed(() => store.currency === 'USD' ? 'value_usd' : 'value_eur')
+
+const portfolioData = computed(() => {
+  const items = portfolio.value
+  return {
+    labels: items.map(p => p.date),
+    datasets: [
+      {
+        label: `${t('stats.portfolio_value')} ${store.currency}`,
+        data: items.map(p => p[portfolioValueKey.value]),
+        borderColor: '#2dd4bf', backgroundColor: 'rgba(45,212,191,0.1)',
+        fill: true, tension: 0.3, pointRadius: 0, yAxisID: 'y',
+      },
+      {
+        label: t('stats.balance_qu'),
+        data: items.map(p => p.balance_qubic),
+        borderColor: '#a78bfa', backgroundColor: 'transparent',
+        fill: false, tension: 0.3, pointRadius: 0, yAxisID: 'y1',
+      },
+    ],
+  }
+})
+
+const portfolioChartOptions = computed(() => {
+  const base = chartOptions.value
+  return {
+    ...base,
+    scales: {
+      x: { ...base.scales.x, ticks: { ...base.scales.x.ticks, maxTicksLimit: 12 } },
+      y: { ...base.scales.y, position: 'left' },
+      y1: { ...base.scales.y, position: 'right', grid: { drawOnChartArea: false } },
+    },
   }
 })
 
@@ -778,10 +818,18 @@ const currentEpochFilteredTotals = computed(() => {
       </div>
 
       <!-- Balkendiagramm: letzte 12 Wochen TX vs Events -->
-      <div class="card" style="height:260px">
+      <div class="card mb-4" style="height:260px">
         <div class="text-sm uppercase text-gray-400 mb-2">{{ t('stats.bar_chart_title') }}</div>
         <div style="height:210px">
           <Bar :data="barData" :options="chartOptions" />
+        </div>
+      </div>
+
+      <!-- Portfolio-Wertverlauf: Bestand × Tageskurs -->
+      <div v-if="portfolio.length" class="card" style="height:300px">
+        <div class="text-sm uppercase text-gray-400 mb-2">{{ t('stats.portfolio_chart_title') }}</div>
+        <div style="height:250px">
+          <Line :data="portfolioData" :options="portfolioChartOptions" />
         </div>
       </div>
     </div>

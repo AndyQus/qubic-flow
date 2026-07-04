@@ -10,6 +10,8 @@ TAX_RULES = {
     "DE": {"holding_days": 365, "threshold": 1000, "threshold_type": "Freigrenze", "currency": "EUR"},
     "AT": {"holding_days": None, "threshold": None, "threshold_type": None, "currency": "EUR"},
     "CH": {"holding_days": None, "threshold": None, "threshold_type": None, "currency": "CHF"},
+    "DK": {"holding_days": None, "threshold": None, "threshold_type": "Spekulationsbeskatning",
+           "currency": "DKK", "forced_method": "FIFO", "separate_losses": True},
     "US": {"holding_days": 365, "threshold": None, "threshold_type": "Short/Long-Term", "currency": "USD"},
     "GB": {"holding_days": 365, "threshold": 3000, "threshold_type": "CGT Allowance", "currency": "GBP"},
     "AU": {"holding_days": 365, "threshold": None, "threshold_type": "50% CGT Discount", "currency": "AUD"},
@@ -24,6 +26,16 @@ TAX_RULES = {
     "SG": {"holding_days": None, "threshold": None, "threshold_type": None, "currency": "SGD"},
     "OTHER": {"holding_days": None, "threshold": None, "threshold_type": None, "currency": None},
 }
+
+
+def calc_currency(rules: dict) -> str:
+    """Currency the report is actually calculated in.
+
+    Only EUR and USD rates are tracked (price_cache). Countries with another
+    local currency (CHF, GBP, DKK, …) get an honest EUR report instead of
+    EUR numbers silently labelled with the local currency.
+    """
+    return "USD" if rules.get("currency") == "USD" else "EUR"
 
 
 def _parse_date(iso: str) -> datetime:
@@ -164,7 +176,10 @@ def calculate_tax_report(
     method: str,
 ) -> dict:
     rules = TAX_RULES.get(country, TAX_RULES["OTHER"])
-    currency = rules.get("currency") or "EUR"
+    currency = calc_currency(rules)
+    if rules.get("forced_method"):
+        method = rules["forced_method"]
+    separate_losses = bool(rules.get("separate_losses"))
     holding_days_threshold = rules.get("holding_days")
     threshold = rules.get("threshold")
     threshold_type = rules.get("threshold_type")
@@ -177,6 +192,7 @@ def calculate_tax_report(
             "summary": {
                 "taxable_gains_eur": 0.0,
                 "tax_free_gains_eur": 0.0,
+                "deductible_losses_eur": 0.0 if separate_losses else None,
                 "income_eur": 0.0,
                 "total_volume_eur": 0.0,
                 "transactions_count": 0,
@@ -184,6 +200,8 @@ def calculate_tax_report(
                 "threshold_exceeded": False,
                 "threshold_type": threshold_type,
             },
+            "currency": currency,
+            "method": method,
             "disposals": [],
             "income": [],
             "year_end_holdings": [],
@@ -230,6 +248,10 @@ def calculate_tax_report(
             continue
 
         ts = _parse_date(evt.timestamp)
+        # Stop at year end: later events must not consume lots, otherwise
+        # year_end_holdings would reflect disposals from subsequent years.
+        if ts > year_end:
+            break
         price_eur = float(evt.qubic_eur_rate) if evt.qubic_eur_rate is not None else 0.0
         price_usd = float(evt.qubic_usd_rate) if evt.qubic_usd_rate is not None else 0.0
 
@@ -247,12 +269,14 @@ def calculate_tax_report(
                     "price_usd": price_usd,
                 })
             elif evt.source_type == "EVENT":
-                # income / reward: add lot with zero cost basis, also record income
+                # Income / reward: taxed as income at receipt, so the lot's
+                # cost basis is the market value at receipt (not zero) —
+                # otherwise the same value would be taxed again on disposal.
                 lots[target_wallet].append({
                     "date": ts,
                     "amount": amount,
-                    "price_eur": 0.0,
-                    "price_usd": 0.0,
+                    "price_eur": price_eur,
+                    "price_usd": price_usd,
                 })
                 value = price_eur if currency == "EUR" else price_usd
                 if ts.year == year:
@@ -305,13 +329,19 @@ def calculate_tax_report(
     # 5) Summary
     taxable_gains = 0.0
     tax_free_gains = 0.0
+    deductible_losses = 0.0
     total_volume = 0.0
     for d in disposals:
         total_volume += d["proceeds"]
-        gain_sum_free = sum(l["gain"] for l in d["lots"] if l["tax_free"])
-        gain_sum_tax = sum(l["gain"] for l in d["lots"] if not l["tax_free"])
-        tax_free_gains += gain_sum_free
-        taxable_gains += gain_sum_tax
+        for l in d["lots"]:
+            if l["tax_free"]:
+                tax_free_gains += l["gain"]
+            elif separate_losses and l["gain"] < 0:
+                # e.g. Denmark: losses cannot be netted against gains —
+                # they are only a (lower-valued) deduction, reported separately.
+                deductible_losses += -l["gain"]
+            else:
+                taxable_gains += l["gain"]
 
     income_total = sum(i["value"] for i in income)
     threshold_exceeded = bool(threshold is not None and taxable_gains > threshold)
@@ -339,6 +369,7 @@ def calculate_tax_report(
         "summary": {
             "taxable_gains_eur": taxable_gains,
             "tax_free_gains_eur": tax_free_gains,
+            "deductible_losses_eur": deductible_losses if separate_losses else None,
             "income_eur": income_total,
             "total_volume_eur": total_volume,
             "transactions_count": len(disposals) + len(income),
@@ -346,6 +377,8 @@ def calculate_tax_report(
             "threshold_exceeded": threshold_exceeded,
             "threshold_type": threshold_type,
         },
+        "currency": currency,
+        "method": method,
         "disposals": disposals,
         "income": income,
         "year_end_holdings": year_end_holdings,

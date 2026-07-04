@@ -142,6 +142,31 @@ async def resync_all(background_tasks: BackgroundTasks, db: Session = Depends(ge
     return {"wallets_queued": len(states), "reclassified": reclassified}
 
 
+@router.get("/wallets/{wallet_id}/assets")
+async def wallet_assets(wallet_id: str, db: Session = Depends(get_db)):
+    """Live token/asset holdings for a wallet (proxied from the RPC node,
+    enriched with names from the address-label registry)."""
+    from ...models.address_label import AddressLabel
+    from ...services.sync_engine import _get_rpc_client
+
+    client = _get_rpc_client(db)
+    try:
+        assets = await client.get_owned_assets(wallet_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Asset lookup failed: {e}")
+
+    issuers = [a["issuer"] for a in assets if a.get("issuer")]
+    labels = {}
+    if issuers:
+        labels = {
+            row.address: row.label
+            for row in db.query(AddressLabel).filter(AddressLabel.address.in_(issuers)).all()
+        }
+    for a in assets:
+        a["issuer_label"] = labels.get(a.get("issuer"))
+    return {"wallet_id": wallet_id, "assets": assets}
+
+
 @router.delete("/wallets/{wallet_id}", status_code=204)
 def delete_wallet(wallet_id: str, db: Session = Depends(get_db)):
     wallet = db.query(Wallet).filter(Wallet.id == wallet_id, Wallet.deleted_at.is_(None)).first()

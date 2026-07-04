@@ -166,8 +166,25 @@ function setFilter(mode) {
 
 watch([filterEpoch, filterMonth, filterYear], () => { page.value = 1; load() })
 watch(page, load)
-onMounted(() => { load(); loadFilterOptions(); loadOpeningPositions() })
+onMounted(() => { load(); loadFilterOptions(); loadOpeningPositions(); loadWalletAssets() })
 
+
+// Token / asset holdings (live from RPC)
+const walletAssets = ref([])
+const assetsLoading = ref(false)
+
+async function loadWalletAssets() {
+  assetsLoading.value = true
+  try {
+    const r = await api.wallets.assets(props.id)
+    walletAssets.value = r?.assets || []
+  } catch (e) {
+    console.error(e)
+    walletAssets.value = []
+  } finally {
+    assetsLoading.value = false
+  }
+}
 
 const resyncing = ref(false)
 async function resyncTx() {
@@ -249,6 +266,34 @@ async function resyncTx() {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Token / Asset Holdings -->
+    <div v-if="walletAssets.length" class="card">
+      <h3 class="text-sm font-bold uppercase text-gray-400 mb-3">{{ t('walletDetail.assets_title') }}</h3>
+      <div class="overflow-x-auto">
+        <table class="table-std">
+          <thead>
+            <tr class="border-b border-qubic-border text-gray-500 uppercase">
+              <th class="text-left py-2 pr-3">{{ t('assets.name') }}</th>
+              <th class="text-left py-2 pr-3">{{ t('walletDetail.assets_issuer') }}</th>
+              <th class="text-right py-2 whitespace-nowrap">{{ t('walletDetail.assets_units') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(a, i) in walletAssets" :key="i"
+                class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
+              <td class="py-2 pr-3 font-medium text-gray-200">{{ a.name }}</td>
+              <td class="py-2 pr-3 text-gray-400 text-xs font-mono">
+                {{ a.issuer_label || (a.issuer ? a.issuer.slice(0, 10) + '…' : '—') }}
+              </td>
+              <td class="py-2 text-right font-mono">
+                {{ store.hideAddresses ? '••••••' : Number(a.units).toLocaleString(store.locale) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

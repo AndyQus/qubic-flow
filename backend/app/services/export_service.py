@@ -109,6 +109,104 @@ def export_cointracking(db: Session, year: int | None = None) -> str:
     return buf.getvalue()
 
 
+KOINLY_HEADER = [
+    "Date", "Sent Amount", "Sent Currency", "Received Amount", "Received Currency",
+    "Fee Amount", "Fee Currency", "Net Worth Amount", "Net Worth Currency",
+    "Label", "Description", "TxHash",
+]
+
+BLOCKPIT_HEADER = [
+    "Date (UTC)", "Integration Name", "Label", "Outgoing Asset", "Outgoing Amount",
+    "Incoming Asset", "Incoming Amount", "Fee Asset (optional)", "Fee Amount (optional)",
+    "Comment (optional)", "Trx. ID (optional)",
+]
+
+
+def _private_events(db: Session, year: int | None):
+    """Shared query + context for the consumer tax-tool exports (PRIVATE wallets)."""
+    q = db.query(Event).join(Wallet, Wallet.id == Event.wallet_id).filter(
+        Wallet.wallet_type == "PRIVATE",
+        Wallet.deleted_at.is_(None),
+    )
+    if year:
+        q = q.filter(Event.timestamp.like(f"{year}-%"))
+    events = q.order_by(Event.timestamp).all()
+    owned = {w.id for w in db.query(Wallet.id).filter(Wallet.deleted_at.is_(None)).all()}
+    return events, owned
+
+
+def _addr_comment(db: Session, e: Event) -> str:
+    src_name = get_label(db, e.source_address)
+    dst_name = get_label(db, e.destination_addr)
+    if src_name and dst_name:
+        return f"{src_name} → {dst_name}"
+    if src_name:
+        return f"{src_name} →"
+    if dst_name:
+        return f"→ {dst_name}"
+    return ""
+
+
+def _fmt_date_utc(iso: str, fmt: str) -> str:
+    try:
+        return datetime.fromisoformat((iso or "").replace("Z", "+00:00")).strftime(fmt)
+    except Exception:
+        return iso or ""
+
+
+def export_koinly(db: Session, year: int | None = None) -> str:
+    """Koinly universal CSV (PRIVATE wallets, internal transfers excluded)."""
+    events, owned = _private_events(db, year)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=",", quoting=csv.QUOTE_ALL)
+    writer.writerow(KOINLY_HEADER)
+
+    for e in events:
+        kind = _classify(e, owned)
+        if kind not in ("QUBIC_IN", "QUBIC_OUT"):
+            continue
+        amount = e.amount_qubic or 0
+        date = _fmt_date_utc(e.timestamp, "%Y-%m-%d %H:%M UTC")
+        net_worth = _eur_value(amount, e.qubic_eur_rate)
+        label = "reward" if (kind == "QUBIC_IN" and e.source_type == "EVENT") else ""
+        desc = _addr_comment(db, e)
+
+        if kind == "QUBIC_IN":
+            row = [date, "", "", amount, "QUBIC", "", "", net_worth, "EUR", label, desc, e.id]
+        else:
+            row = [date, amount, "QUBIC", "", "", "", "", net_worth, "EUR", label, desc, e.id]
+        writer.writerow(row)
+
+    return buf.getvalue()
+
+
+def export_blockpit(db: Session, year: int | None = None) -> str:
+    """Blockpit generic import CSV (PRIVATE wallets, internal transfers excluded)."""
+    events, owned = _private_events(db, year)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=",", quoting=csv.QUOTE_ALL)
+    writer.writerow(BLOCKPIT_HEADER)
+
+    for e in events:
+        kind = _classify(e, owned)
+        if kind not in ("QUBIC_IN", "QUBIC_OUT"):
+            continue
+        amount = e.amount_qubic or 0
+        date = _fmt_date_utc(e.timestamp, "%Y-%m-%d %H:%M:%S")
+        desc = _addr_comment(db, e)
+
+        if kind == "QUBIC_IN":
+            label = "Staking" if e.source_type == "EVENT" else "Deposit"
+            row = [date, "QubicFlow", label, "", "", "QUBIC", amount, "", "", desc, e.id]
+        else:
+            row = [date, "QubicFlow", "Withdrawal", "QUBIC", amount, "", "", "", "", desc, e.id]
+        writer.writerow(row)
+
+    return buf.getvalue()
+
+
 def export_steuerberater(db: Session, year: int | None = None) -> str:
     q = db.query(Event).join(Wallet, Wallet.id == Event.wallet_id).filter(
         Wallet.wallet_type == "BUSINESS",

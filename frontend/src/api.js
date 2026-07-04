@@ -27,6 +27,7 @@ export const api = {
     remove: (id) => req(`/wallets/${id}`, { method: 'DELETE' }),
     resyncTx: (id) => req(`/wallets/${id}/resync-tx`, { method: 'POST' }),
     resyncAll: () => req('/wallets/resync-all', { method: 'POST' }),
+    assets: (id) => req(`/wallets/${id}/assets`),
   },
   events: {
     list: (params = {}) => {
@@ -77,6 +78,10 @@ export const api = {
       return req(`/stats/history${q ? '?' + q : ''}`)
     },
     epochs:   () => req('/stats/epochs'),
+    portfolioHistory: (walletIds = []) => {
+      const q = buildQuery({ wallet_ids: walletIds })
+      return req(`/stats/portfolio-history${q ? '?' + q : ''}`)
+    },
   },
   labels: {
     list: (params = {}) => {
@@ -87,6 +92,11 @@ export const api = {
   backup: {
     export: () => req('/backup'),
     restore: (data) => req('/backup/restore', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  notifications: {
+    getSettings: () => req('/notifications/settings'),
+    saveSettings: (data) => req('/notifications/settings', { method: 'PUT', body: JSON.stringify(data) }),
+    test: () => req('/notifications/test', { method: 'POST' }),
   },
   metrics: () => req('/metrics'),
   health: () => req('/health'),

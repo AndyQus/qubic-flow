@@ -54,11 +54,14 @@ async def get_price_for_date(db: Session, date_str: str) -> dict:
         logger.warning(f"CoinGecko fetch failed for {date_str}: {e}")
         return {"eur": None, "usd": None}
 
-    if eur is not None or usd is not None:
+    # Only cache complete pairs — persisting a missing rate as 0.0 would
+    # permanently poison cost-basis calculations for that date. Partial
+    # responses are retried by the backfill_missing_rates job.
+    if eur is not None and usd is not None:
         entry = PriceCache(
             date=date_str,
-            qubic_eur=eur or 0.0,
-            qubic_usd=usd or 0.0,
+            qubic_eur=eur,
+            qubic_usd=usd,
             source="coingecko",
             fetched_at=now_utc_iso(),
         )

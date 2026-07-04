@@ -41,15 +41,59 @@ const taxSaving = ref(false)
 const taxSaved = ref(false)
 const loadError = ref(null)
 
+// Some countries mandate a specific cost-basis method (e.g. DK → FIFO)
+const forcedMethod = computed(() => taxCountries.value[taxSettings.value.country]?.forced_method || null)
+watch(forcedMethod, (m) => { if (m) taxSettings.value.method = m })
+
 onMounted(async () => {
   try {
-    const [s, c] = await Promise.all([api.tax.getSettings(), api.tax.getCountries()])
+    const [s, c, n] = await Promise.all([
+      api.tax.getSettings(),
+      api.tax.getCountries(),
+      api.notifications.getSettings().catch(() => null),
+    ])
     if (s) Object.assign(taxSettings.value, s)
     if (c) taxCountries.value = c
+    if (n) Object.assign(notifySettings.value, n)
   } catch (e) {
     loadError.value = e.message
   }
 })
+
+// Webhook notifications
+const notifySettings = ref({ enabled: false, webhook_url: '', format: 'generic', min_amount: 0 })
+const notifySaving = ref(false)
+const notifySaved = ref(false)
+const notifyTesting = ref(false)
+const notifyTestResult = ref(null)
+
+async function saveNotifySettings() {
+  notifySaving.value = true
+  notifySaved.value = false
+  notifyTestResult.value = null
+  try {
+    await api.notifications.saveSettings(notifySettings.value)
+    notifySaved.value = true
+    setTimeout(() => { notifySaved.value = false }, 3000)
+  } finally {
+    notifySaving.value = false
+  }
+}
+
+async function testNotification() {
+  notifyTesting.value = true
+  notifyTestResult.value = null
+  try {
+    // Save first so the backend tests exactly what is configured
+    await api.notifications.saveSettings(notifySettings.value)
+    const r = await api.notifications.test()
+    notifyTestResult.value = !!r?.ok
+  } catch {
+    notifyTestResult.value = false
+  } finally {
+    notifyTesting.value = false
+  }
+}
 
 async function saveTaxSettings() {
   taxSaving.value = true
@@ -420,6 +464,54 @@ function simulate() {
         </p>
       </div>
     </div>
+
+    <!-- Benachrichtigungen Panel -->
+    <div class="card space-y-4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.notify_section') }}</h3>
+      <div class="space-y-3">
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.notify_desc') }}</p>
+
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input v-model="notifySettings.enabled" type="checkbox" class="accent-qubic-teal" />
+          {{ t('settings.notify_enabled') }}
+        </label>
+
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('settings.notify_url') }}</label>
+          <input v-model="notifySettings.webhook_url" type="text" class="input w-full text-sm"
+                 placeholder="https://ntfy.sh/mein-topic | https://discord.com/api/webhooks/…" />
+        </div>
+
+        <div class="flex flex-wrap items-end gap-3">
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('settings.notify_format') }}</label>
+            <div class="flex gap-1">
+              <button v-for="f in ['generic', 'discord', 'ntfy']" :key="f"
+                      :class="['btn-ghost text-sm py-1.5 px-3', notifySettings.format === f && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                      @click="notifySettings.format = f">
+                {{ f === 'generic' ? 'JSON' : f === 'discord' ? 'Discord' : 'ntfy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 block mb-1">{{ t('settings.notify_min_amount') }}</label>
+            <input v-model.number="notifySettings.min_amount" type="number" min="0" class="input w-40 text-sm" />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button class="btn text-sm" :disabled="notifySaving" @click="saveNotifySettings">
+            {{ notifySaving ? t('common.loading') : t('common.save') }}
+          </button>
+          <button class="btn-ghost text-sm" :disabled="notifyTesting || !notifySettings.webhook_url" @click="testNotification">
+            {{ notifyTesting ? t('common.loading') : t('settings.notify_test_btn') }}
+          </button>
+          <span v-if="notifySaved" class="text-xs text-green-400">✓ {{ t('common.save') }}</span>
+          <span v-if="notifyTestResult === true" class="text-xs text-green-400">✓ {{ t('settings.notify_test_ok') }}</span>
+          <span v-if="notifyTestResult === false" class="text-xs text-red-400">{{ t('settings.notify_test_failed') }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Tab: Steuern -->
@@ -445,13 +537,17 @@ function simulate() {
           <div class="flex flex-wrap gap-1">
             <button v-for="[val] in [['FIFO'], ['LIFO'], ['HIFO'], ['AVCO']]"
                     :key="val"
-                    :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal']"
+                    :disabled="forcedMethod && val !== forcedMethod"
+                    :class="['btn-ghost text-sm py-1.5 px-3', taxSettings.method === val && 'bg-qubic-teal/20 border-qubic-teal text-qubic-teal', forcedMethod && val !== forcedMethod && 'opacity-40 cursor-not-allowed']"
                     @click="taxSettings.method = val">
               {{ val }}
             </button>
           </div>
           <p class="text-xs text-gray-500 leading-snug">
             {{ t(`tax.method_${taxSettings.method.toLowerCase()}_desc`) }}
+          </p>
+          <p v-if="forcedMethod" class="text-xs text-amber-400 leading-snug">
+            {{ t('tax.method_forced', { country: taxSettings.country, method: forcedMethod }) }}
           </p>
         </div>
       </div>

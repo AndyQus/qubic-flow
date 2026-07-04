@@ -198,6 +198,64 @@ def epochs_breakdown(db: Session = Depends(get_db)):
     return sorted(by_epoch.values(), key=lambda b: b["epoch"], reverse=True)
 
 
+@router.get("/stats/portfolio-history")
+def portfolio_history(
+    wallet_ids: List[str] = Query(default=[]),
+    db: Session = Depends(get_db),
+):
+    """Daily portfolio value over time: cumulative QU balance × daily rate.
+
+    Balance is derived from stored events (incoming minus outgoing per day).
+    Internal transfers between tracked wallets cancel out in the aggregate.
+    Missing rates are forward-filled with the last known rate.
+    """
+    from ...models.price_cache import PriceCache
+    from datetime import date as date_cls
+
+    day_expr = func.substr(Event.timestamp, 1, 10)
+    delta_expr = func.coalesce(func.sum(
+        func.iif(Event.destination_addr == Event.wallet_id, Event.amount_qubic, 0)
+        - func.iif(Event.source_address == Event.wallet_id, Event.amount_qubic, 0)
+    ), 0)
+
+    q = db.query(day_expr.label("day"), delta_expr.label("delta")).filter(
+        Event.timestamp.isnot(None),
+        Event.timestamp >= "2020",  # skip unresolved 1970 timestamps
+    )
+    if wallet_ids:
+        q = q.filter(Event.wallet_id.in_(wallet_ids))
+    rows = q.group_by("day").order_by("day").all()
+    if not rows:
+        return {"points": []}
+
+    deltas = {r.day: int(r.delta or 0) for r in rows}
+    rates = {
+        p.date: (p.qubic_eur, p.qubic_usd)
+        for p in db.query(PriceCache).all()
+    }
+
+    start = date_cls.fromisoformat(rows[0].day)
+    end = datetime.now(timezone.utc).date()
+    points = []
+    balance = 0
+    last_eur, last_usd = None, None
+    day = start
+    while day <= end:
+        key = day.isoformat()
+        balance += deltas.get(key, 0)
+        if key in rates:
+            last_eur, last_usd = rates[key]
+        points.append({
+            "date": key,
+            "balance_qubic": balance,
+            "value_eur": round(balance * last_eur, 2) if last_eur is not None else None,
+            "value_usd": round(balance * last_usd, 2) if last_usd is not None else None,
+        })
+        day += timedelta(days=1)
+
+    return {"points": points}
+
+
 @router.get("/stats/history")
 def history(
     group_by: str = "week",

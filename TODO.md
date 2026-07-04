@@ -9,25 +9,24 @@ Have an idea? Open an [issue](https://github.com/AndyQus/qubic-flow/issues) or l
 
 | # | Feature | Requested by | Status |
 |---|---------|-------------|--------|
-| 1 | 🇩🇰 Danish FIFO tax model | Community | 🔜 Planned |
+| 1 | 💾 Automatic backups | AndyQus | 🔜 Planned |
 
 ---
 
-## 🇩🇰 Danish FIFO Tax Model
+## 💾 Automatic Backups
 
-**Request:**
-> "Can you at some point make Danish FIFO available? They got other rules than germany (unfortunately stricter). Great work"
+**Idea:**
+Scheduled backups instead of manual export only — a tax app should never lose data.
 
 **Details:**
-Denmark has stricter FIFO rules for crypto taxation compared to Germany.
-This requires:
-- Research into Danish crypto tax regulations
-- Country-profile selection in the tax report settings
-- Country-specific calculation logic (FIFO per DK rules)
-- UI: country selector in Settings or Tax Report dialog
+- Scheduler job (e.g. weekly) that writes a JSON/SQLite backup automatically
+- Rotation (e.g. keep the last 4 backups)
+- **Open question:** storage location — inside the Docker volume, a user-configurable path, or an external target (SMB/S3/…)?
 
 ---
 
 ## ✅ Completed
+
+- 🇩🇰 **Danish FIFO tax model** — shipped in v0.2.10 (mandatory FIFO, separate gain/loss reporting)
 
 See [CHANGELOG.md](CHANGELOG.md) for all released features.

@@ -166,7 +166,10 @@ async def get_tax_report(
         "year": year,
         "mode": mode,
         "country": country,
-        "method": method,
+        # Effective values from the engine: DK forces FIFO, and countries
+        # without tracked local rates are calculated in EUR.
+        "method": report.get("method", method),
+        "currency": report.get("currency", "EUR"),
         "wallet_ids": wallet_ids,
     }
     return report

@@ -147,6 +147,9 @@ function exportCSV() {
   lines.push(['Field', 'Value'].join(sep))
   lines.push([t('tax.taxable_gains'), `${fmtNum(s.taxable_gains_eur)} ${currency}`].join(sep))
   lines.push([t('tax.tax_free_gains'), `${fmtNum(s.tax_free_gains_eur)} ${currency}`].join(sep))
+  if (s.deductible_losses_eur !== null && s.deductible_losses_eur !== undefined) {
+    lines.push([t('tax.deductible_losses'), `${fmtNum(s.deductible_losses_eur)} ${currency}`].join(sep))
+  }
   lines.push([t('tax.income'), `${fmtNum(s.income_eur)} ${currency}`].join(sep))
   lines.push([t('tax.total_volume'), `${fmtNum(s.total_volume_eur)} ${currency}`].join(sep))
   lines.push([t('tax.transactions'), s.transactions_count].join(sep))
@@ -235,6 +238,9 @@ function exportPDF() {
   const summaryBody = [
     [t('tax.taxable_gains'), `${fmtNum(s.taxable_gains_eur)} ${currency}`],
     [t('tax.tax_free_gains'), `${fmtNum(s.tax_free_gains_eur)} ${currency}`],
+    ...(s.deductible_losses_eur !== null && s.deductible_losses_eur !== undefined
+      ? [[t('tax.deductible_losses'), `${fmtNum(s.deductible_losses_eur)} ${currency}`]]
+      : []),
     [t('tax.income'), `${fmtNum(s.income_eur)} ${currency}`],
     [t('tax.total_volume'), `${fmtNum(s.total_volume_eur)} ${currency}`],
     [t('tax.transactions'), String(s.transactions_count)],
@@ -436,6 +442,8 @@ function exportPDF() {
       <!-- Export buttons -->
       <div class="flex flex-wrap gap-2 justify-end">
         <a v-if="mode === 'private'" :href="exportUrl('cointracking', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.cointracking') }}</a>
+        <a v-if="mode === 'private'" :href="exportUrl('koinly', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.koinly') }}</a>
+        <a v-if="mode === 'private'" :href="exportUrl('blockpit', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.blockpit') }}</a>
         <a v-if="mode === 'business'" :href="exportUrl('steuerberater', year)" class="btn-ghost text-sm py-1.5 px-4">{{ t('export.steuerberater') }}</a>
         <button class="btn-ghost text-sm py-1.5 px-4" @click="exportCSV">{{ t('tax.export_csv') }}</button>
         <button class="btn text-sm py-1.5 px-4" @click="exportPDF">{{ t('tax.export_pdf') }}</button>
@@ -455,6 +463,13 @@ function exportPDF() {
             <div class="text-xs text-gray-500 mb-1">{{ t('tax.tax_free_gains') }}</div>
             <div class="text-base font-mono font-semibold text-qubic-teal">
               {{ fmtNum(report.summary.tax_free_gains_eur) }} {{ ccy }}
+            </div>
+          </div>
+          <div v-if="report.summary.deductible_losses_eur !== null && report.summary.deductible_losses_eur !== undefined"
+               class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
+            <div class="text-xs text-gray-500 mb-1">{{ t('tax.deductible_losses') }}</div>
+            <div class="text-base font-mono font-semibold text-red-400">
+              {{ fmtNum(report.summary.deductible_losses_eur) }} {{ ccy }}
             </div>
           </div>
           <div class="rounded-lg border border-qubic-border bg-qubic-bg/50 px-4 py-3">
