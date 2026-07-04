@@ -67,7 +67,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
   - Steuerberater-Format (GESCHÄFTLICH-Wallets, semikolongetrennt, UTF-8 BOM)
   - Aufgelöste Adress-Namen im Kommentarfeld
 - **Portfolio-Wertverlauf** — täglicher QU-Bestand × Tageskurs als Liniendiagramm auf der Statistik-Seite (Bestand auf zweiter Achse)
-- **Webhook-Benachrichtigungen** — neue eingehende Zahlungen können einen Webhook auslösen (generisches JSON, Discord oder ntfy) mit Mindestbetrags-Filter und Test-Schaltfläche (Einstellungen → Daten)
+- **Webhook-Benachrichtigungen** — neue eingehende Zahlungen können einen Webhook auslösen (generisches JSON, Discord oder ntfy) mit Mindestbetrags-Filter, TX-/SC-Event-Typfilter (Checkboxen entscheiden, welcher Typ eine Nachricht auslöst) und Test-Schaltfläche (Einstellungen → Daten); jede Nachricht enthält den vollständigen Datensatz mit dem Event-Typ in der ersten Zeile
 - **Token- & Asset-Bestände** — Live-Token-Bestände (z. B. QX-Shares) je Wallet auf der Wallet-Detailseite, aufgelöst über das Qubic-Assets-Register
 - **Interne Transfers** — Wallet-zu-Wallet-Transfers werden beim Export steuerlich neutral behandelt
 - **Datenschutz-Modus** — Auge-Symbol im Header blendet alle sensiblen Werte app-weit aus: Wallet-Adressen, Kontostände, Portfolio-Werte, Gewinn/Verlust, Steuerbeträge, EUR/USD-Summen sowie persönliche Datenfelder im Steuerformular

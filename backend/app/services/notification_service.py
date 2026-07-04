@@ -20,6 +20,8 @@ DEFAULT_SETTINGS = {
     "webhook_url": "",
     "format": "generic",
     "min_amount": 0,
+    "notify_tx": True,     # notify on regular transfers (source_type TX)
+    "notify_event": True,  # notify on smart-contract events (source_type EVENT)
 }
 
 
@@ -54,16 +56,33 @@ def _short(addr: str | None) -> str:
     return f"{addr[:5]}…{addr[-5:]}" if addr and len(addr) > 12 else (addr or "?")
 
 
+def _event_kind(ev: dict) -> str:
+    return "TX" if ev.get("source_type") == "TX" else "SC EVENT"
+
+
 def _build_text(ev: dict, wallet_label: str) -> str:
+    """Full multi-line message with the event type on the very first line."""
     amount = ev.get("amount_qubic") or 0
-    text = f"QubicFlow: +{amount:,} QU → {wallet_label}"
-    src = ev.get("source_address")
-    if src:
-        text += f" (from {_short(src)})"
+    lines = [f"[{_event_kind(ev)}] QubicFlow: +{amount:,} QU → {wallet_label}"]
     rate = ev.get("qubic_eur_rate")
     if rate:
-        text += f" ≈ {amount * rate:.2f} EUR"
-    return text
+        usd = ev.get("qubic_usd_rate")
+        value = f"Value: ≈ {amount * rate:.2f} EUR"
+        if usd:
+            value += f" / {amount * usd:.2f} USD"
+        lines.append(value)
+    lines.append(f"From: {ev.get('source_address') or '?'}")
+    lines.append(f"To: {ev.get('destination_addr') or '?'}")
+    lines.append(f"Wallet: {wallet_label}")
+    if ev.get("tick_number") is not None:
+        lines.append(f"Tick: {ev['tick_number']}")
+    if ev.get("epoch") is not None:
+        lines.append(f"Epoch: {ev['epoch']}")
+    if ev.get("timestamp"):
+        lines.append(f"Time: {ev['timestamp']}")
+    if ev.get("id"):
+        lines.append(f"TxID: {ev['id']}")
+    return "\n".join(lines)
 
 
 async def _post_webhook(url: str, fmt: str, ev: dict, wallet_label: str):
@@ -75,21 +94,15 @@ async def _post_webhook(url: str, fmt: str, ev: dict, wallet_label: str):
                 await client.post(
                     url,
                     content=_build_text(ev, wallet_label).encode("utf-8"),
-                    headers={"Title": "QubicFlow", "Tags": "moneybag"},
+                    headers={"Title": f"QubicFlow [{_event_kind(ev)}]", "Tags": "moneybag"},
                     timeout=5,
                 )
-            else:  # generic JSON
+            else:  # generic JSON — event type first, then the full record
                 await client.post(url, json={
+                    "event_type": _event_kind(ev).replace(" ", "_"),  # TX | SC_EVENT
                     "type": "qubicflow.incoming",
-                    "wallet_id": ev.get("wallet_id"),
                     "wallet_label": wallet_label,
-                    "amount_qubic": ev.get("amount_qubic"),
-                    "source_address": ev.get("source_address"),
-                    "destination_addr": ev.get("destination_addr"),
-                    "tick_number": ev.get("tick_number"),
-                    "timestamp": ev.get("timestamp"),
-                    "qubic_eur_rate": ev.get("qubic_eur_rate"),
-                    "qubic_usd_rate": ev.get("qubic_usd_rate"),
+                    **ev,
                 }, timeout=5)
     except Exception as e:
         # Notifications are best-effort — never break the sync because of them.
@@ -112,6 +125,12 @@ async def notify_incoming(db: Session, events: list[dict]):
             continue
         if ev.get("destination_addr") != ev.get("wallet_id"):
             continue  # only incoming transfers
+        # Type filter: user chooses whether TX and/or SC events trigger a push
+        src_type = ev.get("source_type")
+        if src_type == "TX" and not cfg.get("notify_tx", True):
+            continue
+        if src_type == "EVENT" and not cfg.get("notify_event", True):
+            continue
         if (ev.get("amount_qubic") or 0) < min_amount:
             continue
         wallet_label = labels.get(ev.get("wallet_id"), _short(ev.get("wallet_id")))
@@ -125,14 +144,18 @@ async def send_test_notification(db: Session) -> bool:
     if not url:
         return False
     ev = {
+        "id": "test-notification",
         "wallet_id": "TEST",
         "amount_qubic": 1_000_000,
         "source_address": "QUBICFLOWTESTNOTIFICATION",
         "destination_addr": "TEST",
         "tick_number": 0,
+        "epoch": None,
         "timestamp": None,
         "qubic_eur_rate": None,
         "qubic_usd_rate": None,
+        "source_type": "TX",
+        "is_internal": 0,
     }
     try:
         await _post_webhook(url, cfg.get("format") or "generic", ev, "Test wallet")

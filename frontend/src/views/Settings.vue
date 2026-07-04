@@ -61,7 +61,7 @@ onMounted(async () => {
 })
 
 // Webhook notifications
-const notifySettings = ref({ enabled: false, webhook_url: '', format: 'generic', min_amount: 0 })
+const notifySettings = ref({ enabled: false, webhook_url: '', format: 'generic', min_amount: 0, notify_tx: true, notify_event: true })
 const notifySaving = ref(false)
 const notifySaved = ref(false)
 const notifyTesting = ref(false)
@@ -475,6 +475,23 @@ function simulate() {
           <input v-model="notifySettings.enabled" type="checkbox" class="accent-qubic-teal" />
           {{ t('settings.notify_enabled') }}
         </label>
+
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('settings.notify_types') }}</label>
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input v-model="notifySettings.notify_tx" type="checkbox" class="accent-qubic-teal" />
+              <span class="pill text-xs py-0.5 px-2 bg-amber-500/20 text-amber-400 border-amber-500/30">{{ t('event.badge_tx') }}</span>
+              {{ t('event.filter_tx') }}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input v-model="notifySettings.notify_event" type="checkbox" class="accent-qubic-teal" />
+              <span class="pill text-xs py-0.5 px-2 bg-violet-500/20 text-violet-400 border-violet-500/30">{{ t('event.badge_event') }}</span>
+              {{ t('event.filter_event') }}
+            </label>
+          </div>
+          <p class="text-xs text-gray-500 mt-1 leading-snug">{{ t('settings.notify_types_hint') }}</p>
+        </div>
 
         <div>
           <label class="text-xs text-gray-500 block mb-1">{{ t('settings.notify_url') }}</label>
