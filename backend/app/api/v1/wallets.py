@@ -142,12 +142,25 @@ async def resync_all(background_tasks: BackgroundTasks, db: Session = Depends(ge
     return {"wallets_queued": len(states), "reclassified": reclassified}
 
 
+@router.get("/wallets/assets-summary")
+async def wallets_assets_summary(db: Session = Depends(get_db)):
+    """Token/share holdings for ALL active wallets in one call — used by the
+    portfolio Token/Shares view. Cached per wallet on the server so switching
+    views does not hammer the RPC node."""
+    from ...services.sync_engine import _get_rpc_client
+    from ...services.asset_service import build_assets_summary
+
+    client = _get_rpc_client(db)
+    return await build_assets_summary(db, client)
+
+
 @router.get("/wallets/{wallet_id}/assets")
 async def wallet_assets(wallet_id: str, db: Session = Depends(get_db)):
     """Live token/asset holdings for a wallet (proxied from the RPC node,
-    enriched with names from the address-label registry)."""
-    from ...models.address_label import AddressLabel
+    enriched with names from the address-label registry and current QX
+    trade prices from the official QX API)."""
     from ...services.sync_engine import _get_rpc_client
+    from ...services.asset_service import enrich_assets, get_today_qu_rate
 
     client = _get_rpc_client(db)
     try:
@@ -155,15 +168,8 @@ async def wallet_assets(wallet_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Asset lookup failed: {e}")
 
-    issuers = [a["issuer"] for a in assets if a.get("issuer")]
-    labels = {}
-    if issuers:
-        labels = {
-            row.address: row.label
-            for row in db.query(AddressLabel).filter(AddressLabel.address.in_(issuers)).all()
-        }
-    for a in assets:
-        a["issuer_label"] = labels.get(a.get("issuer"))
+    qu_rate = await get_today_qu_rate(db)
+    assets = await enrich_assets(db, assets, qu_rate)
     return {"wallet_id": wallet_id, "assets": assets}
 
 

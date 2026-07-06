@@ -748,6 +748,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
             resp = await client.get_transfer_transactions(wallet_id, from_tick, to_tick, page=page, page_size=100)
             tick_groups = resp.get("transactions", [])
             inserted = 0
+            new_tx_events = []
 
             for tick_group in tick_groups:
                 tick_number = tick_group.get("tickNumber")
@@ -848,8 +849,15 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                     )
                     db.add(event)
                     inserted += 1
+                    new_tx_events.append({
+                        "tick_number": tick_number,
+                        "amount_qubic": amount,
+                        "source_address": source,
+                        "destination_addr": dest,
+                    })
 
             if inserted > 0:
+                _apply_balance_delta(db, wallet_id, new_tx_events)
                 db.commit()
                 total_inserted += inserted
                 logger.info(f"Wallet {wallet_id}: TX page {page} — {inserted} new records")

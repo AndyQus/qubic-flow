@@ -4,6 +4,20 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.12] — 2026-07-05
+
+### Added
+- **Live QX prices for token holdings** — the Tokens & Assets table on the wallet detail page now shows the current price (last QX trade, in QU per share) plus the resulting value in QU and in EUR/USD (today's rate). Prices come from the official Qubic QX API (`qxinfo.qubic.org`, the same source QXBoard uses) and are cached for 10 minutes; assets without trades show a dash. Configurable via `QX_API_URL`
+- **Token/Shares portfolio view** — new "QUBIC | Tokens/Shares" switch on the Wallets → Portfolio tab. The token view mirrors the familiar owner grouping: summary bar with total token value, number of token types and **total value including QUBIC**; owner cards with token chips and totals; per-owner drilldown with one card per wallet listing every token (units, price, value in QU and EUR/USD) plus the wallet's combined total. Data comes from a new batch endpoint (`GET /wallets/assets-summary`) with a 5-minute server-side cache so the RPC node is not hit per wallet on every page view
+- **Share vs. token classification** — assets issued by the QX smart contract itself (QX, QEARN, QVAULT, QSWAP, …) are now labelled "Share", assets issued by any other project (CFB, QFT, community tokens, …) are labelled "Token", shown as a colored badge (amber/sky) everywhere assets are listed
+- Token/share lists (wallet detail page, portfolio owner cards, portfolio drilldown) are now sorted alphabetically by name
+
+### Fixed
+- **Portfolio Token/Shares totals** — the "total value" shown for an owner or wallet could be smaller than the token value alone if the QUBIC price (loaded separately) hadn't arrived yet. The total is now only shown once both components are known, instead of silently treating a missing QUBIC price as zero
+- **Negative QUBIC balances** — regular wallet-to-wallet transfers (the TX sync path) never updated the tracked balance counter, only transfers touching a smart-contract/token address did. Wallets with heavy smart-contract activity (e.g. QX) could drift arbitrarily, even negative, dragging the portfolio total below the token-only value. TX-synced transfers now update the balance the same way SC events do, and the hourly reconciliation job now corrects the stored balance to the live RPC value on mismatch instead of only logging a warning and re-syncing history that didn't address the drift
+
+---
+
 ## [0.2.11] — 2026-07-04
 
 ### Added

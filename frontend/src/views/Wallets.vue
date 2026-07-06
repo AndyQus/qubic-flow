@@ -139,18 +139,27 @@ function balanceSyncTitle(w) {
   return w.balance === w.balance_live ? t('wallet.balance_synced') : `${t('wallet.balance_drift')}: ${w.balance_live.toLocaleString(store.locale)}`
 }
 
-// Tabs & Portfolio selection — synced to URL query (?tab=, ?owner=)
+// Tabs & Portfolio selection — synced to URL query (?tab=, ?owner=, ?view=)
 const activeTab = ref(route.query.tab === 'config' ? 'config' : 'portfolio')
 const selectedPortfolioOwner = ref(route.query.owner || null)
+const portfolioView = ref(route.query.view === 'assets' ? 'assets' : 'qubic')
 
 watch(() => route.query, (q) => {
   activeTab.value = q.tab === 'config' ? 'config' : 'portfolio'
   selectedPortfolioOwner.value = q.owner || null
+  portfolioView.value = q.view === 'assets' ? 'assets' : 'qubic'
 })
 
 function setActiveTab(tab) {
   const q = {}
   if (tab === 'config') q.tab = 'config'
+  router.push({ path: '/wallets', query: q })
+}
+
+function setPortfolioView(view) {
+  const q = { ...route.query }
+  if (view === 'assets') q.view = 'assets'
+  else delete q.view
   router.push({ path: '/wallets', query: q })
 }
 
@@ -297,6 +306,123 @@ const grandTotal = computed(() => {
   return { balance, value, cost, hasValue, hasCost }
 })
 
+// ── Token/Shares view (assets summary for all wallets) ─────────
+const assetsSummary = ref(null)   // { wallets: {id: {assets, total_value_*}}, qu_rate }
+const assetsLoading = ref(false)
+
+async function loadAssetsSummary() {
+  if (assetsSummary.value || assetsLoading.value) return
+  assetsLoading.value = true
+  try {
+    assetsSummary.value = await api.wallets.assetsSummary()
+  } catch (e) {
+    console.error(e)
+    assetsSummary.value = { wallets: {}, qu_rate: null }
+  } finally {
+    assetsLoading.value = false
+  }
+}
+
+watch(portfolioView, (v) => { if (v === 'assets') loadAssetsSummary() }, { immediate: true })
+
+const walletAssetsMap = computed(() => assetsSummary.value?.wallets || {})
+const assetFiatField = computed(() => store.currency === 'USD' ? 'total_value_usd' : 'total_value_eur')
+const assetValueField = computed(() => store.currency === 'USD' ? 'value_usd' : 'value_eur')
+
+function walletAssets(w) {
+  const assets = walletAssetsMap.value[w.id]?.assets || []
+  return [...assets].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+}
+
+function walletAssetsFiat(w) {
+  const entry = walletAssetsMap.value[w.id]
+  if (!entry || !entry.assets.length) return null
+  return entry[assetFiatField.value]
+}
+
+// Total wallet value = QUBIC value + token/share value.
+// Only combine once BOTH are known — the QUBIC rate loads separately
+// (loadPortfolioData) and can lag behind the token summary, which would
+// otherwise make the total look smaller than the token value alone.
+function walletTotalFiat(w) {
+  const qu = walletValue(w)
+  const tok = walletAssetsFiat(w)
+  if (qu == null) return null
+  return qu + (tok ?? 0)
+}
+
+// Owner groups enriched with token totals for the assets view
+const ownerAssetGroups = computed(() => {
+  return ownerGroups.value.map(g => {
+    let tokenValue = 0
+    let hasTokens = false
+    const tokenCounts = new Map()   // name -> { units, kind }
+    for (const w of g.wallets) {
+      const entry = walletAssetsMap.value[w.id]
+      if (!entry || !entry.assets.length) continue
+      hasTokens = true
+      for (const a of entry.assets) {
+        const existing = tokenCounts.get(a.name)
+        tokenCounts.set(a.name, { units: (existing?.units || 0) + a.units, kind: a.kind })
+      }
+      const fiat = entry[assetFiatField.value]
+      if (fiat != null) tokenValue += fiat
+    }
+    // Only combine QUBIC value + token value once BOTH are known — otherwise
+    // a slow-loading QUBIC price (fetched separately, see loadPortfolioData)
+    // would make the total look smaller than the token value alone.
+    const totalFiat = g.hasValue ? g.totalValue + tokenValue : null
+    return {
+      ...g,
+      tokenValue,
+      hasTokens,
+      tokens: [...tokenCounts.entries()]
+        .map(([name, v]) => ({ name, units: v.units, kind: v.kind }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+      totalFiat,
+      hasTotalFiat: totalFiat != null,
+    }
+  })
+})
+
+const selectedAssetGroup = computed(() =>
+  ownerAssetGroups.value.find(g => g.owner === selectedPortfolioOwner.value) || null
+)
+
+const assetsGrandTotal = computed(() => {
+  let tokenValue = 0
+  const kinds = new Set()
+  for (const g of ownerAssetGroups.value) {
+    tokenValue += g.tokenValue
+    for (const tok of g.tokens) kinds.add(tok.name)
+  }
+  return {
+    tokenValue,
+    kinds: kinds.size,
+    total: grandTotal.value.hasValue ? grandTotal.value.value + tokenValue : null,
+  }
+})
+
+function fmtUnits(n) {
+  if (n == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(n).toLocaleString(store.locale)
+}
+
+function fmtTokenPrice(n) {
+  if (n == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(n).toLocaleString(store.locale, { maximumFractionDigits: 4 })
+}
+
+// Amber = share (issued by the QX smart contract itself), sky = token
+// (issued by any other project/identity).
+function assetKindChipClass(kind) {
+  return kind === 'share'
+    ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+    : 'bg-sky-500/10 text-sky-300 border-sky-500/20'
+}
+
 onMounted(async () => {
   await reload()
   loadPortfolioData()
@@ -334,15 +460,24 @@ onMounted(async () => {
 
     <!-- =================== PORTFOLIO TAB =================== -->
     <div v-if="activeTab === 'portfolio'" class="space-y-3">
-      <!-- Filter pills + Add Wallet button -->
+      <!-- Filter pills + view switch + Add Wallet button -->
       <div class="flex items-center justify-between gap-2 flex-wrap">
-        <div class="filter-row">
-          <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
-                  @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
-          <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
-                  @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
-          <button :class="['filter-pill', store.walletFilter === 'business' && 'filter-pill-active']"
-                  @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="filter-row">
+            <button :class="['filter-pill', store.walletFilter === 'all'      && 'filter-pill-active']"
+                    @click="store.walletFilter = 'all'">{{ t('filter.all') }}</button>
+            <button :class="['filter-pill', store.walletFilter === 'private'  && 'filter-pill-active']"
+                    @click="store.walletFilter = 'private'">{{ t('filter.private') }}</button>
+            <button :class="['filter-pill', store.walletFilter === 'business' && 'filter-pill-active']"
+                    @click="store.walletFilter = 'business'">{{ t('filter.business') }}</button>
+          </div>
+          <!-- View switch: QUBIC balances vs. token/share holdings -->
+          <div class="tab-group">
+            <button :class="['tab-btn', portfolioView === 'qubic' && 'tab-btn-active']"
+                    @click="setPortfolioView('qubic')">QUBIC</button>
+            <button :class="['tab-btn', portfolioView === 'assets' && 'tab-btn-active']"
+                    @click="setPortfolioView('assets')">{{ t('wallet.view_assets') }}</button>
+          </div>
         </div>
         <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
       </div>
@@ -375,6 +510,7 @@ onMounted(async () => {
 
       <div v-if="!ownerGroups.length" class="card p-6 text-center text-gray-500 text-xs">{{ t('wallet.none') }}</div>
 
+      <template v-if="portfolioView === 'qubic'">
       <!-- Grand total summary bar (icon + colored label per column, like Dashboard panels) -->
       <div v-if="ownerGroups.length" class="card p-4 bg-gradient-to-r from-qubic-teal/5 to-qubic-teal/[0.02] border-qubic-teal/20">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 divide-y md:divide-y-0 md:divide-x divide-qubic-border/50">
@@ -643,6 +779,196 @@ onMounted(async () => {
           </table>
         </div>
       </div>
+      </template>
+
+      <!-- =================== TOKEN/SHARES VIEW =================== -->
+      <template v-else>
+        <!-- Loading -->
+        <div v-if="assetsLoading" class="card flex items-center justify-center py-10">
+          <div class="flex items-center gap-3 text-sm text-gray-400">
+            <div class="w-5 h-5 rounded-full border-2 border-qubic-border border-t-qubic-teal animate-spin" />
+            {{ t('wallet.assets_loading') }}
+          </div>
+        </div>
+
+        <template v-else>
+          <!-- Token grand total summary bar -->
+          <div v-if="ownerGroups.length" class="card p-4 bg-gradient-to-r from-violet-500/5 to-violet-500/[0.02] border-violet-500/20">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 divide-y md:divide-y-0 md:divide-x divide-qubic-border/50">
+              <!-- Token value -->
+              <div class="md:pl-0 pb-3 md:pb-0 min-w-0">
+                <div class="flex items-center gap-1 mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                  </svg>
+                  <span class="text-xs uppercase tracking-wide text-violet-400">{{ t('wallet.token_value') }}</span>
+                </div>
+                <div class="font-mono text-base sm:text-xl text-violet-400 whitespace-nowrap cursor-copy select-none"
+                     @dblclick.prevent="copyValue(assetsGrandTotal.tokenValue)">{{ fmtFiat(assetsGrandTotal.tokenValue) }}</div>
+              </div>
+              <!-- Token kinds -->
+              <div class="md:pl-4 pb-3 md:pb-0 min-w-0">
+                <div class="flex items-center gap-1 mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10M7 12h10M7 17h6"/>
+                  </svg>
+                  <span class="text-xs uppercase tracking-wide text-gray-400">{{ t('wallet.token_kinds') }}</span>
+                </div>
+                <div class="font-mono text-base sm:text-xl text-gray-300 whitespace-nowrap">{{ assetsGrandTotal.kinds }}</div>
+              </div>
+              <!-- Total incl. QUBIC -->
+              <div class="md:pl-4 min-w-0">
+                <div class="flex items-center gap-1 mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 flex-shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                  </svg>
+                  <span class="text-xs uppercase tracking-wide text-emerald-400">{{ t('wallet.total_incl_qu') }}</span>
+                </div>
+                <div class="font-mono text-base sm:text-xl text-emerald-400 whitespace-nowrap cursor-copy select-none"
+                     @dblclick.prevent="copyValue(assetsGrandTotal.total)">{{ fmtFiat(assetsGrandTotal.total) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- View A: owner cards (token perspective) -->
+          <div v-if="!selectedPortfolioOwner && ownerAssetGroups.length"
+               class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <button v-for="group in ownerAssetGroups" :key="group.owner"
+                    class="card !p-3 text-left transition-all hover:border-violet-400/50 hover:shadow-lg hover:shadow-violet-500/10 group cq-panel"
+                    @click="selectPortfolioOwner(group.owner)">
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                  <OwnerIcon :type="groupIconType(group)" />
+                  <span class="font-medium text-sm truncate group-hover:text-violet-300 transition-colors">
+                    {{ store.hideAddresses ? '••••••' : group.owner }}
+                  </span>
+                </div>
+                <span class="text-xs px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono shrink-0">
+                  {{ group.wallets.length }}w
+                </span>
+              </div>
+
+              <!-- Total value (hero) — the one number that matters: tokens + QUBIC -->
+              <div class="font-mono text-lg mb-2 whitespace-nowrap" :class="group.hasTotalFiat ? 'text-emerald-400' : 'text-gray-600'">
+                <template v-if="group.hasTotalFiat">{{ fmtFiat(group.totalFiat) }}</template>
+                <template v-else>{{ t('wallet.no_assets') }}</template>
+              </div>
+
+              <!-- Token chips — all of them, sorted by name; the card simply grows.
+                   Amber = share (issued by the QX contract), sky = token. -->
+              <div v-if="group.tokens.length" class="flex flex-wrap gap-1 mb-1">
+                <span v-for="tok in group.tokens" :key="tok.name"
+                      :class="['pill text-xs py-0.5 px-2 font-mono', assetKindChipClass(tok.kind)]">
+                  {{ tok.name }} {{ fmtUnits(tok.units) }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-qubic-border/30">
+                <span class="text-xs text-gray-500 font-mono">
+                  {{ group.tokens.length }} {{ t('wallet.token_kinds') }}
+                </span>
+                <div class="flex gap-1">
+                  <span v-for="type in [...group.types]" :key="type"
+                        :class="['pill text-xs py-0.5 px-2', type === 'BUSINESS' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : '']">
+                    {{ type }}
+                  </span>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          <!-- View B: per-wallet token drilldown for selected owner -->
+          <div v-if="selectedPortfolioOwner && selectedAssetGroup" class="space-y-3">
+            <!-- Owner summary -->
+            <div class="flex items-center justify-end gap-4 flex-wrap">
+              <div>
+                <div class="text-xs text-gray-500">{{ t('filter.owner') }}</div>
+                <div class="font-medium flex items-center gap-1.5">
+                  <OwnerIcon :type="groupIconType(selectedAssetGroup)" />
+                  {{ store.hideAddresses ? '••••••' : selectedAssetGroup.owner }}
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-gray-500">{{ t('wallet.token_value') }}</div>
+                <div class="font-mono text-sm text-violet-300">{{ fmtFiat(selectedAssetGroup.tokenValue) }}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-gray-500">{{ t('wallet.total_incl_qu') }}</div>
+                <div class="font-mono text-sm text-emerald-400">{{ fmtFiat(selectedAssetGroup.totalFiat) }}</div>
+              </div>
+            </div>
+
+            <!-- One card per wallet -->
+            <div v-for="w in selectedAssetGroup.wallets" :key="w.id" class="card">
+              <div class="flex items-start justify-between gap-3 flex-wrap mb-2">
+                <router-link :to="`/wallets/${w.id}`" class="flex items-center gap-1.5 min-w-0 group">
+                  <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
+                  <span class="font-medium text-sm group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </router-link>
+                <div class="flex items-center gap-4 text-right flex-wrap">
+                  <div>
+                    <div class="text-xs text-gray-500">QUBIC</div>
+                    <div class="font-mono text-xs text-gray-300">{{ fmtBalance(w) }}</div>
+                  </div>
+                  <div v-if="walletValue(w) != null">
+                    <div class="text-xs text-gray-500">{{ t('wallet.value') }} QUBIC</div>
+                    <div class="font-mono text-xs text-gray-300">{{ fmtFiat(walletValue(w)) }}</div>
+                  </div>
+                  <div v-if="walletAssetsFiat(w) != null">
+                    <div class="text-xs text-gray-500">{{ t('wallet.token_value') }}</div>
+                    <div class="font-mono text-xs text-violet-300">{{ fmtFiat(walletAssetsFiat(w)) }}</div>
+                  </div>
+                  <div v-if="walletTotalFiat(w) != null">
+                    <div class="text-xs text-gray-500">{{ t('wallet.total_short') }}</div>
+                    <div class="font-mono text-sm font-semibold text-emerald-400 cursor-copy select-none"
+                         @dblclick.prevent="copyValue(walletTotalFiat(w))">{{ fmtFiat(walletTotalFiat(w)) }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Asset table -->
+              <div v-if="walletAssets(w).length" class="overflow-x-auto">
+                <table class="table-std">
+                  <thead>
+                    <tr class="border-b border-qubic-border text-gray-500 uppercase">
+                      <th class="text-left py-2 pr-3">{{ t('assets.name') }}</th>
+                      <th class="text-left py-2 pr-3">{{ t('walletDetail.assets_kind') }}</th>
+                      <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_units') }}</th>
+                      <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_price') }}</th>
+                      <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_value_qu') }}</th>
+                      <th class="text-right py-2 whitespace-nowrap">{{ t('walletDetail.assets_value') }} {{ store.currency }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(a, i) in walletAssets(w)" :key="i"
+                        class="border-b border-qubic-border/30 hover:bg-violet-500/5 transition-colors">
+                      <td class="py-2 pr-3 font-medium text-gray-200">
+                        {{ a.name }}
+                        <span v-if="a.issuer_label" class="text-xs text-gray-500 font-normal ml-1">· {{ a.issuer_label }}</span>
+                      </td>
+                      <td class="py-2 pr-3">
+                        <span :class="['pill text-xs py-0.5 px-2', assetKindChipClass(a.kind)]">
+                          {{ a.kind === 'share' ? t('walletDetail.assets_share') : t('walletDetail.assets_token') }}
+                        </span>
+                      </td>
+                      <td class="py-2 pr-3 text-right font-mono cursor-copy select-none"
+                          @dblclick.prevent="copyValue(a.units)">{{ fmtUnits(a.units) }}</td>
+                      <td class="py-2 pr-3 text-right font-mono text-gray-400">{{ fmtTokenPrice(a.price_qu) }}</td>
+                      <td class="py-2 pr-3 text-right font-mono text-qubic-teal">{{ a.value_qubic != null ? fmtUnits(a.value_qubic) : '—' }}</td>
+                      <td class="py-2 text-right font-mono text-green-400 cursor-copy select-none"
+                          @dblclick.prevent="a[assetValueField] != null && copyValue(a[assetValueField])">
+                        {{ a[assetValueField] != null ? fmtFiat(a[assetValueField]) : '—' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p v-else class="text-xs text-gray-600">{{ t('wallet.no_assets') }}</p>
+            </div>
+          </div>
+        </template>
+      </template>
     </div>
 
     <!-- =================== KONFIGURATION TAB =================== -->

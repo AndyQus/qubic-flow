@@ -39,10 +39,10 @@ async def check_all_balances():
 
     For each wallet:
     1. Fetch live balance from RPC and store in balance_live.
-    2. If computed balance (balance) and live balance differ, trigger a targeted
-       re-sync from balance_since_tick so missing events are re-imported without
-       doing a full reset of the wallet's entire history.
-    3. After re-sync the next hourly run will re-compare and confirm the fix.
+    2. If computed balance (balance) and live balance differ, correct balance
+       to the authoritative live value and rebase the tracking baseline to the
+       current tick, then trigger a targeted re-sync from the old baseline so
+       any events/TXs missing from history still get backfilled.
     """
     from .sync_engine import _trigger_balance_resync
 
@@ -67,8 +67,9 @@ async def check_all_balances():
                 updated += 1
 
                 # Reconciliation: if computed balance diverges from live balance,
-                # reset the sync pointer back to balance_since_tick so the normal
-                # 60-second sync loop re-imports whatever events are missing.
+                # the live RPC value is authoritative — correct the tracked
+                # balance to match and rebase the baseline tick, then trigger a
+                # re-sync from the old baseline to backfill any missing history.
                 if (
                     wallet.balance is not None
                     and wallet.balance_live is not None
@@ -76,12 +77,16 @@ async def check_all_balances():
                     and wallet.balance_since_tick is not None
                 ):
                     mismatches += 1
+                    old_since_tick = wallet.balance_since_tick
                     logger.warning(
                         f"Balance mismatch for {wallet.id}: "
                         f"computed={wallet.balance}, live={wallet.balance_live} "
-                        f"— triggering re-sync from tick {wallet.balance_since_tick}"
+                        f"— correcting to live value and re-syncing from tick {old_since_tick}"
                     )
-                    await _trigger_balance_resync(db, wallet.id, wallet.balance_since_tick, current_tick)
+                    wallet.balance = wallet.balance_live
+                    wallet.balance_updated_at = now_utc_iso()
+                    wallet.balance_since_tick = current_tick
+                    await _trigger_balance_resync(db, wallet.id, old_since_tick, current_tick)
 
             except Exception as e:
                 logger.warning(f"Balance check failed for {wallet.id}: {e}")

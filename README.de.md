@@ -68,7 +68,8 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
   - Aufgelöste Adress-Namen im Kommentarfeld
 - **Portfolio-Wertverlauf** — täglicher QU-Bestand × Tageskurs als Liniendiagramm auf der Statistik-Seite (Bestand auf zweiter Achse)
 - **Webhook-Benachrichtigungen** — neue eingehende Zahlungen können einen Webhook auslösen (generisches JSON, Discord oder ntfy) mit Mindestbetrags-Filter, TX-/SC-Event-Typfilter (Checkboxen entscheiden, welcher Typ eine Nachricht auslöst) und Test-Schaltfläche (Einstellungen → Daten); jede Nachricht enthält den vollständigen Datensatz mit dem Event-Typ in der ersten Zeile
-- **Token- & Asset-Bestände** — Live-Token-Bestände (z. B. QX-Shares) je Wallet auf der Wallet-Detailseite, aufgelöst über das Qubic-Assets-Register
+- **Token- & Asset-Bestände** — Live-Token-Bestände (z. B. QX-Shares) je Wallet auf der Wallet-Detailseite, aufgelöst über das Qubic-Assets-Register; je Asset mit aktuellem Kurs (letzter QX-Trade in QU, von der offiziellen QX-API) und dem daraus berechneten Wert in QU und EUR/USD
+- **Token/Shares-Portfolio-Ansicht** — Umschalter „QUBIC | Token/Shares" im Wallets → Portfolio-Tab: Token-Werte nach Besitzer gruppiert, Token-Drilldown je Wallet und der Gesamtwert der Wallet inklusive QUBIC (Batch-Endpoint mit serverseitigem Cache)
 - **Interne Transfers** — Wallet-zu-Wallet-Transfers werden beim Export steuerlich neutral behandelt
 - **Datenschutz-Modus** — Auge-Symbol im Header blendet alle sensiblen Werte app-weit aus: Wallet-Adressen, Kontostände, Portfolio-Werte, Gewinn/Verlust, Steuerbeträge, EUR/USD-Summen sowie persönliche Datenfelder im Steuerformular
 - **Dashboard-Suche & Paginierung** — Volltextsuche mit Entprellung über alle Events; einstellbare Seitengröße (10–1000), wird in localStorage gespeichert
@@ -386,7 +387,8 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Dokumentation: `http://localhost:80
 | POST    | `/wallets`                            | Wallet anlegen                                        |
 | PUT     | `/wallets/{id}`                       | Wallet bearbeiten                                     |
 | DELETE  | `/wallets/{id}`                       | Wallet als gelöscht markieren                         |
-| GET     | `/wallets/{id}/assets`                | Live-Token-/Asset-Bestände (RPC-Proxy)                |
+| GET     | `/wallets/{id}/assets`                | Live-Token-/Asset-Bestände inkl. QX-Kursen (RPC-Proxy) |
+| GET     | `/wallets/assets-summary`             | Token-Bestände + Werte aller Wallets (Batch, gecacht) |
 | POST    | `/wallets/{id}/resync-tx`             | TX-Sync für ein Wallet neu starten                    |
 | POST    | `/wallets/resync-all`                 | Alle Wallets neu synchronisieren (nur fehlende)       |
 | GET     | `/events`                             | Events (Filter: Wallet, Epoche, Monat, Jahr, source_type; seitenweise) |

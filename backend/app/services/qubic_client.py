@@ -86,11 +86,17 @@ class RPCClient:
         }
         return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
+    # Assets issued directly by the QX smart contract (e.g. QX, QEARN, QVAULT,
+    # QSWAP) represent shares in that contract/project. Assets issued by any
+    # other identity (CFB, QFT, community project tokens, ...) are tokens.
+    QX_ISSUER = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB"
+
     async def get_owned_assets(self, wallet_id: str) -> list[dict]:
         """Fetch token/asset holdings for an identity.
 
-        Returns a flat list of {name, issuer, units, managing_contract} entries
-        mapped from /v1/assets/{identity}/owned.
+        Returns a flat list of {name, issuer, units, managing_contract, kind}
+        entries mapped from /v1/assets/{identity}/owned. `kind` is "share" for
+        assets issued by the QX smart contract itself, "token" otherwise.
         """
         data = await self._request("GET", f"/v1/assets/{wallet_id}/owned")
         result = []
@@ -103,12 +109,14 @@ class RPCClient:
                 units = 0
             if units <= 0:
                 continue
+            issuer = issued.get("issuerIdentity")
             result.append({
                 "name": issued.get("name") or "?",
-                "issuer": issued.get("issuerIdentity"),
+                "issuer": issuer,
                 "units": units,
                 "decimals": issued.get("numberOfDecimalPlaces", 0),
                 "managing_contract": d.get("managingContractIndex"),
+                "kind": "share" if issuer == self.QX_ISSUER else "token",
             })
         return result
 

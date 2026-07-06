@@ -28,6 +28,7 @@ export const api = {
     resyncTx: (id) => req(`/wallets/${id}/resync-tx`, { method: 'POST' }),
     resyncAll: () => req('/wallets/resync-all', { method: 'POST' }),
     assets: (id) => req(`/wallets/${id}/assets`),
+    assetsSummary: () => req('/wallets/assets-summary'),
   },
   events: {
     list: (params = {}) => {

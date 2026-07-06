@@ -13,7 +13,7 @@ import { useQubicUtils } from '../composables/useQubicUtils'
 const props = defineProps({ id: String })
 const store = useAppStore()
 const { t } = useTranslation()
-const { explorerUrl, copyAddress, maskLabel } = useQubicUtils()
+const { explorerUrl, copyAddress, copyValue, maskLabel } = useQubicUtils()
 const router = useRouter()
 
 function goBack() {
@@ -169,18 +169,49 @@ watch(page, load)
 onMounted(() => { load(); loadFilterOptions(); loadOpeningPositions(); loadWalletAssets() })
 
 
-// Token / asset holdings (live from RPC)
-const walletAssets = ref([])
+// Token / asset holdings (live from RPC, prices from the official QX API)
+const rawWalletAssets = ref([])
 const assetsLoading = ref(false)
+
+const walletAssets = computed(() =>
+  [...rawWalletAssets.value].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+)
+
+const assetFiatKey = computed(() => store.currency === 'USD' ? 'value_usd' : 'value_eur')
+
+function assetKindClass(a) {
+  return a.kind === 'share'
+    ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+    : 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+}
+
+function fmtAssetPrice(val) {
+  if (val == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(val).toLocaleString(store.locale, { maximumFractionDigits: 4 })
+}
+
+function fmtAssetValue(val) {
+  if (val == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(val).toLocaleString(store.locale, { maximumFractionDigits: 0 })
+}
+
+function fmtAssetFiat(val) {
+  if (val == null) return '—'
+  if (store.hideAddresses) return '••••••'
+  return Number(val).toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    + (store.currency === 'USD' ? ' $' : ' €')
+}
 
 async function loadWalletAssets() {
   assetsLoading.value = true
   try {
     const r = await api.wallets.assets(props.id)
-    walletAssets.value = r?.assets || []
+    rawWalletAssets.value = r?.assets || []
   } catch (e) {
     console.error(e)
-    walletAssets.value = []
+    rawWalletAssets.value = []
   } finally {
     assetsLoading.value = false
   }
@@ -277,19 +308,41 @@ async function resyncTx() {
           <thead>
             <tr class="border-b border-qubic-border text-gray-500 uppercase">
               <th class="text-left py-2 pr-3">{{ t('assets.name') }}</th>
+              <th class="text-left py-2 pr-3">{{ t('walletDetail.assets_kind') }}</th>
               <th class="text-left py-2 pr-3">{{ t('walletDetail.assets_issuer') }}</th>
-              <th class="text-right py-2 whitespace-nowrap">{{ t('walletDetail.assets_units') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_units') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_price') }}</th>
+              <th class="text-right py-2 pr-3 whitespace-nowrap">{{ t('walletDetail.assets_value_qu') }}</th>
+              <th class="text-right py-2 whitespace-nowrap">{{ t('walletDetail.assets_value') }} {{ store.currency }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(a, i) in walletAssets" :key="i"
                 class="border-b border-qubic-border/30 hover:bg-qubic-teal/5 transition-colors">
               <td class="py-2 pr-3 font-medium text-gray-200">{{ a.name }}</td>
+              <td class="py-2 pr-3">
+                <span :class="['pill text-xs py-0.5 px-2', assetKindClass(a)]">
+                  {{ a.kind === 'share' ? t('walletDetail.assets_share') : t('walletDetail.assets_token') }}
+                </span>
+              </td>
               <td class="py-2 pr-3 text-gray-400 text-xs font-mono">
                 {{ a.issuer_label || (a.issuer ? a.issuer.slice(0, 10) + '…' : '—') }}
               </td>
-              <td class="py-2 text-right font-mono">
+              <td class="py-2 pr-3 text-right font-mono cursor-copy select-none"
+                  @dblclick.prevent="a.units != null && copyValue(a.units)">
                 {{ store.hideAddresses ? '••••••' : Number(a.units).toLocaleString(store.locale) }}
+              </td>
+              <td class="py-2 pr-3 text-right font-mono text-gray-400 whitespace-nowrap"
+                  :title="t('walletDetail.assets_price_hint')">
+                {{ fmtAssetPrice(a.price_qu) }}
+              </td>
+              <td class="py-2 pr-3 text-right font-mono text-qubic-teal whitespace-nowrap cursor-copy select-none"
+                  @dblclick.prevent="a.value_qubic != null && copyValue(a.value_qubic)">
+                {{ fmtAssetValue(a.value_qubic) }}
+              </td>
+              <td class="py-2 text-right font-mono text-green-400 whitespace-nowrap cursor-copy select-none"
+                  @dblclick.prevent="a[assetFiatKey] != null && copyValue(a[assetFiatKey])">
+                {{ fmtAssetFiat(a[assetFiatKey]) }}
               </td>
             </tr>
           </tbody>

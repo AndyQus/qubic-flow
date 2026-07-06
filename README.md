@@ -69,7 +69,8 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
   - Resolved address names in the comment field
 - **Portfolio value chart** — daily QU balance × daily rate as a line chart on the statistics page (with balance on a second axis)
 - **Webhook notifications** — new incoming transfers can trigger a webhook (generic JSON, Discord or ntfy format) with a minimum-amount filter, a TX/SC-event type filter (checkboxes decide which kind triggers a push) and a test button (Settings → Data); every message carries the full record with the event type on the first line
-- **Token & asset holdings** — live token balances (e.g. QX shares) per wallet on the wallet detail page, resolved via the Qubic assets registry
+- **Token & asset holdings** — live token balances (e.g. QX shares) per wallet on the wallet detail page, resolved via the Qubic assets registry; each asset shows its current price (last QX trade in QU, from the official QX API) and the resulting value in QU and EUR/USD
+- **Token/Shares portfolio view** — "QUBIC | Tokens/Shares" switch on the Wallets → Portfolio tab: token values grouped by owner, per-wallet token drilldown and the total wallet value including QUBIC (batch endpoint with server-side cache)
 - **Internal transfers** — wallet-to-wallet transfers are treated as tax-neutral in exports
 - **Privacy mode** — eye icon in the header masks all sensitive values app-wide: wallet addresses, balances, portfolio values, P&L, tax amounts, EUR/USD totals, and personal data fields in the tax form
 - **Dashboard search & pagination** — full-text search with debounce across all events; configurable page size (10–1000) persisted in localStorage
@@ -388,7 +389,8 @@ All endpoints under `/api/v1/`. Interactive docs: `http://localhost:8000/docs`
 | POST   | `/wallets`                            | Create wallet                                         |
 | PUT    | `/wallets/{id}`                       | Update wallet                                         |
 | DELETE | `/wallets/{id}`                       | Soft-delete wallet                                    |
-| GET    | `/wallets/{id}/assets`                | Live token/asset holdings (RPC proxy)                 |
+| GET    | `/wallets/{id}/assets`                | Live token/asset holdings incl. QX prices (RPC proxy) |
+| GET    | `/wallets/assets-summary`             | Token holdings + values for all wallets (batch, cached) |
 | POST   | `/wallets/{id}/resync-tx`             | Restart TX sync for a wallet                          |
 | POST   | `/wallets/resync-all`                 | Resync all wallets (missing records only)             |
 | GET    | `/events`                             | Events (filters: wallet, epoch, month, year, source_type; paginated) |
