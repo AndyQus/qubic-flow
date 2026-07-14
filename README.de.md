@@ -50,6 +50,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 - **Epochen-Ansicht** — alle Epochen navigierbar als Wallet-Panel-Raster (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Aufteilung, ausgehende Qubics inkl. EUR-Wert); Dividenden aus Smart-Contract-Ausschüttungen und Token-Payouts (z. B. QX-Shares, Qearn, QMine) werden je Epoche als EVENTs automatisch erkannt und sind vollständig sichtbar; Filter „Alle" / „Nur mit Eingang" plus „Alles anzeigen"-Umschalter (`?ext=1`) zum Ein-/Ausblenden leerer Unterzeilen
 - **Events-Tabelle** — getrennte Spalten für TxId und Tick, je mit Kopier-Schaltfläche und Explorer-Link (`/network/tx/{id}` bzw. `/network/tick/{tick}`); Kurzanzeige 5 Zeichen mit Tooltip, voller Wert beim Kopieren/Öffnen. Nur echte 60-Zeichen-Qubic-TxIDs werden angezeigt — SC-interne Events ohne Nutzer-TX zeigen in der TxID-Spalte einen Bindestrich.
 - **Wöchentliche Schnappschüsse** — jeden Mittwoch 12:00 UTC
+- **Bestandsverlauf** — automatische Bestandserfassung aller aktiven Wallets in drei einzeln aktivierbaren Serien: stündlich, täglich (12:00 UTC) und wöchentlich zum Epochenwechsel (Mittwoch ab 12:00 UTC; gewartet wird, bis der RPC die neue Epoche meldet). Jeder Datensatz speichert Bestand, Differenz zum letzten Datensatz, Zu-/Abfluss im Intervall, Tick, Epoche und EUR/USD-Kurs. Neuer Statistik-Tab mit allen Sheets (Ledger-Übersicht, absolute Bestände je Wallet mit Konsistenz-Kontrolle gegen die erfassten Zu-/Abflüsse, Ledger je Besitzer, Transfer, Transaktionen), „Jetzt erfassen"-Testbutton, Inline-Bearbeitung (geänderte Werte werden markiert, der ursprüngliche Messwert bleibt intern als Nachweis erhalten) und manuellen Datensätzen. Erzeugt drei Excel-Dateien im persönlichen Ledger-Layout — Wallet-Spalten und Besitzer-Sheets entstehen dynamisch aus der lokalen Datenbank — nach jeder Erfassung/Änderung neu geschrieben und jederzeit herunterladbar. Konfiguration auf einem eigenen Einstellungen-Tab „Bestandsverlauf" mit Zurücksetzen je Serie (mit Sicherheitsabfrage) und integrierter Kurz-Doku zur Funktionsweise
 - **3 Animations-Varianten** für neue Events: Herunterschieben, Einfahren, Balken-Einblenden (einstellbar)
 - **Live-Updates** per WebSocket (Events + Node-Status)
 - **Steuerauswertung**:
@@ -268,6 +269,11 @@ Der Sync-Job (`sync_all_wallets`, alle 60 s) wählt die **Live-Sync**-Node nach 
 Datei `backend/.env` anlegen (Vorlage: `backend/.env.example`):
 
 ```env
+# Umgebung: production (Standard) oder development.
+# Im Development-Modus sind die Bestandsverlauf-Serien zum Testen vorab aktiviert;
+# in Produktion starten sie deaktiviert und werden je Nutzer in den Einstellungen aktiviert.
+APP_ENV=production
+
 # Datenbank (lokal: relativer Pfad, Docker: absoluter Pfad im Container)
 DATABASE_URL=sqlite:///./data/qubicflow.db
 
@@ -427,6 +433,20 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Dokumentation: `http://localhost:80
 | DELETE  | `/tax/opening-positions/{id}`         | Eröffnungsposition löschen                            |
 | GET     | `/tax/report`                         | Steuerbericht berechnen                               |
 | GET     | `/tax/price`                          | EUR/USD-Kurs für ein Datum (`?date=`)                 |
+| GET     | `/balance-history/settings`           | Bestandsverlauf-Einstellungen (Serien-Schalter, Aufbewahrung, Auto-Export) |
+| PUT     | `/balance-history/settings`           | Bestandsverlauf-Einstellungen speichern               |
+| GET     | `/balance-history/overview`           | Erfassungszeilen einer Serie (`?kind=hourly\|daily\|weekly`) |
+| POST    | `/balance-history/capture`            | Jetzt erfassen (manueller Auslöser, gleiche Funktion wie der Scheduler) |
+| PATCH   | `/balance-history/snapshots/{id}`     | Erfassten Wert ändern (Original bleibt als Nachweis erhalten) |
+| PATCH   | `/balance-history/annotations`        | why/Informationen/Anmerkungen einer Zeile speichern   |
+| POST    | `/balance-history/rows`               | Manuellen Datensatz anlegen                           |
+| DELETE  | `/balance-history/rows`               | Manuellen Datensatz löschen (`?kind=&bucket=`)        |
+| GET     | `/balance-history/owner-ledger`       | Event-Ledger je Besitzer (`?owner=`)                  |
+| GET     | `/balance-history/transfers`          | Interne Transfers zwischen eigenen Wallets            |
+| GET     | `/balance-history/transactions`       | Flache Transaktionsliste (paginiert)                  |
+| GET     | `/balance-history/export/{kind}`      | Excel-Datei einer Serie herunterladen (`?lang=de\|en`) |
+| POST    | `/balance-history/export/rebuild`     | Alle aktivierten Excel-Dateien im Datenordner neu erzeugen |
+| DELETE  | `/balance-history/series/{kind}`      | Eine Serie komplett zurücksetzen (löscht alle ihre Erfassungen, erzeugt ihre Excel-Datei leer neu) |
 | WS      | `/ws`                                 | WebSocket (event.new, node.health, sync.node)         |
 
 ### Wallet-Adresse

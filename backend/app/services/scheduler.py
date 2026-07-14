@@ -157,3 +157,57 @@ scheduler.add_job(
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),
 )
+
+
+# ── Bestandsverlauf (balance history) snapshots ──────────────────────────
+# Toggles in the settings decide per series whether a run actually captures.
+from .balance_snapshot_service import (  # noqa: E402
+    capture_snapshots, capture_with_retry, capture_weekly_after_epoch, apply_hourly_retention,
+)
+
+
+async def hourly_balance_snapshot():
+    # no retry needed — the next full hour comes soon anyway
+    await capture_snapshots("hourly", trigger="auto")
+
+
+scheduler.add_job(
+    hourly_balance_snapshot,
+    CronTrigger(minute=0, timezone="UTC"),
+    id="balance_snapshot_hourly",
+    max_instances=1,
+    coalesce=True,
+)
+
+
+async def daily_balance_snapshot():
+    # retries bridge a temporarily unreachable RPC/BOB at the 12:00 UTC slot
+    await capture_with_retry("daily", trigger="auto")
+
+
+scheduler.add_job(
+    daily_balance_snapshot,
+    CronTrigger(hour=12, minute=0, timezone="UTC"),
+    id="balance_snapshot_daily",
+    max_instances=1,
+    coalesce=True,
+)
+
+
+scheduler.add_job(
+    capture_weekly_after_epoch,
+    CronTrigger(day_of_week="wed", hour=12, minute=0, timezone="UTC"),
+    id="balance_snapshot_weekly",
+    max_instances=1,
+    coalesce=True,
+)
+
+
+scheduler.add_job(
+    apply_hourly_retention,
+    "interval",
+    hours=24,
+    id="balance_snapshot_retention",
+    max_instances=1,
+    coalesce=True,
+)

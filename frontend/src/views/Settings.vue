@@ -12,7 +12,7 @@ const { t } = useTranslation()
 const route = useRoute()
 const router = useRouter()
 
-const TABS = ['display', 'tax', 'data']
+const TABS = ['display', 'tax', 'data', 'bhistory']
 function normalizeTab(q) { return TABS.includes(q) ? q : 'display' }
 const activeTab = ref(normalizeTab(route.query.tab))
 
@@ -47,18 +47,84 @@ watch(forcedMethod, (m) => { if (m) taxSettings.value.method = m })
 
 onMounted(async () => {
   try {
-    const [s, c, n] = await Promise.all([
+    const [s, c, n, bh] = await Promise.all([
       api.tax.getSettings(),
       api.tax.getCountries(),
       api.notifications.getSettings().catch(() => null),
+      api.balanceHistory.getSettings().catch(() => null),
     ])
     if (s) Object.assign(taxSettings.value, s)
     if (c) taxCountries.value = c
     if (n) Object.assign(notifySettings.value, n)
+    if (bh) Object.assign(bhSettings.value, bh)
   } catch (e) {
     loadError.value = e.message
   }
 })
+
+// Bestandsverlauf (balance history) capture settings
+const bhSettings = ref({
+  hourly_enabled: true, daily_enabled: true, weekly_enabled: true,
+  excel_autoexport: true, hourly_retention_days: 0, export_lang: 'de',
+})
+const bhSaving = ref(false)
+const bhSaved = ref(false)
+const bhRebuilding = ref(false)
+const bhRebuilt = ref(null)
+
+async function saveBhSettings() {
+  bhSaving.value = true
+  bhSaved.value = false
+  try {
+    const s = bhSettings.value
+    const saved = await api.balanceHistory.saveSettings({
+      bh_hourly_enabled: s.hourly_enabled,
+      bh_daily_enabled: s.daily_enabled,
+      bh_weekly_enabled: s.weekly_enabled,
+      bh_excel_autoexport: s.excel_autoexport,
+      bh_hourly_retention_days: Number(s.hourly_retention_days) || 0,
+      bh_export_lang: store.lang === 'de' ? 'de' : 'en',
+    })
+    Object.assign(bhSettings.value, saved)
+    bhSaved.value = true
+    setTimeout(() => { bhSaved.value = false }, 2500)
+  } catch (e) {
+    loadError.value = e.message
+  } finally {
+    bhSaving.value = false
+  }
+}
+
+async function rebuildBhExports() {
+  bhRebuilding.value = true
+  bhRebuilt.value = null
+  try {
+    const r = await api.balanceHistory.rebuildExports()
+    bhRebuilt.value = r.written?.length ?? 0
+  } catch (e) {
+    loadError.value = e.message
+  } finally {
+    bhRebuilding.value = false
+  }
+}
+
+const bhResetting = ref(null)          // kind currently being reset
+const bhResetResult = ref(null)        // { kind, deleted } of the last reset
+
+async function resetBhSeries(kind) {
+  const label = t(`bhistory.series_${kind}`)
+  if (!confirm(t('settings.bh_reset_confirm').replace('{series}', label))) return
+  bhResetting.value = kind
+  bhResetResult.value = null
+  try {
+    const r = await api.balanceHistory.resetSeries(kind)
+    bhResetResult.value = r
+  } catch (e) {
+    loadError.value = e.message
+  } finally {
+    bhResetting.value = null
+  }
+}
 
 // Webhook notifications
 const notifySettings = ref({ enabled: false, webhook_url: '', format: 'generic', min_amount: 0, notify_tx: true, notify_event: true })
@@ -269,6 +335,8 @@ function simulate() {
               @click="setActiveTab('tax')">{{ t('settings.tab_tax') }}</button>
       <button :class="['tab-btn', activeTab === 'data' && 'tab-btn-active']"
               @click="setActiveTab('data')">{{ t('settings.tab_data') }}</button>
+      <button :class="['tab-btn', activeTab === 'bhistory' && 'tab-btn-active']"
+              @click="setActiveTab('bhistory')">{{ t('settings.tab_bhistory') }}</button>
     </div>
   </PageHeader>
 
@@ -527,6 +595,119 @@ function simulate() {
           <span v-if="notifyTestResult === true" class="text-xs text-green-400">✓ {{ t('settings.notify_test_ok') }}</span>
           <span v-if="notifyTestResult === false" class="text-xs text-red-400">{{ t('settings.notify_test_failed') }}</span>
         </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab: Bestandsverlauf -->
+  <div v-if="activeTab === 'bhistory'" class="space-y-6">
+
+    <!-- Einstellungen -->
+    <div class="card space-y-4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('settings.bh_section') }}</h3>
+      <div class="space-y-3">
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('settings.bh_desc') }}</p>
+
+        <div class="space-y-2">
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer w-56">
+              <input v-model="bhSettings.hourly_enabled" type="checkbox" class="accent-qubic-teal" />
+              {{ t('bhistory.series_hourly') }}
+            </label>
+            <button class="btn-ghost text-xs py-0.5 px-2 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
+                    :disabled="bhResetting === 'hourly'"
+                    :title="t('settings.bh_reset_hint')"
+                    @click="resetBhSeries('hourly')">
+              {{ bhResetting === 'hourly' ? t('common.loading') : '🗑 ' + t('settings.bh_reset_btn') }}
+            </button>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer w-56">
+              <input v-model="bhSettings.daily_enabled" type="checkbox" class="accent-qubic-teal" />
+              {{ t('bhistory.series_daily') }} <span class="text-xs text-gray-500">(12:00 UTC)</span>
+            </label>
+            <button class="btn-ghost text-xs py-0.5 px-2 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
+                    :disabled="bhResetting === 'daily'"
+                    :title="t('settings.bh_reset_hint')"
+                    @click="resetBhSeries('daily')">
+              {{ bhResetting === 'daily' ? t('common.loading') : '🗑 ' + t('settings.bh_reset_btn') }}
+            </button>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer w-56">
+              <input v-model="bhSettings.weekly_enabled" type="checkbox" class="accent-qubic-teal" />
+              {{ t('bhistory.series_weekly') }} <span class="text-xs text-gray-500">(Mi/Wed 12:00 UTC)</span>
+            </label>
+            <button class="btn-ghost text-xs py-0.5 px-2 text-red-400 border-red-400/40 hover:bg-red-400/10 hover:border-red-400 transition-colors"
+                    :disabled="bhResetting === 'weekly'"
+                    :title="t('settings.bh_reset_hint')"
+                    @click="resetBhSeries('weekly')">
+              {{ bhResetting === 'weekly' ? t('common.loading') : '🗑 ' + t('settings.bh_reset_btn') }}
+            </button>
+          </div>
+          <p v-if="bhResetResult" class="text-xs text-green-400">
+            ✓ {{ t(`bhistory.series_${bhResetResult.kind}`) }}: {{ bhResetResult.deleted }} {{ t('settings.bh_reset_done') }}
+          </p>
+        </div>
+        <p class="text-xs text-gray-500 leading-snug">{{ t('settings.bh_toggle_hint') }}</p>
+
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input v-model="bhSettings.excel_autoexport" type="checkbox" class="accent-qubic-teal" />
+          {{ t('settings.bh_autoexport') }}
+        </label>
+        <p class="text-xs text-gray-500 leading-snug">{{ t('settings.bh_autoexport_hint') }}</p>
+
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">{{ t('settings.bh_retention') }}</label>
+          <input v-model.number="bhSettings.hourly_retention_days" type="number" min="0" class="input w-40 text-sm" />
+          <p class="text-xs text-gray-500 mt-1 leading-snug">{{ t('settings.bh_retention_hint') }}</p>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button class="btn text-sm" :disabled="bhSaving" @click="saveBhSettings">
+            {{ bhSaving ? t('common.loading') : t('common.save') }}
+          </button>
+          <button class="btn-ghost text-sm" :disabled="bhRebuilding" @click="rebuildBhExports">
+            {{ bhRebuilding ? t('common.loading') : t('settings.bh_rebuild_btn') }}
+          </button>
+          <span v-if="bhSaved" class="text-xs text-green-400">✓ {{ t('common.save') }}</span>
+          <span v-if="bhRebuilt !== null" class="text-xs text-green-400">✓ {{ bhRebuilt }} {{ t('settings.bh_rebuilt') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mini-Doku: wird bei jeder Funktionsänderung mitgepflegt -->
+    <div class="card space-y-4">
+      <h3 class="text-sm font-bold uppercase text-gray-400">{{ t('bhdoc.title') }}</h3>
+      <p class="text-xs text-gray-400 leading-relaxed">{{ t('bhdoc.intro') }}</p>
+
+      <div class="space-y-1">
+        <h4 class="text-xs font-semibold text-qubic-teal">{{ t('bhdoc.capture_title') }}</h4>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.capture_text') }}</p>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.gaps_text') }}</p>
+      </div>
+
+      <div class="space-y-1">
+        <h4 class="text-xs font-semibold text-qubic-teal">{{ t('bhdoc.balance_title') }}</h4>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.balance_text') }}</p>
+      </div>
+
+      <div class="space-y-1">
+        <h4 class="text-xs font-semibold text-qubic-teal">{{ t('bhdoc.view_title') }}</h4>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.view_text') }}</p>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.edit_text') }}</p>
+      </div>
+
+      <div class="space-y-1">
+        <h4 class="text-xs font-semibold text-qubic-teal">{{ t('bhdoc.excel_title') }}</h4>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.excel_text') }}</p>
+        <p class="text-xs text-amber-400/80 leading-relaxed">⚠ {{ t('bhdoc.excel_warning') }}</p>
+      </div>
+
+      <div class="space-y-1">
+        <h4 class="text-xs font-semibold text-qubic-teal">{{ t('bhdoc.settings_title') }}</h4>
+        <p class="text-xs text-gray-500 leading-relaxed">{{ t('bhdoc.settings_text') }}</p>
       </div>
     </div>
   </div>

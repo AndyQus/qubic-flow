@@ -77,6 +77,38 @@ class RPCClient:
         except Exception:
             return None
 
+    async def get_balance_info(self, wallet_id: str) -> dict | None:
+        """Full balance object of /v1/balances/{id}: balance, validForTick and
+        the cumulative transfer totals (incomingAmount/outgoingAmount)."""
+        try:
+            data = await self._request("GET", f"/v1/balances/{wallet_id}")
+            b = data.get("balance", {}) or {}
+
+            def _int(v):
+                try:
+                    return int(v)
+                except (TypeError, ValueError):
+                    return None
+
+            return {
+                "balance": _int(b.get("balance")),
+                "valid_for_tick": _int(b.get("validForTick")),
+                "in_total": _int(b.get("incomingAmount")),
+                "out_total": _int(b.get("outgoingAmount")),
+                "in_count": _int(b.get("numberOfIncomingTransfers")),
+                "out_count": _int(b.get("numberOfOutgoingTransfers")),
+            }
+        except Exception:
+            return None
+
+    async def get_current_epoch(self) -> int | None:
+        try:
+            info = await self.get_tick_info()
+            epoch = info.get("tickInfo", {}).get("epoch")
+            return int(epoch) if epoch is not None else None
+        except Exception:
+            return None
+
     async def get_transfer_transactions(self, wallet_id: str, from_tick: int, to_tick: int, page: int = 1, page_size: int = 100) -> dict:
         params = {
             "start_tick": from_tick,
@@ -284,6 +316,24 @@ class BOBClient:
             return data.get("balance")
         except Exception:
             return None
+
+    async def get_balance_info(self, wallet_id: str) -> dict | None:
+        """BOB provides only the plain balance — cumulative totals stay None."""
+        balance = await self.get_balance(wallet_id)
+        if balance is None:
+            return None
+        return {
+            "balance": int(balance),
+            "valid_for_tick": None,
+            "in_total": None,
+            "out_total": None,
+            "in_count": None,
+            "out_count": None,
+        }
+
+    async def get_current_epoch(self) -> int | None:
+        # BOB tick info carries no epoch number
+        return None
 
     # ------------------------------------------------------------------ timestamp
 

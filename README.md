@@ -51,6 +51,7 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 - **Epoch view** — all epochs navigable as a wallet panel grid (label, owner, incoming Qubics incl. TX/event split, outgoing Qubics incl. EUR value); dividends from smart contract payouts and token distributions (e.g. QX shares, Qearn, QMine) are automatically detected per epoch as EVENTs; filter "All" / "With income only" plus "Show all" toggle (`?ext=1`) to show/hide empty sub-rows
 - **Events table** — separate columns for TxId and Tick, each with copy button and Explorer link (`/network/tx/{id}` and `/network/tick/{tick}`); short display (5 chars) with tooltip, full value on copy/open. Only real 60-character Qubic TxIDs are shown — SC-internal events without user TX show a dash in the TxID column
 - **Weekly snapshots** — every Wednesday at 12:00 UTC
+- **Balance History (Bestandsverlauf)** — automatic balance capture of all active wallets in three toggleable series: hourly, daily (12:00 UTC) and weekly at the epoch transition (Wednesday from 12:00 UTC, waits until the RPC reports the new epoch). Every record stores balance, delta versus the previous capture, interval in/out amounts, tick, epoch and EUR/USD rates. New Statistics tab with all sheets (ledger overview, absolute balances per wallet with consistency check against the captured in-/outflows, per-owner ledgers, internal transfers, transactions), a "Capture now" test button, inline editing (edited values are marked, the original measurement is kept as audit trail) and manual records. Generates three Excel files in a personal ledger layout — wallet columns and owner sheets built dynamically from the local database — regenerated after every capture/edit and downloadable any time. Configured on a dedicated settings tab "Balance History" with per-series reset (confirmation-guarded) and a built-in guide explaining how the feature works
 - **3 animation variants** for new events: slide down, fly in, bar fade (configurable)
 - **Live updates** via WebSocket (events + node status)
 - **Tax reporting**:
@@ -269,6 +270,11 @@ The sync job (`sync_all_wallets`, every 60 s) selects the **live-sync** node usi
 Create `backend/.env` (template: `backend/.env.example`):
 
 ```env
+# Environment: production (default) or development.
+# In development the balance history capture series are pre-enabled for testing;
+# in production they start disabled and are enabled per user in the settings.
+APP_ENV=production
+
 # Database (local: relative path, Docker: absolute path in container)
 DATABASE_URL=sqlite:///./data/qubicflow.db
 
@@ -429,6 +435,20 @@ All endpoints under `/api/v1/`. Interactive docs: `http://localhost:8000/docs`
 | DELETE | `/tax/opening-positions/{id}`         | Delete opening position                               |
 | GET    | `/tax/report`                         | Calculate tax report                                  |
 | GET    | `/tax/price`                          | EUR/USD rate for a date (`?date=`)                    |
+| GET    | `/balance-history/settings`           | Balance history settings (series toggles, retention, auto export) |
+| PUT    | `/balance-history/settings`           | Save balance history settings                         |
+| GET    | `/balance-history/overview`           | Capture rows of a series (`?kind=hourly\|daily\|weekly`) |
+| POST   | `/balance-history/capture`            | Capture now (manual trigger, same function as the scheduler) |
+| PATCH  | `/balance-history/snapshots/{id}`     | Edit a captured value (original kept as audit trail)  |
+| PATCH  | `/balance-history/annotations`        | Save why/information/notes of a capture row           |
+| POST   | `/balance-history/rows`               | Add a manual record                                   |
+| DELETE | `/balance-history/rows`               | Delete a manual record (`?kind=&bucket=`)             |
+| GET    | `/balance-history/owner-ledger`       | Per-owner event ledger (`?owner=`)                    |
+| GET    | `/balance-history/transfers`          | Internal transfers between own wallets                |
+| GET    | `/balance-history/transactions`       | Flat transaction list (paginated)                     |
+| GET    | `/balance-history/export/{kind}`      | Download the Excel file of a series (`?lang=de\|en`)  |
+| POST   | `/balance-history/export/rebuild`     | Regenerate all enabled Excel files in the data folder |
+| DELETE | `/balance-history/series/{kind}`      | Reset one series completely (deletes all its captures, regenerates its Excel file empty) |
 | WS     | `/ws`                                 | WebSocket (event.new, node.health, sync.node)         |
 
 ### Wallet address format

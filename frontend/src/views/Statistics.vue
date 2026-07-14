@@ -11,6 +11,7 @@ import PageLoader from '../components/PageLoader.vue'
 import PageHeader from '../components/PageHeader.vue'
 import OwnerIcon from '../components/OwnerIcon.vue'
 import InfoLabel from '../components/InfoLabel.vue'
+import BalanceHistoryPanel from '../components/BalanceHistoryPanel.vue'
 import {
   Chart as ChartJS, Title, Tooltip, Legend, LineElement, BarElement,
   CategoryScale, LinearScale, PointElement, Filler,
@@ -78,20 +79,21 @@ function toggleFunction(fn) {
   selectedFunction.value = selectedFunction.value === fn ? null : fn
 }
 
-// Tabs + epoch selection, URL-synced (?tab=epochs|overview&epoch=168&ext=1)
-const activeTab = ref(route.query.tab === 'overview' ? 'overview' : 'epochs')
+// Tabs + epoch selection, URL-synced (?tab=epochs|overview|history&epoch=168&ext=1)
+const TABS = ['epochs', 'overview', 'history']
+const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'epochs')
 const selectedEpoch = ref(route.query.epoch != null ? Number(route.query.epoch) : null)
 // `extended` is a computed directly from the route — avoids stale ref-watch timing
 const extended = computed(() => route.query.ext === '1')
 
 watch(() => route.query, (q) => {
-  activeTab.value = q.tab === 'overview' ? 'overview' : 'epochs'
+  activeTab.value = TABS.includes(q.tab) ? q.tab : 'epochs'
   selectedEpoch.value = q.epoch != null ? Number(q.epoch) : null
 })
 
 function setActiveTab(tab) {
   const q = {}
-  if (tab === 'overview') q.tab = 'overview'
+  if (tab !== 'epochs') q.tab = tab
   router.push({ path: '/stats', query: q })
 }
 
@@ -402,7 +404,7 @@ const currentEpochFilteredTotals = computed(() => {
   <div class="space-y-3">
 
     <PageHeader :title="t('nav.stats')"
-                :hint="activeTab === 'epochs' ? t('stats.title_epochs') : t('stats.title_overview')">
+                :hint="activeTab === 'epochs' ? t('stats.title_epochs') : activeTab === 'history' ? t('stats.title_history') : t('stats.title_overview')">
       <button v-if="activeTab === 'epochs'"
               :class="['filter-pill inline-flex items-center gap-1.5', extended && 'filter-pill-active']"
               :title="t('stats.tt_extended')"
@@ -429,10 +431,15 @@ const currentEpochFilteredTotals = computed(() => {
                 @click="setActiveTab('epochs')">{{ t('stats.tab_epochs') }}</button>
         <button :class="['tab-btn', activeTab === 'overview' && 'tab-btn-active']"
                 @click="setActiveTab('overview')">{{ t('stats.tab_overview') }}</button>
+        <button :class="['tab-btn', activeTab === 'history' && 'tab-btn-active']"
+                @click="setActiveTab('history')">{{ t('stats.tab_history') }}</button>
       </div>
     </PageHeader>
 
-    <PageLoader v-if="loading" />
+    <!-- =================== BESTANDSVERLAUF TAB =================== -->
+    <BalanceHistoryPanel v-if="activeTab === 'history'" />
+
+    <PageLoader v-else-if="loading" />
     <template v-else>
 
     <!-- =================== EPOCHEN TAB =================== -->

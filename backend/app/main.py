@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import engine, Base
-from .api.v1 import wallets, events, nodes, stats, export, health, ws, labels, tax, backup, notifications
+from .api.v1 import wallets, events, nodes, stats, export, health, ws, labels, tax, backup, notifications, balance_history
 from .services.scheduler import scheduler
 from .utils.log_buffer import install_buffer_handler
 import os
@@ -108,3 +108,4 @@ app.include_router(labels.router, prefix="/api/v1", tags=["labels"])
 app.include_router(tax.router, prefix="/api/v1", tags=["tax"])
 app.include_router(backup.router, prefix="/api/v1", tags=["backup"])
 app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
+app.include_router(balance_history.router, prefix="/api/v1", tags=["balance-history"])

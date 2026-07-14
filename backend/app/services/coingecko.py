@@ -26,6 +26,44 @@ async def _rate_limit_wait():
         _request_times.append(datetime.now(timezone.utc).timestamp())
 
 
+_live_price_cache: dict = {"at": 0.0, "eur": None, "usd": None}
+_LIVE_PRICE_TTL_SECONDS = 300
+
+
+async def get_live_price() -> dict:
+    """Returns the current QUBIC price {'eur': float|None, 'usd': float|None}.
+
+    Cached in-memory for a few minutes so hourly snapshot runs across many
+    wallets cost a single CoinGecko call.
+    """
+    now = datetime.now(timezone.utc).timestamp()
+    if _live_price_cache["eur"] is not None and now - _live_price_cache["at"] < _LIVE_PRICE_TTL_SECONDS:
+        return {"eur": _live_price_cache["eur"], "usd": _live_price_cache["usd"]}
+
+    try:
+        await _rate_limit_wait()
+        headers = {}
+        if settings.coingecko_api_key:
+            headers["x-cg-demo-api-key"] = settings.coingecko_api_key
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{settings.coingecko_api_url}/simple/price",
+                params={"ids": "qubic-network", "vs_currencies": "eur,usd"},
+                headers=headers,
+                timeout=15,
+            )
+            r.raise_for_status()
+            data = r.json().get("qubic-network", {})
+            eur = data.get("eur")
+            usd = data.get("usd")
+            if eur is not None and usd is not None:
+                _live_price_cache.update({"at": now, "eur": eur, "usd": usd})
+            return {"eur": eur, "usd": usd}
+    except Exception as e:
+        logger.warning(f"CoinGecko live price fetch failed: {e}")
+        return {"eur": None, "usd": None}
+
+
 async def get_price_for_date(db: Session, date_str: str) -> dict:
     """Returns {'eur': float|None, 'usd': float|None}. Reads cache first."""
     cached = db.query(PriceCache).filter(PriceCache.date == date_str).first()

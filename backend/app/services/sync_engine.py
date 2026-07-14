@@ -575,9 +575,13 @@ def _epoch_for_tick(db: Session, tick_number: int | None) -> int | None:
 
 async def _epoch_from_api(tick_number: int, cache: dict, http_client=None) -> int | None:
     """Fetch epoch for a tick from the Qubic API, with in-memory cache."""
+    from .qubic_client import _rpc_rate_limit
+
     if tick_number in cache:
         return cache[tick_number]
     try:
+        # direct rpc.qubic.org call — must share the global 100/min budget
+        await _rpc_rate_limit()
         if http_client is not None:
             r = await http_client.get(
                 f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
@@ -624,10 +628,14 @@ async def backfill_tx_epochs(db: Session) -> int:
 
 async def _tick_timestamp_from_api(tick_number: int, cache: dict, http_client, base_url: str) -> str | None:
     """Fetch the Unix-ms timestamp for a tick from the archiver, with cache."""
+    from .qubic_client import _rpc_rate_limit
+
     if tick_number in cache:
         return cache[tick_number]
     ts = None
     try:
+        # direct RPC-node call — must share the global 100/min budget
+        await _rpc_rate_limit()
         r = await http_client.get(f"{base_url}/v1/ticks/{tick_number}/tick-data", timeout=10)
         if r.status_code == 200:
             raw = r.json().get("tickData", {}).get("timestamp")
