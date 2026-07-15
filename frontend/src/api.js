@@ -111,7 +111,7 @@ export const api = {
     createRow: (data) => req('/balance-history/rows', { method: 'POST', body: JSON.stringify(data) }),
     deleteRow: (kind, bucket) => req(`/balance-history/rows?${buildQuery({ kind, bucket })}`, { method: 'DELETE' }),
     ownerLedger: (owner, kind, limit = 200, offset = 0) => req(`/balance-history/owner-ledger?${buildQuery({ owner, kind, limit, offset })}`),
-    transfers: (limit = 200, offset = 0) => req(`/balance-history/transfers?${buildQuery({ limit, offset })}`),
+    transfers: (kind, limit = 200, offset = 0) => req(`/balance-history/transfers?${buildQuery({ kind, limit, offset })}`),
     transactions: (kind, limit = 200, offset = 0) => req(`/balance-history/transactions?${buildQuery({ kind, limit, offset })}`),
     rebuildExports: () => req('/balance-history/export/rebuild', { method: 'POST' }),
     resetSeries: (kind) => req(`/balance-history/series/${kind}`, { method: 'DELETE' }),

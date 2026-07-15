@@ -97,6 +97,31 @@ def _parse_iso(value: str | None) -> datetime | None:
         return None
 
 
+def _to_local(dt: datetime | None) -> datetime | None:
+    """Naive UTC -> naive local time for Excel date cells. Excel has no
+    timezone concept, so dates are written in the server's local timezone
+    (TZ environment variable); the UI converts in the browser instead."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+
+
+def _series_baseline(db: Session, kind: str) -> datetime | None:
+    """First capture (auto/manual) of the series. Rows before it lie outside
+    the recorded period — same rule as build_owner_rows."""
+    first = (
+        db.query(BalanceSnapshot.captured_at)
+        .filter(
+            BalanceSnapshot.kind == kind,
+            BalanceSnapshot.trigger.in_(("auto", "manual")),
+        )
+        .order_by(BalanceSnapshot.captured_at, BalanceSnapshot.id)
+        .limit(1)
+        .scalar()
+    )
+    return _parse_iso(first)
+
+
 def _sheet_name(base: str, taken: set) -> str:
     name = re.sub(r"[\[\]:*?/\\']", "", base).strip()[:31] or "Sheet"
     candidate = name
@@ -208,14 +233,14 @@ def _build_overview_sheet(ws, db: Session, kind: str, t: dict):
         ws.cell(row=r_header, column=first_owner + gi, value=g["owner"] or t["no_owner"]).font = bold
 
     # Summary block: previous years (constant), current year (formula), total
-    cur_year = datetime.now(timezone.utc).year
+    cur_year = datetime.now().year
     ws.cell(row=r_total, column=col_why, value=t["total"]).font = bold
     ws.cell(row=r_prev, column=col_why, value=t["prev_year"]).font = bold
     ws.cell(row=r_cur, column=col_why, value=t["cur_year"]).font = bold
 
     cur_year_start = data_start
     for idx, row in enumerate(rows):
-        dt = _parse_iso(row["captured_at"])
+        dt = _to_local(_parse_iso(row["captured_at"]))
         if dt and dt.year >= cur_year:
             cur_year_start = data_start + idx
             break
@@ -226,7 +251,7 @@ def _build_overview_sheet(ws, db: Session, kind: str, t: dict):
         letter = get_column_letter(first_wallet + i)
         prev_sum = 0
         for idx, row in enumerate(rows):
-            dt = _parse_iso(row["captured_at"])
+            dt = _to_local(_parse_iso(row["captured_at"]))
             if dt and dt.year < cur_year:
                 snap = row["cells"].get(col["id"])
                 if snap is not None and snap.delta is not None:
@@ -254,16 +279,16 @@ def _build_overview_sheet(ws, db: Session, kind: str, t: dict):
     # Data rows
     for idx, row in enumerate(rows):
         r = data_start + idx
-        dt = _parse_iso(row["captured_at"])
+        dt = _to_local(_parse_iso(row["captured_at"]))
         if dt:
             c = ws.cell(row=r, column=col_date, value=dt)
             c.number_format = FMT_DATE
         ws.cell(row=r, column=col_epoch, value=row["epoch"])
-        d_from = _parse_iso(row["range_from"])
+        d_from = _to_local(_parse_iso(row["range_from"]))
         if d_from:
             c = ws.cell(row=r, column=col_from, value=d_from)
             c.number_format = FMT_DATE
-        d_to = _parse_iso(row["range_to"])
+        d_to = _to_local(_parse_iso(row["range_to"]))
         if d_to:
             c = ws.cell(row=r, column=col_to, value=d_to)
             c.number_format = FMT_DATE
@@ -345,7 +370,7 @@ def _build_balance_sheet(ws, db: Session, kind: str, t: dict):
 
     for idx, row in enumerate(rows):
         r = data_start + idx
-        dt = _parse_iso(row["captured_at"])
+        dt = _to_local(_parse_iso(row["captured_at"]))
         if dt:
             c = ws.cell(row=r, column=col_date, value=dt)
             c.number_format = FMT_DATE
@@ -513,7 +538,7 @@ def _build_owner_sheet(ws, db: Session, owner: str, wallets: list[dict], t: dict
     r = data_start
     for row in rows:
         if row["ts"]:
-            c = ws.cell(row=r, column=col_date, value=row["ts"])
+            c = ws.cell(row=r, column=col_date, value=_to_local(row["ts"]))
             c.number_format = FMT_DATE
         ws.cell(row=r, column=col_epoch, value=row["epoch"])
         if row["eur_rate"] is not None:
@@ -550,7 +575,7 @@ def _build_owner_sheet(ws, db: Session, owner: str, wallets: list[dict], t: dict
     ws.column_dimensions[get_column_letter(col_note)].width = 25
 
 
-def _build_transfer_sheet(ws, db: Session, columns: list[dict], t: dict):
+def _build_transfer_sheet(ws, db: Session, columns: list[dict], t: dict, kind: str):
     bold = Font(bold=True)
     col_date = 1
     first_wallet = 2
@@ -564,6 +589,11 @@ def _build_transfer_sheet(ws, db: Session, columns: list[dict], t: dict):
 
     owned = {c["id"] for c in columns}
     col_of = {c["id"]: first_wallet + i for i, c in enumerate(columns)}
+
+    # Only transfers inside the recorded period of this series — everything
+    # before the first capture (baseline) predates the ledger, like in
+    # build_owner_rows. Without captures the sheet stays empty.
+    start_dt = _series_baseline(db, kind)
 
     internal = (
         db.query(Event)
@@ -580,9 +610,10 @@ def _build_transfer_sheet(ws, db: Session, columns: list[dict], t: dict):
         if e.source_address not in owned and e.destination_addr not in owned:
             continue
         dt = _parse_iso(e.timestamp)
-        if dt:
-            c = ws.cell(row=r, column=col_date, value=dt)
-            c.number_format = FMT_DATE
+        if start_dt is None or dt is None or dt <= start_dt:
+            continue
+        c = ws.cell(row=r, column=col_date, value=_to_local(dt))
+        c.number_format = FMT_DATE
         amount = e.amount_qubic or 0
         if e.source_address in col_of:
             c = ws.cell(row=r, column=col_of[e.source_address], value=-amount)
@@ -643,7 +674,7 @@ def _build_transactions_sheet(ws, db: Session, columns: list[dict], t: dict, kin
     r = 2
     for row in build_flat_rows(db, columns, kind):
         if row["ts"]:
-            c = ws.cell(row=r, column=1, value=row["ts"])
+            c = ws.cell(row=r, column=1, value=_to_local(row["ts"]))
             c.number_format = 'dd/mm/yyyy'
         ws.cell(row=r, column=2, value="Qubic")
         c = ws.cell(row=r, column=3, value=row["amount"])
@@ -692,7 +723,7 @@ def build_workbook(db: Session, kind: str, lang: str = "de") -> Workbook:
         name = _sheet_name(f"Ledger{owner or t['no_owner']}", taken)
         _build_owner_sheet(wb.create_sheet(name), db, owner, wallets, t, kind)
 
-    _build_transfer_sheet(wb.create_sheet(_sheet_name("Transfer", taken)), db, columns, t)
+    _build_transfer_sheet(wb.create_sheet(_sheet_name("Transfer", taken)), db, columns, t, kind)
     _build_transactions_sheet(wb.create_sheet(_sheet_name("MyLedgerCSV", taken)), db, columns, t, kind)
     return wb
 

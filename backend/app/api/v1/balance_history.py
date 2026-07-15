@@ -333,7 +333,9 @@ def owner_ledger(
         "total": len(rows),
         "rows": [{
             "type": r["type"],
-            "timestamp": r["ts"].isoformat() if r["ts"] else None,
+            # ts is naive UTC (Excel needs it that way) — re-tag as UTC so the
+            # browser converts to the user's local timezone
+            "timestamp": r["ts"].replace(tzinfo=timezone.utc).isoformat() if r["ts"] else None,
             "epoch": r["epoch"],
             "count": r["count"],
             "cells": r["cells"],
@@ -350,10 +352,19 @@ def owner_ledger(
 
 @router.get("/balance-history/transfers")
 def internal_transfers(
+    kind: str = Query(default="hourly"),
     limit: int = Query(default=200, le=1000),
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
+    """Internal transfers inside the recorded period of the series: only
+    events after the first capture (baseline) — same rule as the owner
+    ledgers. Without captures the sheet is empty."""
+    if kind not in bhs.KINDS:
+        raise HTTPException(400, "invalid kind")
+    from ...services.excel_workbook_service import _parse_iso, _series_baseline
+    start_dt = _series_baseline(db, kind)
+
     labels = {w.id: w.label for w in db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()}
     base = db.query(Event).filter(Event.is_internal == 1)
     rows = base.order_by(Event.timestamp.desc(), Event.tick_number.desc()).all()
@@ -363,6 +374,9 @@ def internal_transfers(
         if e.id in seen:
             continue
         seen.add(e.id)
+        dt = _parse_iso(e.timestamp)
+        if start_dt is None or dt is None or dt <= start_dt:
+            continue
         unique.append(e)
     page = unique[offset:offset + limit]
     return {
@@ -401,7 +415,7 @@ def transactions(
         "kind": kind,
         "total": len(rows),
         "rows": [{
-            "timestamp": r["ts"].isoformat() if r["ts"] else None,
+            "timestamp": r["ts"].replace(tzinfo=timezone.utc).isoformat() if r["ts"] else None,
             "epoch": r["epoch"],
             "wallet_id": r["wallet_id"],
             "wallet_label": labels.get(r["wallet_id"]),

@@ -4,6 +4,17 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.14] — 2026-07-15
+
+### Fixed
+- **Balance History: owner ledgers and MyLedgerCSV showed UTC times** — the per-owner ledger and the flat transaction list returned timestamps without timezone information, so the browser displayed the raw UTC time (e.g. 9:00 instead of 11:00 local). The API now tags these timestamps as UTC and the browser converts them to the user's local timezone — all Balance History views (hourly/daily/weekly) behave the same as the Ledger overview
+- **Balance History: Transfer sheet no longer shows pre-series history** — the Transfer view and the Excel `Transfer` sheet listed every internal transfer ever synced, including transfers from long before Balance History was enabled. They now only include transfers after the first capture (baseline) of the respective series — the same rule the per-owner ledgers already use. The API endpoint takes the series (`GET /balance-history/transfers?kind=hourly|daily|weekly`); without any captures the sheet is empty
+
+### Changed
+- **Excel exports written in the server's local timezone** — date cells in the generated .xlsx files (Ledger, Bestand, owner ledgers, Transfer, MyLedgerCSV) were written in UTC; they now use the server timezone, configurable via the `TZ` environment variable (e.g. `TZ=Europe/Berlin`; docker-compose passes `TZ` through, default remains UTC). The app UI always converts to the browser's local timezone independently of this setting
+
+---
+
 ## [0.2.13] — 2026-07-14
 
 ### Added

@@ -222,3 +222,59 @@ def test_workbook_bytes_roundtrip(db):
     data = build_workbook_bytes(db, "weekly", "en")
     assert data[:2] == b"PK"  # xlsx = zip container
     assert len(data) > 1000
+
+
+def _seed_internal_transfer(db, eid, ts, src, dst, amount):
+    # internal transfers are stored once per involved wallet (same event id)
+    for wid in (src, dst):
+        db.add(Event(
+            id=eid, wallet_id=wid, timestamp=ts, epoch=221,
+            source_address=src, destination_addr=dst,
+            amount_qubic=amount, source_type="TX", is_internal=1,
+            qubic_eur_rate=4e-7, qubic_usd_rate=5e-7,
+        ))
+    db.commit()
+
+
+def test_transfers_limited_to_recorded_period(db):
+    """The Transfer view/sheet only covers the recorded period of the series:
+    transfers before the first capture (baseline) are excluded, a series
+    without captures yields no transfers at all."""
+    wid_a, wid_b = _seed(db)  # weekly baseline at 2026-07-08T12:00:05
+    _seed_internal_transfer(db, "int-old", "2026-07-01T09:00:00+00:00", wid_a, wid_b, 40)
+    _seed_internal_transfer(db, "int-new", "2026-07-10T09:00:00+00:00", wid_b, wid_a, 70)
+
+    from app.api.v1.balance_history import internal_transfers
+    resp = internal_transfers(kind="weekly", limit=200, offset=0, db=db)
+    assert [r["id"] for r in resp["rows"]] == ["int-new"]
+    assert resp["total"] == 1
+
+    # daily series has no captures -> no recorded period -> empty
+    resp = internal_transfers(kind="daily", limit=200, offset=0, db=db)
+    assert resp["rows"] == [] and resp["total"] == 0
+
+    # Excel Transfer sheet applies the same rule (-source / +destination)
+    wb = build_workbook(db, "weekly", "de")
+    ws = wb["Transfer"]
+    row_values = [(ws.cell(row=4, column=c).value) for c in (2, 3)]
+    assert sorted(v for v in row_values if v is not None) == [-70, 70]
+    assert ws.cell(row=5, column=2).value is None  # only one transfer row
+
+    wb_daily = build_workbook(db, "daily", "de")
+    assert wb_daily["Transfer"].cell(row=4, column=2).value is None
+
+
+def test_sheet_timestamps_are_utc_tagged(db):
+    """API timestamps of the owner ledger and transaction list must carry
+    timezone info so the browser can convert them to the user's local time."""
+    wid_a, _ = _seed(db)
+    _seed_tx(db, wid_a, "2026-07-10T09:00:00+00:00", 30, incoming=True)
+
+    from app.api.v1.balance_history import owner_ledger, transactions
+    resp = owner_ledger(owner="Anna", kind="weekly", limit=200, offset=0, db=db)
+    assert resp["rows"]
+    assert all(r["timestamp"].endswith("+00:00") for r in resp["rows"] if r["timestamp"])
+
+    resp = transactions(kind="weekly", limit=200, offset=0, db=db)
+    assert resp["rows"]
+    assert all(r["timestamp"].endswith("+00:00") for r in resp["rows"] if r["timestamp"])

@@ -126,7 +126,7 @@ async function loadSheet(reset = true) {
     if (sheet.value.startsWith('owner:')) {
       resp = await api.balanceHistory.ownerLedger(sheet.value.slice(6), series.value, SHEET_PAGE, sheetOffset.value)
     } else if (sheet.value === 'transfer') {
-      resp = await api.balanceHistory.transfers(SHEET_PAGE, sheetOffset.value)
+      resp = await api.balanceHistory.transfers(series.value, SHEET_PAGE, sheetOffset.value)
     } else {
       resp = await api.balanceHistory.transactions(series.value, SHEET_PAGE, sheetOffset.value)
     }

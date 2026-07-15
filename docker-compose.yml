@@ -16,7 +16,9 @@ services:
       - path: ./backend/.env
         required: false
     environment:
-      - TZ=UTC
+      # Zeitzone der Excel-Exporte (Datumsspalten), z. B. TZ=Europe/Berlin.
+      # Setzen über Shell-Env oder eine .env neben dieser Datei.
+      - TZ=${TZ:-UTC}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
