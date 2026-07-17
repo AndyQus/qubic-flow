@@ -37,7 +37,9 @@ async def _check_node(db, node: Node):
     else:
         url = f"{base}/v1/tick-info"
     start = time.perf_counter()
-    verify = node.node_type != "BOB_NODE"
+    # SSL-Verify nur für öffentliche RPCs; BOB & HOME_NODE laufen oft im LAN
+    # mit http oder selbstsignierten Zertifikaten.
+    verify = node.node_type == "RPC"
     try:
         if node.node_type == "BOB_NODE":
             # Try JSON-RPC first (qubic_getTickNumber), fall back to REST /status

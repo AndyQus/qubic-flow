@@ -46,11 +46,15 @@ def _get_active_client(db):
 
 
 def _get_ordered_clients(db):
-    """Return list of (node, client) sorted by health then priority."""
+    """Return list of (node, client) sorted by health, then HOME_NODE first, then priority.
+
+    HOME_NODE speaks the RPC interface (RPCClient) and is preferred whenever
+    healthy — the user's own archive node beats public infrastructure.
+    """
     nodes = (
         db.query(Node)
         .filter(Node.is_active == 1, Node.health_status.in_(["ONLINE", "DEGRADED"]))
-        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .order_by(Node.health_status != "ONLINE", Node.node_type != "HOME_NODE", Node.priority)
         .all()
     )
     result = []
@@ -62,12 +66,27 @@ def _get_ordered_clients(db):
     return result
 
 
+def _select_home_node(db):
+    """Best available HOME_NODE (ONLINE preferred, then priority), or None."""
+    return (
+        db.query(Node)
+        .filter(
+            Node.is_active == 1,
+            Node.node_type == "HOME_NODE",
+            Node.health_status.in_(["ONLINE", "DEGRADED"]),
+        )
+        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .first()
+    )
+
+
 def _get_rpc_client(db) -> RPCClient:
-    """Return the best available RPC client for historical/gap queries.
+    """Return the best available RPC-interface client for historical/gap queries.
 
     Priority:
-      1. User-configured RPC node (ONLINE preferred, DEGRADED accepted)
-      2. Default URL from settings (settings.qubic_rpc_url = rpc.qubic.org)
+      1. User's own HOME_NODE (speaks the RPC interface, serves from its archive)
+      2. User-configured RPC node (ONLINE preferred, DEGRADED accepted)
+      3. Default URL from settings (settings.qubic_rpc_url = rpc.qubic.org)
 
     This means users can always change the fallback URL by adding/editing their
     RPC node entry — no code release needed.
@@ -76,10 +95,10 @@ def _get_rpc_client(db) -> RPCClient:
         db.query(Node)
         .filter(
             Node.is_active == 1,
-            Node.node_type == "RPC",
+            Node.node_type.in_(["HOME_NODE", "RPC"]),
             Node.health_status.in_(["ONLINE", "DEGRADED"]),
         )
-        .order_by(Node.health_status != "ONLINE", Node.priority)
+        .order_by(Node.health_status != "ONLINE", Node.node_type != "HOME_NODE", Node.priority)
         .first()
     )
     if rpc_node:
@@ -156,15 +175,22 @@ async def _set_active_sync_node(db, node_id: int | None):
 async def _get_event_client(db, rpc_tick: int | None = None):
     """Return the best available event client for incremental (live) sync.
 
-    BOB nodes are preferred for live sync since they stream the current tick
-    efficiently, but only the BOB node with the highest tick is used, and only
-    if it is not stalled relative to the RPC tip (see _select_best_bob).
-    BOB cannot perform historical queries — use _get_rpc_client() for gap filling.
-    Falls back to RPC if no suitable BOB node is available or reachable.
+    Selection chain: HOME_NODE → BOB → RPC.
+    1. A healthy HOME_NODE wins: it speaks the RPC interface (incl.
+       /query/v1/getEventLogs), serves from its own permanent archive and
+       keeps working even when public infrastructure is down.
+    2. Otherwise BOB nodes are preferred for live sync (tick-based selection,
+       stall detection — see _select_best_bob).
+    3. Otherwise the best RPC node / default RPC.
 
     Also records the chosen node in _active_sync_node_id (and notifies the UI
     on change) so the header can show which node is really feeding live data.
     """
+    home_node = _select_home_node(db)
+    if home_node:
+        await _set_active_sync_node(db, home_node.id)
+        return RPCClient(home_node.url)
+
     bob_node = _select_best_bob(db, rpc_tick)
     if bob_node:
         bob = BOBClient(bob_node.url)

@@ -1,11 +1,11 @@
-from pydantic import BaseModel, field_validator, Field
+from pydantic import BaseModel, field_validator, model_validator, Field
 from typing import Optional, Literal
 from urllib.parse import urlparse
 
 
 class NodeCreate(BaseModel):
     url: str
-    node_type: Literal["RPC", "BOB_NODE"]
+    node_type: Literal["RPC", "BOB_NODE", "HOME_NODE"]
     label: Optional[str] = None
     priority: int = 1
     notes: Optional[str] = Field(None, max_length=2000)
@@ -20,11 +20,21 @@ class NodeCreate(BaseModel):
         _blocked = ("localhost", "127.0.0.1", "0.0.0.0", "::1", "[::]")
         if hostname in _blocked:
             raise ValueError("localhost URLs are not allowed")
-        # Block private/cloud-metadata IP ranges
-        _private_prefixes = ("10.", "192.168.", "169.254.", "172.")
-        if any(hostname.startswith(p) for p in _private_prefixes):
-            raise ValueError("Private or link-local IP ranges are not allowed")
         return v
+
+    @model_validator(mode="after")
+    def validate_private_ranges(self):
+        # HOME_NODE steht per Definition im LAN (Raspberry/Umbrel) → private
+        # IP-Bereiche sind für diesen Typ erlaubt. Für RPC/BOB bleibt der
+        # SSRF-Schutz bestehen; Link-Local/Cloud-Metadata bleibt IMMER blockiert.
+        hostname = (urlparse(self.url).hostname or "").lower()
+        if hostname.startswith("169.254."):
+            raise ValueError("Link-local IP ranges are not allowed")
+        if self.node_type != "HOME_NODE":
+            _private_prefixes = ("10.", "192.168.", "172.")
+            if any(hostname.startswith(p) for p in _private_prefixes):
+                raise ValueError("Private IP ranges are not allowed (use node type HOME_NODE for LAN nodes)")
+        return self
 
 
 class NodeOut(BaseModel):

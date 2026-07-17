@@ -19,6 +19,7 @@ const error    = ref('')
 const editId   = ref(null)
 const DEFAULT_RPC = 'https://rpc.qubic.org'
 const DEFAULT_BOB = 'https://bobnet.qubic.li'
+const DEFAULT_HOME = 'http://umbrel.local:8080'
 const form = ref({ url: DEFAULT_RPC, node_type: 'RPC', label: '', priority: 1, notes: '' })
 
 const logs = ref([])
@@ -60,7 +61,9 @@ function setActiveTab(tab) {
 
 watch(() => form.value.node_type, (type) => {
   if (!editId.value) {
-    form.value.url = type === 'BOB_NODE' ? DEFAULT_BOB : DEFAULT_RPC
+    form.value.url = type === 'BOB_NODE' ? DEFAULT_BOB
+                   : type === 'HOME_NODE' ? DEFAULT_HOME
+                   : DEFAULT_RPC
   }
 })
 
@@ -234,11 +237,13 @@ onMounted(reload)
       <div>
         <input v-model="form.url" :placeholder="t('node.url')" class="input w-full" />
         <p v-if="form.node_type === 'BOB_NODE'" class="text-xs text-amber-400 mt-1">⚠ {{ t('node.bob_hint') }}: <span class="font-mono">http://your-bob-node:40420</span></p>
+        <p v-else-if="form.node_type === 'HOME_NODE'" class="text-xs text-teal-300 mt-1">🏠 {{ t('node.home_hint') }}: <span class="font-mono">http://192.168.x.x:8080</span></p>
         <p v-else class="text-xs text-gray-400 mt-1">{{ t('node.url_default') }}: <span class="font-mono">https://rpc.qubic.org</span></p>
       </div>
       <select v-model="form.node_type" class="input w-full">
         <option value="RPC">RPC</option>
         <option value="BOB_NODE">BOB_NODE</option>
+        <option value="HOME_NODE">HOME_NODE</option>
       </select>
       <input v-model="form.label" :placeholder="t('node.label')" class="input w-full" />
       <input v-model.number="form.priority" type="number" min="1" max="99" class="input w-full" />
