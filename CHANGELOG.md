@@ -4,6 +4,13 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.15] — 2026-07-17
+
+### Added
+- **Qubic Home Node support (`HOME_NODE`)** — new node type for your own Qubic archive node on the local network (e.g. Raspberry Pi or Umbrel, default URL `http://umbrel.local:8080`). It speaks the standard RPC interface (incl. `getEventLogs`) and serves from its own permanent archive, so wallets keep syncing even when public infrastructure is down. A healthy Home Node is **preferred over all public nodes** for live sync and historical queries (selection chain: HOME_NODE → BOB → RPC; ONLINE preferred over DEGRADED, then priority). **Private LAN addresses (`10.*`, `192.168.*`, `172.*`) are allowed for this node type only** — for `RPC`/`BOB_NODE` the SSRF protection still blocks them, link-local (`169.254.*`) and localhost stay blocked for every type. TLS certificate verification is skipped for LAN node types (http / self-signed certificates). Selectable on the Nodes page with its own hint text
+
+---
+
 ## [0.2.14] — 2026-07-15
 
 ### Fixed

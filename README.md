@@ -36,7 +36,7 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 ## Features
 
 - **Unlimited wallets** — PRIVATE and BUSINESS, manageable via the UI
-- **Dual-node support** — Standard RPC (`rpc.qubic.org`) **and** BOB Node (`bobnet.qubic.li`); the best available node is chosen automatically
+- **Multi-node support** — Standard RPC (`rpc.qubic.org`), BOB Node (`bobnet.qubic.li`) **and your own Qubic Home Node on the LAN** (`HOME_NODE`, private IPs allowed, preferred for sync whenever healthy); the best available node is chosen automatically
 - **Event sync** — automatically every 60 seconds; RPC nodes via `getEventLogs` (uses `transactionHash` **directly as primary key** — the same 60-character ID shown in the Qubic Explorer), BOB nodes via `POST /getQuTransferForIdentity`. SC-internal events without `transactionHash` fall back to the numeric `logId` (the 16-character `logDigest` is then the Explorer ID for those events)
 - **TX sync** — transfer transactions via Qubic Archiver API, deduplicated against events; tries multiple field names (`transactionId`, `txId`, `id`, `digest`, `hash`) and prefers the real 60-character Qubic TxID. Stub matching: existing event rows are found by `(tick, source, destination, amount)` and updated with the real TxID (user fields like notes/labels are preserved). Chunk-based progress with checkpoint per chunk — failed chunks become a sync gap and do not reset `last_tx_tick`. Initial sync starts at `current_tick − 500,000` (archiver retention period), not at tick 1
 - **Smart contract classification** — `logType=0` transfers are classified as `TX` (normal transfer) or `EVENT` (smart contract / token issuer, e.g. QX, Qearn, QMine) via address labels
@@ -208,14 +208,15 @@ npm run dev
 ## Node Configuration
 
 Nodes are managed via the UI under **Settings → Nodes**.  
-For live sync QubicFlow automatically selects the BOB node with the **highest tick** (furthest advanced), falling back to RPC if every BOB node is stalled. The node actually feeding live sync is shown in the connection pill (top right) and marked with a pulsing dot in the node list.
+For live sync QubicFlow prefers your own **Home Node** whenever one is healthy; otherwise it automatically selects the BOB node with the **highest tick** (furthest advanced), falling back to RPC if every BOB node is stalled. The node actually feeding live sync is shown in the connection pill (top right) and marked with a pulsing dot in the node list.
 
 ### Node Types
 
-| Type       | Description                               | Default URL                      |
-|------------|-------------------------------------------|----------------------------------|
-| `RPC`      | Qubic Public RPC (REST)                  | `https://rpc.qubic.org`         |
-| `BOB_NODE` | Qubic BOB Node (core team, REST + WS)    | `http://your-bob-node:40420`    |
+| Type        | Description                                            | Default URL                      |
+|-------------|--------------------------------------------------------|----------------------------------|
+| `RPC`       | Qubic Public RPC (REST)                               | `https://rpc.qubic.org`         |
+| `BOB_NODE`  | Qubic BOB Node (core team, REST + WS)                 | `http://your-bob-node:40420`    |
+| `HOME_NODE` | Your own Qubic Home Node on the LAN (RPC interface)   | `http://umbrel.local:8080`      |
 
 ### Setting up an RPC node (default)
 
@@ -238,6 +239,17 @@ Priority:  1
 The BOB node uses its own REST API on port **40420** — the standard RPC endpoints (`/v1/tick-info` etc.) are **not** available there.  
 QubicFlow detects the type automatically via `node_type = BOB_NODE` and uses the correct endpoints.
 
+### Setting up a Home Node
+
+```
+URL:       http://umbrel.local:8080   (or http://192.168.x.x:8080)
+Type:      HOME_NODE
+Label:     My Home Node
+Priority:  1
+```
+
+A Home Node is your own Qubic archive node on the local network (e.g. on a Raspberry Pi or Umbrel). It speaks the standard RPC interface (incl. `getEventLogs`) and serves from its own permanent archive, so it keeps working even when public infrastructure is down. **Private LAN addresses (`10.*`, `192.168.*`, `172.*`) are allowed for this node type only** — for `RPC`/`BOB_NODE` the SSRF protection still blocks them; link-local addresses (`169.254.*`) and localhost are always blocked. A healthy Home Node is preferred over all public nodes for both live sync and historical queries; TLS certificate verification is skipped for LAN nodes (http / self-signed certificates).
+
 #### BOB endpoints used
 
 | Endpoint                         | Method | Purpose                                |
@@ -257,9 +269,10 @@ QubicFlow detects the type automatically via `node_type = BOB_NODE` and uses the
 The sync job (`sync_all_wallets`, every 60 s) selects the **live-sync** node using the following logic:
 
 1. Only `is_active = 1` nodes with status ONLINE or DEGRADED are considered
-2. Among the BOB nodes, the one with the **highest tick** wins (furthest advanced); **priority** is only a tiebreaker when ticks are (nearly) equal
-3. If even the best BOB node lags more than `MAX_BOB_LAG` (1000) ticks behind the RPC network tip, it is treated as stalled and RPC is used for live sync (logged as a warning)
-4. If no node is available, the system falls back to `QUBIC_RPC_URL` from `.env`
+2. A healthy **HOME_NODE** always wins (ONLINE preferred over DEGRADED, then priority) — your own archive node beats public infrastructure
+3. Otherwise, among the BOB nodes, the one with the **highest tick** wins (furthest advanced); **priority** is only a tiebreaker when ticks are (nearly) equal
+4. If even the best BOB node lags more than `MAX_BOB_LAG` (1000) ticks behind the RPC network tip, it is treated as stalled and RPC is used for live sync (logged as a warning)
+5. If no node is available, the system falls back to `QUBIC_RPC_URL` from `.env`
 
 > Data is never lost when the active node changes: incremental sync always resumes from the persisted `last_tick`, and any range a node could not serve is backfilled via RPC or recorded as a gap and retried.
 
@@ -585,7 +598,9 @@ python -m pytest tests/ -v
 | `tests/test_wallets_api.py`       | 23    | Wallet CRUD + resync endpoints                                       |
 | `tests/test_time_utils.py`        | 15    | UTC helpers                                                          |
 | `tests/test_donation_utils.py`    | 13    | Supporter rank / donation logic                                      |
+| `tests/test_balance_snapshots.py` | 10    | Balance history: buckets, edit audit trail, Excel workbook, transfer period, UTC timestamps |
 | `tests/test_bob_selection.py`     | 8     | Tick-based BOB node election + lag fallback                          |
+| `tests/test_home_node_selection.py` | 7   | HOME_NODE preference in the sync source selection chain (HOME → BOB → RPC) |
 | `tests/test_sync_engine_logic.py` | 8     | Sync window / persistence logic                                      |
 | `tests/test_sync_gap_type.py`     | 7     | Gap recording (EVENT vs. TX)                                         |
 | `tests/test_coingecko.py`         | 6     | Rate cache hit/miss, network errors, side-effect-free                |
