@@ -565,12 +565,34 @@ Der Bericht kann direkt in der Oberfläche als **CSV** oder **PDF** heruntergela
 | `check_balances`          | stündlich            | Live-RPC-Kontostand mit berechnetem Bestand vergleichen; bei Abweichung gezielten Resync auslösen |
 | `backfill_tx_epochs`      | stündlich            | Fehlende Epochen-Nummern an TX-Datensätzen ergänzen                       |
 | `refresh_donation_cache`  | stündlich            | Supporter-/Spenden-Cache aktualisieren                                    |
+| `auto_dedup`              | stündlich + Start    | Doppelt erfasste Events entfernen und den Kontostand entsprechend korrigieren |
 | `backfill_rates`          | alle 6 Stunden       | EUR/USD-Kurse für Events ohne Kurs nachladen                              |
 | `backfill_timestamps`     | alle 6 Stunden       | Events ohne verwertbaren Zeitstempel (alte BOB-Importe) über Tick-Daten reparieren |
 | `sync_labels`             | alle 24 Stunden      | Adress-Namensauflösung (address_labels, tokens, issuances)               |
 | `weekly_snapshot`         | Mi 12:00 UTC (Cron)  | Wöchentlichen Aggregations-Schnappschuss speichern                        |
 
 Jobs laufen mit `max_instances=1` und `coalesce=True` — kein paralleler Doppellauf.
+
+### Doppelerfassungs-Schutz
+
+Derselbe On-Chain-Transfer erreicht die Datenbank über zwei Erfassungswege (`getEventLogs` und
+`getTransferTransactions`), die ihn unter unterschiedlichen IDs führen. Der TX-Weg *gleicht* deshalb ab:
+Er hebt den vorhandenen Event-Log-Stub an Ort und Stelle an, statt eine zweite Zeile einzufügen.
+
+Drei Ebenen halten das frei von Duplikaten:
+
+1. **Stub-Reservierung** — ein im laufenden Durchgang bereits abgeglichener Stub wird nicht erneut
+   verwendet. N identische Transfers in einem Tick belegen dadurch N verschiedene Stubs, statt alle
+   auf denselben zu treffen.
+2. **`log_digest`-Prüfung** — ein erneut geliefertes Event-Log wird auch dann erkannt, wenn seine `id`
+   zuvor auf die TxID angehoben wurde.
+3. **Automatische Bereinigung** — `auto_dedup` läuft beim Start, stündlich und nach jedem Sync-Zyklus.
+   Der Job fasst verbliebene Duplikate zusammen, überträgt Benutzerdaten (Notiz, Tags, `verified`) auf
+   die verbleibende Zeile und rechnet den Phantom-Betrag wieder aus dem Kontostand heraus.
+   Ein manueller Eingriff ist nicht nötig.
+
+Zwei Transfers mit *unterschiedlichen* TxIDs im selben Tick sind echte Einzelbuchungen und werden nie
+zusammengefasst.
 
 Wenn der RPC für einen Tick-Bereich weniger Daten liefert als erwartet (`validForTick < to_tick`), wird eine Synchronisierungslücke angelegt und der fehlende Bereich beim nächsten Lauf erneut versucht.
 

@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, true
 from ..database import SessionLocal
 from ..models.wallet import Wallet
 from ..models.event import Event
@@ -313,6 +313,20 @@ async def sync_all_wallets():
             except Exception as e:
                 logger.error(f"TX sync failed for wallet {wallet.id}: {e}", exc_info=True)
                 log_buffer.add("ERROR", "sync", f"TX sync failed for wallet {wallet.id}: {e}", node=_src_url)
+
+            # Collapse any duplicate that this cycle may have produced, so the
+            # UI never shows the same transfer twice. Cheap: the grouping query
+            # returns nothing when the wallet is clean.
+            try:
+                from .dedup_service import dedup_events
+                res = dedup_events(db, wallet_id=wallet.id)
+                if res["removed"]:
+                    msg = f"Dedup: {res['removed']} duplicate event(s) removed for wallet {wallet.id}"
+                    logger.info(msg)
+                    log_buffer.add("INFO", "sync", msg, node=_src_url)
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Dedup failed for wallet {wallet.id}: {e}", exc_info=True)
     finally:
         db.close()
 
@@ -503,6 +517,15 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         if db.query(Event.id).filter(
             Event.wallet_id == wallet_id,
             Event.id.in_(dedup_keys),
+        ).first():
+            continue
+        # A row the TX sync already reconciled carries the TxID in `id` *and*
+        # `log_digest`, so its original logId no longer matches above. Without
+        # this second guard a re-served event log (gap retry, node switch,
+        # re-sync) would insert a fresh stub beside the reconciled row.
+        if db.query(Event.id).filter(
+            Event.wallet_id == wallet_id,
+            Event.log_digest.in_(dedup_keys),
         ).first():
             continue
 
@@ -776,6 +799,14 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
     total_inserted = 0
     epoch_cache: dict = {}
     price_cache: dict = {}
+    # Stubs already upgraded during this run. Without this, N identical
+    # transfers in one tick would all reconcile against the same stub and the
+    # remaining N-1 stubs would survive as duplicates of the reconciled row.
+    reconciled_stub_ids: set = set()
+    # TxIDs handled in this run - the per-row DB guards above only see rows that
+    # are already committed, so a second page returning the same TxID could
+    # otherwise insert it twice.
+    seen_tx_ids: set = set()
 
     async with httpx.AsyncClient() as http_client:
         while True:
@@ -817,6 +848,9 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                                 break
                     if not tx_id:
                         continue
+                    if tx_id in seen_tx_ids:
+                        continue
+                    seen_tx_ids.add(tx_id)
 
                     # Skip if already stored as TX
                     if db.query(Event.id).filter(Event.id == tx_id, Event.wallet_id == wallet_id).first():
@@ -853,8 +887,13 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                         Event.destination_addr == dest,
                         Event.amount_qubic == amount,
                         func.length(Event.id) != 60,
+                        Event.id.notin_(reconciled_stub_ids) if reconciled_stub_ids else true(),
                     ).order_by(Event.id).first()
                     if stub is not None:
+                        # Claim this stub so a second identical transfer in the
+                        # same tick reconciles against a *different* stub rather
+                        # than inserting a new row next to the leftover one.
+                        reconciled_stub_ids.add(stub.id)
                         db.execute(
                             update(Event)
                             .where(Event.id == stub.id, Event.wallet_id == wallet_id)

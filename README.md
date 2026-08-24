@@ -567,12 +567,30 @@ The report can be downloaded directly in the UI as **CSV** or **PDF**.
 | `check_balances`          | every hour           | Compare live RPC balance vs. computed balance; trigger targeted resync on drift |
 | `backfill_tx_epochs`      | every hour           | Fill missing epoch numbers on TX records                                  |
 | `refresh_donation_cache`  | every hour           | Update supporter/donation cache                                           |
+| `auto_dedup`              | every hour + startup | Remove duplicate events and correct the affected wallet balance           |
 | `backfill_rates`          | every 6 hours        | Fetch EUR/USD rates for events without a rate                             |
 | `backfill_timestamps`     | every 6 hours        | Resolve events without a usable timestamp (old BOB imports) via tick data |
 | `sync_labels`             | every 24 hours       | Address name sync (address_labels, tokens, issuances)                    |
 | `weekly_snapshot`         | Wed 12:00 UTC (cron) | Save weekly aggregation snapshot                                          |
 
 Jobs run with `max_instances=1` and `coalesce=True` — no parallel duplicate runs.
+
+### Duplicate protection
+
+The same on-chain transfer reaches the database through two ingest paths (`getEventLogs` and
+`getTransferTransactions`), which identify it under different ids. The TX path therefore *reconciles*:
+it upgrades the existing event-log stub in place instead of inserting a second row.
+
+Three layers keep that free of duplicates:
+
+1. **Stub claiming** — a stub already reconciled during the current run is not reused, so N identical
+   transfers in one tick consume N distinct stubs instead of all matching the same one.
+2. **`log_digest` guard** — a re-served event log is recognised even after its `id` was upgraded to the TxID.
+3. **Automatic cleanup** — `auto_dedup` runs at startup, hourly, and after every sync cycle. It collapses
+   any duplicate that still slipped through, merges user data (note, tags, `verified`) onto the surviving
+   row, and subtracts the phantom amount back out of the tracked wallet balance. No user action required.
+
+Two transfers with *different* TxIDs in the same tick are genuinely distinct and are never merged.
 
 If the RPC delivers fewer records than expected for a tick range (`validForTick < to_tick`), a sync gap is created and the missing range is retried on the next run.
 

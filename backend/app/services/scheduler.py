@@ -10,6 +10,7 @@ from .label_service import sync_labels
 from .coingecko import get_price_for_date
 from .balance_service import check_all_balances
 from .donation_cache_service import refresh_donation_cache
+from .dedup_service import auto_dedup_job
 from ..database import SessionLocal
 from ..models.event import Event
 
@@ -153,6 +154,20 @@ scheduler.add_job(
     "interval",
     hours=1,
     id="refresh_donation_cache",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
+
+
+# Automatic duplicate cleanup. Runs right after startup (so an existing stock of
+# duplicates is healed without the user doing anything) and hourly afterwards to
+# catch anything a future ingest edge case might still slip through.
+scheduler.add_job(
+    auto_dedup_job,
+    "interval",
+    hours=1,
+    id="auto_dedup",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),

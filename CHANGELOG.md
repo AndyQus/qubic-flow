@@ -4,6 +4,18 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.16] — 2026-08-24
+
+### Fixed
+- **Events were recorded twice** — the same on-chain transfer reaches the database through two ingest paths (`getEventLogs` and `getTransferTransactions`), which identify it under different ids. The TX path reconciles by upgrading the existing event-log stub in place, but it matched stubs on `(wallet, tick, source, destination, amount)` and took the *first* hit without ever marking it as used. When a tick contained several identical transfers, every one of them reconciled against the same stub, so each additional transfer inserted a new row next to the leftover stubs — visible in the wallet detail view as the identical entry twice (same time, same tick, same amount). A second path caused the same effect: once a row's `id` had been upgraded to the TxID, its original `logId` no longer matched the dedup check, so a re-served event log (gap retry, node switch, re-sync) inserted a fresh stub beside the reconciled row. Both are fixed — reconciled stubs are now claimed for the duration of a run, TxIDs are deduplicated across pages, and the dedup check also consults `log_digest`
+- **Duplicates inflated the tracked wallet balance** — every phantom row had its amount applied to `wallet.balance` at insert time. The cleanup subtracts that effect back out, so the balance matches the chain again
+
+### Added
+- **Automatic duplicate cleanup (`auto_dedup`)** — runs at startup, hourly, and after every sync cycle, so an existing stock of duplicates is healed **without any user interaction** and no button has to be pressed. Duplicates are collapsed onto a single row, preferring the explorer-verifiable 60-char TxID; user-entered data (note, comment, item tags, `verified`) from the removed rows is merged onto the surviving row so no manual work is lost. Two transfers with *different* TxIDs in the same tick are genuine separate bookings and are never merged
+- **New index `ix_events_dedup`** (migration `015`) over `(wallet_id, tick_number, source_address, destination_addr, amount_qubic)` plus `ix_events_log_digest`, so the duplicate check stays an index seek — ~0.2 s on a database with 77k events
+
+---
+
 ## [0.2.15] — 2026-07-17
 
 ### Added
