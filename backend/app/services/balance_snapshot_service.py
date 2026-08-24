@@ -83,6 +83,22 @@ def bucket_for(kind: str, now: datetime, epoch: int | None) -> str:
     return f"e{epoch}" if epoch is not None else f"w{now.strftime('%Y-%m-%d')}"
 
 
+def settled_epoch(kind: str, current_epoch: int | None) -> int | None:
+    """Epoch a capture row belongs to.
+
+    The weekly row is taken right after the Wednesday 12:00 UTC transition, so
+    the RPC already reports the NEW epoch — but the interval the row measures
+    (and every payout inside it) belongs to the epoch that just ended.
+    Contracts that pay out per epoch (MSVAULT, QBAY, QEARN, …) settle in the
+    very last tick of the old epoch, so their events already carry that older
+    number; labelling the row with the running epoch would file them one epoch
+    too late. Hourly/daily rows sit inside an epoch and keep the current one.
+    """
+    if kind != "weekly" or current_epoch is None:
+        return current_epoch
+    return current_epoch - 1 if current_epoch > 0 else current_epoch
+
+
 def _previous_snapshot(db: Session, kind: str, wallet_id: str) -> BalanceSnapshot | None:
     """Last measured row of the series for the wallet (user rows are deltas
     entered by hand without a balance — they cannot serve as baseline)."""
@@ -133,9 +149,12 @@ async def capture_snapshots(kind: str, trigger: str = "auto", export: bool = Tru
         now_iso = now_utc_iso()
 
         rpc = _get_rpc_client(db)
-        epoch = await rpc.get_current_epoch()
-        if epoch is None:
-            epoch = db.query(Event.epoch).filter(Event.epoch.isnot(None)).order_by(Event.epoch.desc()).limit(1).scalar()
+        running_epoch = await rpc.get_current_epoch()
+        if running_epoch is None:
+            running_epoch = db.query(Event.epoch).filter(Event.epoch.isnot(None)).order_by(Event.epoch.desc()).limit(1).scalar()
+        # The weekly row is filed under the epoch it measured, not the one that
+        # just started — see settled_epoch().
+        epoch = settled_epoch(kind, running_epoch)
 
         if trigger == "manual":
             bucket = f"m{int(now.timestamp() * 1000)}"
@@ -291,9 +310,13 @@ async def capture_weekly_after_epoch() -> dict:
     waited = 0
     while True:
         epoch_now = await rpc.get_current_epoch()
+        # Stored weekly rows carry the settled epoch, the RPC reports the
+        # running one — compare on the same scale, otherwise the wait would
+        # end immediately and the row would miss the epoch-end payouts.
+        settled_now = settled_epoch("weekly", epoch_now)
         if last_epoch is None and epoch_now is not None:
             break  # first weekly capture — baseline, no transition to wait for
-        if epoch_now is not None and last_epoch is not None and epoch_now > last_epoch:
+        if settled_now is not None and last_epoch is not None and settled_now > last_epoch:
             break
         if waited >= EPOCH_POLL_MAX_SECONDS:
             logger.warning(

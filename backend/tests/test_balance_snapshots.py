@@ -14,7 +14,9 @@ from app.database import Base
 from app.models.balance_snapshot import BalanceSnapshot, SnapshotAnnotation
 from app.models.event import Event
 from app.models.wallet import Wallet
-from app.services.balance_snapshot_service import bucket_for, apply_edit, reset_series
+from app.services.balance_snapshot_service import (
+    bucket_for, apply_edit, reset_series, settled_epoch,
+)
 from app.services.excel_workbook_service import build_workbook, build_owner_rows, build_flat_rows
 
 
@@ -65,6 +67,18 @@ def test_bucket_for_slots():
     assert bucket_for("daily", now, 221) == "2026-07-15"
     assert bucket_for("weekly", now, 221) == "e221"
     assert bucket_for("weekly", now, None) == "w2026-07-15"
+
+
+def test_settled_epoch_shifts_weekly_only():
+    # The weekly row is captured after the transition, so the RPC already
+    # reports the new epoch — the row belongs to the one that just ended.
+    assert settled_epoch("weekly", 226) == 225
+    # Hourly/daily rows sit inside the running epoch and keep it.
+    assert settled_epoch("hourly", 226) == 226
+    assert settled_epoch("daily", 226) == 226
+    # No epoch known / degenerate values stay untouched.
+    assert settled_epoch("weekly", None) is None
+    assert settled_epoch("weekly", 0) == 0
 
 
 def test_apply_edit_preserves_original(db):
