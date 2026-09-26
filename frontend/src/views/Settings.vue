@@ -6,13 +6,14 @@ import { api } from '../api'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '../components/PageHeader.vue'
+import QearnPanel from '../components/QearnPanel.vue'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const route = useRoute()
 const router = useRouter()
 
-const TABS = ['display', 'tax', 'data', 'bhistory']
+const TABS = ['display', 'tax', 'data', 'bhistory', 'qearn']
 function normalizeTab(q) { return TABS.includes(q) ? q : 'display' }
 const activeTab = ref(normalizeTab(route.query.tab))
 
@@ -337,6 +338,8 @@ function simulate() {
               @click="setActiveTab('data')">{{ t('settings.tab_data') }}</button>
       <button :class="['tab-btn', activeTab === 'bhistory' && 'tab-btn-active']"
               @click="setActiveTab('bhistory')">{{ t('settings.tab_bhistory') }}</button>
+      <button :class="['tab-btn', activeTab === 'qearn' && 'tab-btn-active']"
+              @click="setActiveTab('qearn')">{{ t('settings.tab_qearn') }}</button>
     </div>
   </PageHeader>
 
@@ -599,6 +602,9 @@ function simulate() {
     </div>
 
   </div>
+
+  <!-- Tab: Qearn -->
+  <QearnPanel v-if="activeTab === 'qearn'" />
 
   <!-- Tab: Bestandsverlauf -->
   <div v-if="activeTab === 'bhistory'" class="space-y-6">

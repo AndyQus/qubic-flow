@@ -10,6 +10,7 @@ from ...config import settings
 from ...database import get_db
 from ...services.balance_service import check_all_balances
 from ...models.event import Event
+from ...models.qearn import EventSplit, QearnPosition
 from ...models.node import Node
 from ...models.opening_position import OpeningPosition
 from ...models.settings import AppSetting
@@ -44,6 +45,8 @@ def export_backup(
     nodes = [_row(n) for n in db.query(Node).all()]
     opening_positions = [_row(p) for p in db.query(OpeningPosition).all()]
     events = [_row(e) for e in db.query(Event).all()]
+    event_splits = [_row(s) for s in db.query(EventSplit).all()]
+    qearn_positions = [_row(p) for p in db.query(QearnPosition).all()]
 
     settings_rows = db.query(AppSetting).filter(AppSetting.key.like(f"{TAX_PREFIX}%")).all()
     tax_settings: dict[str, Any] = {}
@@ -62,6 +65,8 @@ def export_backup(
         "opening_positions": opening_positions,
         "tax_settings": tax_settings,
         "events": events,
+        "event_splits": event_splits,
+        "qearn_positions": qearn_positions,
     }
 
 
@@ -167,13 +172,15 @@ def restore_backup(
                  log_digest, categories, source_address, destination_addr, is_internal,
                  amount_qubic, qubic_eur_rate, qubic_usd_rate, buy_value_eur, buy_value_usd,
                  sell_value_eur, sell_value_usd, source_type, buy_currency, sell_currency,
-                 item_id, item_name, comment, trade_group, verified, created_at)
+                 item_id, item_name, comment, trade_group, verified, created_at,
+                 note, sc_kind, reconstructed)
                 VALUES
                 (:id, :wallet_id, :epoch, :tick_number, :timestamp_raw, :timestamp, :log_type,
                  :log_digest, :categories, :source_address, :destination_addr, :is_internal,
                  :amount_qubic, :qubic_eur_rate, :qubic_usd_rate, :buy_value_eur, :buy_value_usd,
                  :sell_value_eur, :sell_value_usd, :source_type, :buy_currency, :sell_currency,
-                 :item_id, :item_name, :comment, :trade_group, :verified, :created_at)
+                 :item_id, :item_name, :comment, :trade_group, :verified, :created_at,
+                 :note, :sc_kind, :reconstructed)
             """)
             batch_size = 500
             for i in range(0, len(events_data), batch_size):
@@ -193,6 +200,8 @@ def restore_backup(
                     "item_id": e.get("item_id"), "item_name": e.get("item_name"),
                     "comment": e.get("comment"), "trade_group": e.get("trade_group"),
                     "verified": e.get("verified", 0), "created_at": e.get("created_at"),
+                    "note": e.get("note"), "sc_kind": e.get("sc_kind"),
+                    "reconstructed": e.get("reconstructed") or 0,
                 } for e in batch]
                 db.execute(stmt, params)
                 db.commit()
@@ -203,6 +212,49 @@ def restore_backup(
             db.rollback()
             ec["failed"] = len(events_data)
     stats["events"] = ec
+
+    # --- Qearn principal/interest splits (INSERT OR IGNORE on event+wallet+part) ---
+    splits_data = payload.get("event_splits", [])
+    sc = {"created": 0, "skipped": 0, "failed": 0}
+    if splits_data:
+        try:
+            before = db.query(EventSplit).count()
+            db.execute(text("""
+                INSERT OR IGNORE INTO event_splits
+                (event_id, wallet_id, part, amount_qubic, estimated, meta_json, updated_at)
+                VALUES (:event_id, :wallet_id, :part, :amount_qubic, :estimated, :meta_json, :updated_at)
+            """), [{
+                "event_id": sp.get("event_id"), "wallet_id": sp.get("wallet_id"), "part": sp.get("part"),
+                "amount_qubic": sp.get("amount_qubic") or 0, "estimated": sp.get("estimated") or 0,
+                "meta_json": sp.get("meta_json"), "updated_at": sp.get("updated_at"),
+            } for sp in splits_data])
+            db.commit()
+            sc["created"] = db.query(EventSplit).count() - before
+            sc["skipped"] = len(splits_data) - sc["created"]
+        except Exception:
+            db.rollback()
+            sc["failed"] = len(splits_data)
+    stats["event_splits"] = sc
+
+    # --- Qearn positions (overview only; recomputed by every Qearn check) ---
+    positions_data = payload.get("qearn_positions", [])
+    if positions_data:
+        try:
+            db.execute(text("""
+                INSERT OR IGNORE INTO qearn_positions
+                (wallet_id, lock_epoch, principal_qu, early_unlocked_qu, end_epoch, yield_e7,
+                 expected_payout_qu, payout_qu, interest_qu, status, detail_json, checked_at)
+                VALUES (:wallet_id, :lock_epoch, :principal_qu, :early_unlocked_qu, :end_epoch, :yield_e7,
+                 :expected_payout_qu, :payout_qu, :interest_qu, :status, :detail_json, :checked_at)
+            """), [{k: p.get(k) for k in (
+                "wallet_id", "lock_epoch", "principal_qu", "early_unlocked_qu", "end_epoch", "yield_e7",
+                "expected_payout_qu", "payout_qu", "interest_qu", "status", "detail_json", "checked_at",
+            )} for p in positions_data])
+            db.commit()
+            stats["qearn_positions"] = "restored"
+        except Exception:
+            db.rollback()
+            stats["qearn_positions"] = "failed"
 
     # --- Tax settings (overwrite) ---
     if "tax_settings" in payload:

@@ -170,6 +170,61 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
     : ''
   return { ...ev, _dir, _sign }
 }))
+
+// Qearn payouts are shown as two rows (principal return + interest); the
+// on-chain row itself stays one event in the DB.
+const displayRows = computed(() => processedEvents.value.flatMap(ev => {
+  const base = { ...ev, _rowKey: `${ev.id}__${ev.wallet_id}` }
+  if (!ev.qearn_parts?.length) return [base]
+  return ev.qearn_parts.map(p => ({
+    ...base,
+    amount_qubic: p.amount_qubic,
+    _part: p.part,
+    _meta: p.meta || {},
+    _estimated: p.estimated,
+    _rowKey: `${base._rowKey}__${p.part}`,
+  }))
+}))
+
+function fmtQu(n) {
+  return Number(n || 0).toLocaleString(store.locale)
+}
+
+function fmtDay(iso) {
+  if (!iso) return null
+  try { return new Date(iso).toLocaleDateString(store.locale) } catch { return null }
+}
+
+function qearnNote(ev) {
+  const m = ev._meta || {}
+  if (ev._part === 'PRINCIPAL') {
+    const parts = [m.lock_epoch != null
+      ? t('qearn.note_principal', { lock: m.lock_epoch })
+      : t('qearn.note_refund')]
+    if (m.kind === 'EARLY') parts.push(t('qearn.note_early', { weeks: m.weeks ?? '—', pct: m.early_pct ?? 0 }))
+    if (m.derived) parts.push(t('qearn.note_derived'))
+    return parts.join(' · ')
+  }
+  if (ev._part === 'INTEREST') {
+    const rate = m.principal ? (m.interest / m.principal * 100) : null
+    const parts = [t('qearn.note_interest', {
+      lock: m.lock_epoch ?? '—',
+      end: m.payout_epoch ?? '—',
+      weeks: m.weeks ?? '—',
+      rate: rate == null ? '—' : rate.toLocaleString(store.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      principal: fmtQu(m.principal),
+    })]
+    const from = fmtDay(m.lock_ts)
+    const to = fmtDay(m.payout_ts)
+    if (from && to) parts.push(`${from} – ${to}`)
+    if (m.estimated) parts.push(t('qearn.badge_estimated'))
+    return parts.join(' · ')
+  }
+  if (ev.sc_kind === 'QEARN_LOCK') {
+    return t('qearn.note_lock', { end: ev.epoch != null ? ev.epoch + 52 : '—' })
+  }
+  return null
+}
 </script>
 
 <template>
@@ -192,7 +247,7 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
       <!-- Mobile: card list -->
       <div class="sm:hidden divide-y divide-qubic-border/40">
         <div v-if="!events.length" class="p-6 text-center text-gray-500 text-xs">{{ t('event.none') }}</div>
-        <div v-for="ev in processedEvents" :key="ev.id"
+        <div v-for="ev in displayRows" :key="ev._rowKey"
              :class="[
                store.newEventIds.includes(ev.id) ? animClass : '',
                store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
@@ -209,6 +264,21 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
             <span v-if="ev.source_type === 'EVENT'"
                   class="text-xs px-1 rounded bg-violet-500/20 text-violet-300 leading-tight whitespace-nowrap">
               {{ t('event.badge_event') }}
+            </span>
+            <span v-if="ev._part"
+                  :class="['text-xs px-1 rounded leading-tight whitespace-nowrap', ev._part === 'INTEREST' ? 'bg-green-500/20 text-green-300' : 'bg-sky-500/20 text-sky-300']"
+                  :title="qearnNote(ev)">
+              {{ ev._part === 'INTEREST' ? t('qearn.badge_interest') : t('qearn.badge_principal') }}
+            </span>
+            <span v-else-if="ev.sc_kind === 'QEARN_LOCK'"
+                  class="text-xs px-1 rounded bg-sky-500/20 text-sky-300 leading-tight whitespace-nowrap"
+                  :title="qearnNote(ev)">
+              {{ t('qearn.badge_lock') }}
+            </span>
+            <span v-if="ev.reconstructed"
+                  class="text-xs px-1 rounded bg-amber-500/20 text-amber-300 leading-tight whitespace-nowrap"
+                  :title="t('qearn.reconstructed_hint')">
+              {{ t('qearn.badge_reconstructed') }}
             </span>
           </div>
           <!-- Main info -->
@@ -266,8 +336,10 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
                 </svg>
               </a>
             </div>
+            <!-- Qearn auto note (mobile) -->
+            <div v-if="qearnNote(ev)" class="text-xs text-gray-500 italic mt-1 break-words">{{ qearnNote(ev) }}</div>
             <!-- Note (mobile) -->
-            <div v-if="!props.readonly" class="mt-1.5">
+            <div v-if="!props.readonly && ev._part !== 'INTEREST'" class="mt-1.5">
               <template v-if="editingNoteId === noteKey(ev)">
                 <div class="flex items-center gap-1.5">
                   <input v-model="noteInput"
@@ -324,7 +396,7 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
             <tr v-if="!events.length">
               <td colspan="9" class="text-center p-8 text-gray-500">{{ t('event.none') }}</td>
             </tr>
-            <tr v-for="ev in processedEvents" :key="ev.id"
+            <tr v-for="ev in displayRows" :key="ev._rowKey"
                 :class="[
                   store.newEventIds.includes(ev.id) ? animClass : '',
                   store.newEventIds.includes(ev.id) ? flashClass(ev) : '',
@@ -333,9 +405,9 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
               <td class="px-3 py-2.5 text-gray-400 whitespace-nowrap">{{ fmtDate(ev.timestamp) }}</td>
               <td class="px-3 py-2.5 text-gray-400 font-mono">{{ ev.epoch ?? '—' }}</td>
               <td class="px-3 py-2.5">
-                <div class="flex items-center gap-1.5">
-                  <span v-if="ev._dir === 'IN'"       class="text-green-400 font-medium">▲ IN</span>
-                  <span v-else-if="ev._dir === 'OUT'" class="text-red-400 font-medium">▼ OUT</span>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span v-if="ev._dir === 'IN'"       class="text-green-400 font-medium whitespace-nowrap">▲ IN</span>
+                  <span v-else-if="ev._dir === 'OUT'" class="text-red-400 font-medium whitespace-nowrap">▼ OUT</span>
                   <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '−'" class="text-yellow-400 font-medium">⇄ INT</span>
                   <span v-else-if="ev._dir === 'INTERNAL' && ev._sign === '+'" class="text-yellow-400 font-medium">⇄ INT</span>
                   <span v-else-if="ev._dir === 'INTERNAL'" class="text-gray-400">⇄ INT</span>
@@ -343,6 +415,21 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
                   <span v-if="ev.source_type === 'EVENT'"
                         class="text-xs px-1 rounded bg-violet-500/20 text-violet-300 leading-tight whitespace-nowrap">
                     {{ t('event.badge_event') }}
+                  </span>
+                  <span v-if="ev._part"
+                        :class="['text-xs px-1 rounded leading-tight whitespace-nowrap', ev._part === 'INTEREST' ? 'bg-green-500/20 text-green-300' : 'bg-sky-500/20 text-sky-300']"
+                        :title="qearnNote(ev)">
+                    {{ ev._part === 'INTEREST' ? t('qearn.badge_interest') : t('qearn.badge_principal') }}
+                  </span>
+                  <span v-else-if="ev.sc_kind === 'QEARN_LOCK'"
+                        class="text-xs px-1 rounded bg-sky-500/20 text-sky-300 leading-tight whitespace-nowrap"
+                        :title="qearnNote(ev)">
+                    {{ t('qearn.badge_lock') }}
+                  </span>
+                  <span v-if="ev.reconstructed"
+                        class="text-xs px-1 rounded bg-amber-500/20 text-amber-300 leading-tight whitespace-nowrap"
+                        :title="t('qearn.reconstructed_hint')">
+                    {{ t('qearn.badge_reconstructed') }}
                   </span>
                 </div>
               </td>
@@ -448,7 +535,9 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
               </td>
               <!-- Note -->
               <td v-if="!props.readonly" class="px-3 py-2.5 min-w-[180px]">
-                <template v-if="editingNoteId === noteKey(ev)">
+                <span v-if="qearnNote(ev)" class="text-xs text-gray-500 italic break-words block" :title="qearnNote(ev)">{{ qearnNote(ev) }}</span>
+                <template v-if="ev._part === 'INTEREST'"></template>
+                <template v-else-if="editingNoteId === noteKey(ev)">
                   <input v-model="noteInput"
                          class="input text-xs py-0.5 px-2 w-full"
                          :placeholder="t('event.note_placeholder')"
@@ -457,12 +546,13 @@ const processedEvents = computed(() => filteredEvents.value.map(ev => {
                 </template>
                 <template v-else>
                   <span v-if="ev.note" class="text-xs text-gray-300 break-words block" :title="ev.note">{{ ev.note }}</span>
-                  <span v-else class="text-xs text-gray-600">—</span>
+                  <span v-else-if="!qearnNote(ev)" class="text-xs text-gray-600">—</span>
                 </template>
               </td>
               <!-- Note actions -->
               <td v-if="!props.readonly" class="px-3 py-2.5 whitespace-nowrap">
-                <template v-if="editingNoteId === noteKey(ev)">
+                <template v-if="ev._part === 'INTEREST'"></template>
+                <template v-else-if="editingNoteId === noteKey(ev)">
                   <div class="flex items-center gap-1.5">
                     <button :disabled="noteSaving" @click="saveNote(ev)"
                             class="icon-btn text-green-400 hover:text-green-300" :title="t('event.note_save')">

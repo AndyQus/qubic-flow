@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 
 class EventOut(BaseModel):
@@ -20,6 +20,10 @@ class EventOut(BaseModel):
     source_name: Optional[str] = None
     destination_name: Optional[str] = None
     note: Optional[str] = None
+    sc_kind: Optional[str] = None
+    reconstructed: Optional[int] = 0
+    # Qearn payout split: [{part, amount_qubic, estimated, meta}] — empty for all other rows
+    qearn_parts: list[dict[str, Any]] = []
 
     class Config:
         from_attributes = True

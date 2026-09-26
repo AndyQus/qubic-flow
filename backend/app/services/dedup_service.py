@@ -28,6 +28,7 @@ from sqlalchemy import func, delete
 from sqlalchemy.orm import Session
 
 from ..models.event import Event
+from ..models.qearn import EventSplit
 from ..models.wallet import Wallet
 from ..utils.time import now_utc_iso
 
@@ -73,10 +74,11 @@ def _survivor_rank(ev: Event) -> tuple:
       3. rows with an epoch resolved
       4. oldest created_at, then id, for a stable deterministic result
     """
+    real = 1 if ev.reconstructed else 0  # a computed Qearn payout never beats on-chain data
     has_txid = 0 if is_real_txid(ev.id) else 1
     touched = 0 if _has_user_data(ev) else 1
     has_epoch = 0 if ev.epoch is not None else 1
-    return (has_txid, touched, has_epoch, ev.created_at or "", ev.id or "")
+    return (real, has_txid, touched, has_epoch, ev.created_at or "", ev.id or "")
 
 
 def _split_by_txid(rows: list) -> list:
@@ -231,6 +233,15 @@ def dedup_events(db: Session, wallet_id: str | None = None, dry_run: bool = Fals
 
         if not dry_run:
             for loser in losers:
+                # Qearn splits hang on the event id: drop the loser's and let
+                # the Qearn auto-processing rebuild them for the survivor.
+                if db.execute(
+                    delete(EventSplit).where(
+                        EventSplit.event_id == loser.id,
+                        EventSplit.wallet_id == loser.wallet_id,
+                    )
+                ).rowcount:
+                    survivor.sc_kind = None
                 db.execute(
                     delete(Event).where(
                         Event.id == loser.id,

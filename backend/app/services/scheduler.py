@@ -226,3 +226,16 @@ scheduler.add_job(
     max_instances=1,
     coalesce=True,
 )
+
+
+# Qearn: after every epoch switch re-evaluate wallets with Qearn positions so
+# ended rounds move from LOCKED to PAID (or MISSING for the manual check).
+from .qearn_service import refresh_positions_job  # noqa: E402
+
+scheduler.add_job(
+    refresh_positions_job,
+    CronTrigger(day_of_week="wed", hour=14, minute=0, timezone="UTC"),
+    id="qearn_refresh_positions",
+    max_instances=1,
+    coalesce=True,
+)

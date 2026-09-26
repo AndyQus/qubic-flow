@@ -58,6 +58,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
   - Länderspezifische Regeln (DE, AT, CH, DK u. a.) — inkl. Jahresfrist-Steuerfreiheit (DE) und dänischem Modell (FIFO verpflichtend, Gewinne und abzugsfähige Verluste getrennt, keine Verrechnung)
   - Einkommens-Events (Dividenden, Rewards) werden bei Zufluss versteuert und mit Marktwert-Kostenbasis eingebucht — keine Doppelbesteuerung beim späteren Verkauf
   - Ehrliche Berichtswährung: Länder ohne erfasste Lokalwährungskurse (CHF, GBP, DKK, …) werden in EUR berechnet **und ausgewiesen**
+  - **Qearn korrekt versteuert** — ein Qearn-Lock ist kein Verkauf (Lots behalten Anschaffungsdatum und -kurs, gesperrte QU zählen zum Jahresendbestand); die Rückzahlung des Einsatzes ist kein Einkommen, nur der Zins
   - Eröffnungspositionen für den Bestandsübertrag
   - Kurspreis-Nachschlag je Datum direkt in der Oberfläche
   - CSV- und PDF-Export des Steuerberichts
@@ -67,6 +68,8 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
   - Blockpit-Import-Format (PRIVAT-Wallets)
   - Steuerberater-Format (GESCHÄFTLICH-Wallets, semikolongetrennt, UTF-8 BOM)
   - Aufgelöste Adress-Namen im Kommentarfeld
+- **Qearn-Aufteilung Einsatz / Zins** — Qearn zahlt Einsatz + Zins in einer Transaktion zurück; QubicFlow teilt jede Auszahlung in zwei Zeilen („Einsatz“ / „Zins“) mit automatischer Bemerkung (Laufzeit, Epochen, aus dem Betrag berechneter Zinssatz). Die Aufteilung ist auf den QU genau: Der Zinssatz jeder Runde wird direkt aus dem Qearn-Contract gelesen (`getLockInfoPerEpoch`) und gegen die Auszahlung geprüft. Neue Auszahlungen werden nach jedem Sync automatisch aufgeteilt; die On-Chain-Zeile selbst bleibt unverändert
+- **Qearn prüfen** (Einstellungen → Qearn) — lädt die komplette Lock-/Unlock-Historie jeder Wallet, holt fehlende Locks und Auszahlungen aus dem Archiv nach und erkennt fällige Auszahlungen, die in keinem öffentlichen Archiv stehen (z. B. die Epochenende-Batches der Epochen 208–210 und 212). Diese werden berechnet und in einer Vorschau angezeigt; gebucht werden sie erst nach ausdrücklicher Bestätigung als *rekonstruiert* und automatisch ersetzt, sobald die echte Zahlung auftaucht. Geschätzte Zinsen vorzeitiger Unlocks vor ca. Epoche 207 lassen sich von Hand korrigieren. Positionsübersicht mit Status (gesperrt, ausgezahlt, vorzeitig entsperrt, fehlt, rekonstruiert)
 - **Portfolio-Wertverlauf** — täglicher QU-Bestand × Tageskurs als Liniendiagramm auf der Statistik-Seite (Bestand auf zweiter Achse)
 - **Webhook-Benachrichtigungen** — neue eingehende Zahlungen können einen Webhook auslösen (generisches JSON, Discord oder ntfy) mit Mindestbetrags-Filter, TX-/SC-Event-Typfilter (Checkboxen entscheiden, welcher Typ eine Nachricht auslöst) und Test-Schaltfläche (Einstellungen → Daten); jede Nachricht enthält den vollständigen Datensatz mit dem Event-Typ in der ersten Zeile
 - **Token- & Asset-Bestände** — Live-Token-Bestände (z. B. QX-Shares) je Wallet auf der Wallet-Detailseite, aufgelöst über das Qubic-Assets-Register; je Asset mit aktuellem Kurs (letzter QX-Trade in QU, von der offiziellen QX-API) und dem daraus berechneten Wert in QU und EUR/USD
@@ -76,7 +79,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 - **Dashboard-Suche & Paginierung** — Volltextsuche mit Entprellung über alle Events; einstellbare Seitengröße (10–1000), wird in localStorage gespeichert
 - **Ledger-Import** — Wallet-Historie aus [myledger.qubic.tools](https://myledger.qubic.tools/) als JSON direkt in Einstellungen → Daten importieren
 - **Deutsch / Englisch** Benutzeroberfläche, Dunkel- / Hellmodus
-- **Einstellungen in Reitern** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Sicherung/Wiederherstellung, Resync, Ledger-Import); aktiver Reiter wird per URL-Abfrageparameter (`?tab=…`) gespiegelt
+- **Einstellungen in Reitern** — `Darstellung` (Währung, Schrift, Theme, Sprache, Animationen), `Steuern` (Land/Methode, Persönliche/Geschäftsdaten), `Daten` (Export, Sicherung/Wiederherstellung, Resync, Ledger-Import), `Bestandsverlauf`, `Qearn` (Positionen, Qearn prüfen); aktiver Reiter wird per URL-Abfrageparameter (`?tab=…`) gespiegelt
 - **Vollständig containerisiert** — ein `docker-compose up --build` genügt
 - **Footer** — Haftungsausschluss-Banner und fixer Footer mit Copyright, Links (Qubic.org, Nutzungsbedingungen, Datenschutz) und Versionsnummer
 

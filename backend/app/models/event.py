@@ -34,6 +34,8 @@ class Event(Base):
     trade_group = Column(Text)
     note = Column(Text)
     verified = Column(Integer, default=0)
+    sc_kind = Column(Text)  # QEARN_LOCK | QEARN_PAYOUT | QEARN_REFUND
+    reconstructed = Column(Integer, default=0)
     created_at = Column(Text)
 
     wallet = relationship(

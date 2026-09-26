@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 
 from ..models.event import Event
 from ..models.opening_position import OpeningPosition
+from ..models.qearn import EventSplit
+
+QEARN_ADDRESS = "JAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVKHO"
 
 
 TAX_RULES = {
@@ -167,6 +170,41 @@ def _match_lots(
     return sub_disposals, total_cost
 
 
+def _take_lots(q: deque, amount: int) -> list[dict]:
+    """Remove `amount` QU from the front of a lot queue, keeping dates and prices."""
+    taken, remaining = [], amount
+    while remaining > 0 and q:
+        lot = q[0]
+        take = min(remaining, lot["amount"])
+        taken.append({**lot, "amount": take})
+        lot["amount"] -= take
+        remaining -= take
+        if lot["amount"] <= 0:
+            q.popleft()
+    return taken
+
+
+def _restore_lots(q: deque, lots: list[dict]) -> None:
+    """Put lots back in acquisition order so FIFO/LIFO keep working on the original dates."""
+    merged = sorted(list(q) + lots, key=lambda l: l["date"])
+    q.clear()
+    q.extend(merged)
+
+
+def _load_splits(db: Session, wallet_ids: list[str]) -> dict:
+    out: dict = {}
+    for s in db.query(EventSplit).filter(EventSplit.wallet_id.in_(wallet_ids)).all():
+        entry = out.setdefault((s.event_id, s.wallet_id), {"meta": {}})
+        entry[s.part] = int(s.amount_qubic or 0)
+        if not entry["meta"] and s.meta_json:
+            import json
+            try:
+                entry["meta"] = json.loads(s.meta_json)
+            except ValueError:
+                pass
+    return out
+
+
 def calculate_tax_report(
     db: Session,
     wallet_ids: list[str],
@@ -226,9 +264,14 @@ def calculate_tax_report(
     )
 
     wallet_set = set(wallet_ids)
+    splits = _load_splits(db, wallet_ids)
 
     # 3) Build per-wallet FIFO lot queues
     lots: dict[str, deque] = defaultdict(deque)
+    # Qearn: QU locked in the contract stay the user's coins (no disposal).
+    # Their lots wait here per (wallet, lock epoch) until the principal returns.
+    locked: dict[tuple, deque] = defaultdict(deque)
+    qearn_unsplit = 0
     for op_ in opening:
         lots[op_.wallet_id].append({
             "date": _parse_date(op_.date),
@@ -257,6 +300,60 @@ def calculate_tax_report(
 
         dest_in = evt.destination_addr in wallet_set
         src_in = evt.source_address in wallet_set
+
+        # Qearn lock: coins move into the contract but remain the user's —
+        # not a disposal, the lots (dates + cost basis) are parked.
+        if src_in and evt.destination_addr == QEARN_ADDRESS:
+            locked[(evt.source_address, evt.epoch)].extend(_take_lots(lots[evt.source_address], amount))
+            continue
+
+        # Qearn payout: principal returns with its original lots, only the
+        # interest is income. Unsplit payouts (check not run yet) keep the
+        # previous behaviour and are counted for a warning in the report.
+        if dest_in and evt.source_address == QEARN_ADDRESS:
+            target_wallet = evt.destination_addr
+            split = splits.get((evt.id, evt.wallet_id))
+            if evt.sc_kind == "QEARN_REFUND":
+                principal, interest, meta = amount, 0, {}
+            elif split and "PRINCIPAL" in split:
+                principal = min(split["PRINCIPAL"], amount)
+                interest = amount - principal
+                meta = split["meta"]
+            else:
+                principal, interest, meta = 0, amount, {}
+                qearn_unsplit += 1
+            if principal > 0:
+                key = (target_wallet, meta.get("lock_epoch"))
+                pool = locked[key] if locked.get(key) else next(
+                    (q for (w, _e), q in locked.items() if w == target_wallet and q), deque())
+                back = _take_lots(pool, principal)
+                shortfall = principal - sum(l["amount"] for l in back)
+                if shortfall > 0:
+                    # lock happened before the tracked history: unknown cost basis
+                    back.append({"date": _parse_date(meta.get("lock_ts") or evt.timestamp),
+                                 "amount": shortfall, "price_eur": 0.0, "price_usd": 0.0})
+                _restore_lots(lots[target_wallet], back)
+            if interest > 0:
+                lots[target_wallet].append({
+                    "date": ts, "amount": interest, "price_eur": price_eur, "price_usd": price_usd,
+                })
+                if ts.year == year:
+                    value = price_eur if currency == "EUR" else price_usd
+                    income.append({
+                        "date": evt.timestamp,
+                        "wallet_id": target_wallet,
+                        "amount_qubic": interest,
+                        "price_eur": price_eur,
+                        "price_usd": price_usd,
+                        "value": interest * value,
+                        "currency": currency,
+                        "source_type": evt.source_type,
+                        "tick_number": evt.tick_number,
+                        "kind": "qearn_interest" if principal > 0 else None,
+                        "lock_epoch": meta.get("lock_epoch"),
+                        "principal_qubic": principal or None,
+                    })
+            continue
 
         # acquisition (incoming)
         if dest_in and not src_in:
@@ -346,7 +443,10 @@ def calculate_tax_report(
     income_total = sum(i["value"] for i in income)
     threshold_exceeded = bool(threshold is not None and taxable_gains > threshold)
 
-    # year-end holdings: collapse remaining lots per wallet
+    # year-end holdings: collapse remaining lots per wallet (Qearn-locked QU
+    # are still owned and count towards the holdings of their wallet)
+    for (wid, _ep), q in locked.items():
+        lots[wid].extend(q)
     year_end_holdings = []
     for wid, q in lots.items():
         # only count lots acquired <= year end
@@ -382,5 +482,6 @@ def calculate_tax_report(
         "disposals": disposals,
         "income": income,
         "year_end_holdings": year_end_holdings,
+        "qearn_unsplit": qearn_unsplit,
         "data_warning": "Data tracked from April 1, 2026. Calculations may be incomplete for earlier periods.",
     }

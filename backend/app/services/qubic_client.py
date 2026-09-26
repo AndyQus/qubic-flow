@@ -118,6 +118,48 @@ class RPCClient:
         }
         return await self._request("GET", f"/v2/identities/{wallet_id}/transfers", params=params)
 
+    async def get_status(self) -> dict:
+        """Archiver status incl. the processed tick intervals of every epoch."""
+        return await self._request("GET", "/v1/status")
+
+    async def query_smart_contract(self, contract_index: int, input_type: int, data: bytes) -> bytes:
+        """Call a read-only smart contract function; returns the raw output struct."""
+        import base64
+        payload = {
+            "contractIndex": contract_index,
+            "inputType": input_type,
+            "inputSize": len(data),
+            "requestData": base64.b64encode(data).decode(),
+        }
+        resp = await self._request("POST", "/v1/querySmartContract", json=payload)
+        return base64.b64decode(resp.get("responseData") or "")
+
+    async def get_transactions_for_identity(self, identity: str, filters: dict, offset: int = 0, size: int = 100) -> dict:
+        """Server-side filtered transaction history of one identity (full history)."""
+        payload = {
+            "identity": identity,
+            "filters": filters,
+            "pagination": {"offset": offset, "size": size},
+        }
+        return await self._request("POST", "/query/v1/getTransactionsForIdentity", json=payload)
+
+    async def get_event_logs_filtered(self, filters: dict, from_tick: int, to_tick: int, offset: int = 0, size: int = 1000) -> dict:
+        """Event logs with exact server-side filters (e.g. source + destination)."""
+        payload = {
+            "filters": filters,
+            "ranges": {"tickNumber": {"gte": str(from_tick), "lte": str(to_tick)}},
+            "pagination": {"offset": offset, "size": size},
+        }
+        return await self._request("POST", "/query/v1/getEventLogs", json=payload)
+
+    async def get_tick_timestamp_ms(self, tick: int) -> int | None:
+        try:
+            data = await self._request("GET", f"/v1/ticks/{tick}/tick-data")
+            raw = (data.get("tickData") or {}).get("timestamp")
+            return int(raw) if raw and int(raw) > 0 else None
+        except Exception:
+            return None
+
     # Assets issued directly by the QX smart contract (e.g. QX, QEARN, QVAULT,
     # QSWAP) represent shares in that contract/project. Assets issued by any
     # other identity (CFB, QFT, community project tokens, ...) are tokens.

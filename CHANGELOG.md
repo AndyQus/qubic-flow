@@ -4,6 +4,24 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.17] — 2026-09-26
+
+### Added
+- **Qearn principal / interest split** — Qearn pays principal + interest back in one single transfer. Every payout is now split into a *Principal* and an *Interest* row with an automatic note (lock epoch, payout epoch, term, interest rate computed from the amount, lock/payout dates). The split is exact: the yield of each round comes from the Qearn contract (`getLockInfoPerEpoch`, function 1) and `principal + floor(principal × yield / 10⁷)` is verified against the payout (checked against real payouts, e.g. lock epoch 161 → 58 000 190 000 QU). Early unlocks are matched to their unlock transaction in the same tick; the principal comes from the transaction input. The on-chain row stays untouched (new table `event_splits`), so balance, dedup and explorer matching are unaffected
+- **Qearn check** (Settings → Qearn) — loads the full lock/unlock history per wallet (`/query/v1/getTransactionsForIdentity`, server-side filtered), imports missing lock transactions and archive payouts, and finds due payouts that are in no public archive. The archive misses the end-of-epoch Qearn batches of epochs 208–210 and 212 and has no event data before ~epoch 207; such payouts are computed and shown in a dry-run preview and only booked as *reconstructed* after explicit confirmation. A later real payment replaces the reconstruction automatically. Runs as a background job with progress (no proxy timeouts); positions overview with status per lock round
+- **Estimated interest can be corrected** — early unlocks before the archive horizon have an estimated interest (the round's rate at unlock time is not queryable); it is marked *estimated* and can be overwritten, e.g. with the explorer value
+- **Automatic processing** — new Qearn locks/payouts are classified and split right after each sync; a weekly job after the epoch switch re-evaluates open rounds
+- Migration `016`: `events.sc_kind`, `events.reconstructed`, tables `event_splits`, `qearn_positions`, `qearn_epochs` (yield cache)
+
+### Fixed
+- **Tax report: a Qearn lock was treated as a sale** — the lock consumed FIFO lots and realised a gain. It is now no disposal: lots keep their acquisition date and cost basis, and locked QU count towards the year-end holdings
+- **Tax report: the full Qearn payout counted as income** — principal included. Only the interest is income now; the principal returns with its original lots. A warning appears if payouts are not split yet
+- **Exports** — CoinTracking / Koinly / Blockpit list only the Qearn interest (as staking/reward) and skip lock and principal; the tax advisor CSV shows lock, principal and interest as separate rows
+- **Backup/restore** now includes the event note, Qearn fields and splits
+- **Dedup** never keeps a reconstructed payout over real on-chain data
+
+---
+
 ## [0.2.16] — 2026-08-24
 
 ### Fixed

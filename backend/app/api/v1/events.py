@@ -102,13 +102,34 @@ def list_events(
         .limit(limit)
         .all()
     )
+    parts = _qearn_parts(db, events)
     result = []
     for e in events:
         out = EventOut.model_validate(e)
         out.source_name = get_label(db, e.source_address)
         out.destination_name = get_label(db, e.destination_addr)
+        out.qearn_parts = parts.get((e.id, e.wallet_id), [])
         result.append(out)
     return result
+
+
+def _qearn_parts(db: Session, events: list) -> dict:
+    """Principal/interest parts of Qearn payouts, keyed by (event id, wallet id)."""
+    import json
+    from ...models.qearn import EventSplit
+    ids = [e.id for e in events if e.sc_kind == "QEARN_PAYOUT"]
+    if not ids:
+        return {}
+    order = {"PRINCIPAL": 0, "INTEREST": 1}
+    out: dict = {}
+    for s in db.query(EventSplit).filter(EventSplit.event_id.in_(ids)).all():
+        out.setdefault((s.event_id, s.wallet_id), []).append({
+            "part": s.part, "amount_qubic": s.amount_qubic, "estimated": bool(s.estimated),
+            "meta": json.loads(s.meta_json or "{}"),
+        })
+    for v in out.values():
+        v.sort(key=lambda p: order.get(p["part"], 9))
+    return out
 
 
 @router.patch("/events/{event_id}/note", status_code=204)

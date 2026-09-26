@@ -59,6 +59,7 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
   - Country-specific rules (DE, AT, CH, DK, and more) — including the 1-year holding-period tax exemption (DE) and the Danish model (mandatory FIFO, gains and deductible losses reported separately without netting)
   - Income events (dividends, rewards) are taxed at receipt and enter the lot queue at market value — no double taxation on later disposal
   - Honest report currency: countries without tracked local rates (CHF, GBP, DKK, …) are calculated **and labelled** in EUR
+  - **Qearn done right** — a Qearn lock is not a sale (lots keep their acquisition date and cost basis, locked QU count towards year-end holdings); the returned principal is not income, only the interest is
   - Opening positions for pre-tracked balances
   - Price lookup per date directly in the UI
   - CSV and PDF export of the tax report
@@ -68,6 +69,8 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
   - Blockpit generic import format (PRIVATE wallets)
   - Tax advisor format (BUSINESS wallets, semicolon-separated, UTF-8 BOM)
   - Resolved address names in the comment field
+- **Qearn principal / interest split** — Qearn pays principal + interest back in one transaction; QubicFlow splits every payout into two rows ("Principal" / "Interest") with an automatic note (term, epochs, interest rate computed from the amount). The split is exact to the QU: the yield of each round is read directly from the Qearn contract (`getLockInfoPerEpoch`) and verified against the payout. New payouts are split automatically after every sync; the on-chain row itself stays untouched
+- **Qearn check** (Settings → Qearn) — loads the complete lock/unlock history of every wallet, imports missing locks and payouts from the archive and detects due payouts that exist in no public archive (e.g. the end-of-epoch batches of epochs 208–210 and 212). Those are computed and shown in a preview; they are only booked as *reconstructed* after explicit confirmation and replaced automatically once the real payment appears. Estimated interest of early unlocks before ~epoch 207 can be corrected by hand. Position overview with status (locked, paid out, unlocked early, missing, reconstructed)
 - **Portfolio value chart** — daily QU balance × daily rate as a line chart on the statistics page (with balance on a second axis)
 - **Webhook notifications** — new incoming transfers can trigger a webhook (generic JSON, Discord or ntfy format) with a minimum-amount filter, a TX/SC-event type filter (checkboxes decide which kind triggers a push) and a test button (Settings → Data); every message carries the full record with the event type on the first line
 - **Token & asset holdings** — live token balances (e.g. QX shares) per wallet on the wallet detail page, resolved via the Qubic assets registry; each asset shows its current price (last QX trade in QU, from the official QX API) and the resulting value in QU and EUR/USD
@@ -77,7 +80,7 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 - **Dashboard search & pagination** — full-text search with debounce across all events; configurable page size (10–1000) persisted in localStorage
 - **Ledger import** — import wallet history from [myledger.qubic.tools](https://myledger.qubic.tools/) JSON export directly in Settings → Data
 - **German / English** UI, dark / light mode
-- **Tabbed settings** — `Appearance` (currency, font, theme, language, animations), `Tax` (country/method, personal/business data), `Data` (export, backup/restore, resync, ledger import); active tab is reflected in the URL query parameter (`?tab=…`)
+- **Tabbed settings** — `Appearance` (currency, font, theme, language, animations), `Tax` (country/method, personal/business data), `Data` (export, backup/restore, resync, ledger import), `Balance History`, `Qearn` (positions, Qearn check); active tab is reflected in the URL query parameter (`?tab=…`)
 - **Fully containerized** — a single `docker compose up --build` is all you need
 - **Footer** — disclaimer banner and fixed footer with copyright, links (Qubic.org, terms, privacy) and version number
 

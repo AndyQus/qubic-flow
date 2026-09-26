@@ -4,8 +4,10 @@ import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
 from ..models.event import Event
+from ..models.qearn import EventSplit
 from ..models.wallet import Wallet
 from .label_service import get_label
+from .qearn_service import QEARN_ADDRESS
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,58 @@ def _classify(event: Event, owned: set) -> str:
     return "UNKNOWN"
 
 
+# Qearn row roles: a lock is no disposal and the principal of a payout no
+# income (both are the user's own coins moving in/out of the contract) — only
+# the interest is a reward.
+QEARN_LOCK = "QEARN_LOCK"
+QEARN_PRINCIPAL = "QEARN_PRINCIPAL"
+QEARN_INTEREST = "QEARN_INTEREST"
+
+
+def _expand_qearn(db: Session, events: list):
+    """Yield (event, amount, qearn_role, meta) — Qearn payouts become principal + interest rows."""
+    import json
+    ids = [e.id for e in events if e.sc_kind == "QEARN_PAYOUT"]
+    splits: dict = {}
+    if ids:
+        for sp in db.query(EventSplit).filter(EventSplit.event_id.in_(ids)).all():
+            entry = splits.setdefault((sp.event_id, sp.wallet_id), {})
+            entry[sp.part] = int(sp.amount_qubic or 0)
+            entry.setdefault("meta", json.loads(sp.meta_json or "{}"))
+    for e in events:
+        amount = e.amount_qubic or 0
+        if e.destination_addr == QEARN_ADDRESS and e.source_address == e.wallet_id:
+            yield e, amount, QEARN_LOCK, {}
+        elif e.source_address == QEARN_ADDRESS and e.destination_addr == e.wallet_id:
+            split = splits.get((e.id, e.wallet_id))
+            if e.sc_kind == "QEARN_REFUND":
+                yield e, amount, QEARN_PRINCIPAL, {}
+            elif split and "PRINCIPAL" in split:
+                yield e, split["PRINCIPAL"], QEARN_PRINCIPAL, split["meta"]
+                if split.get("INTEREST", 0) > 0:
+                    yield e, split["INTEREST"], QEARN_INTEREST, split["meta"]
+            else:
+                yield e, amount, None, {}
+        else:
+            yield e, amount, None, {}
+
+
+def _qearn_note(role: str | None, meta: dict, lang: str = "en") -> str:
+    """Comment text; German only for the (German-language) tax advisor CSV."""
+    lock_ep, pay_ep = meta.get("lock_epoch"), meta.get("payout_epoch")
+    de = lang == "de"
+    if role == QEARN_LOCK:
+        return "Qearn Lock (kein Verkauf)" if de else "Qearn lock (not a sale)"
+    if role == QEARN_PRINCIPAL:
+        if lock_ep:
+            return f"Qearn Rückzahlung Einsatz (Lock Ep. {lock_ep})" if de else f"Qearn principal returned (lock ep. {lock_ep})"
+        return "Qearn Rückerstattung Einsatz" if de else "Qearn principal refunded"
+    if role == QEARN_INTEREST:
+        est = (" – geschätzt" if de else " – estimated") if meta.get("estimated") else ""
+        return f"Qearn {'Zins' if de else 'interest'} Ep. {lock_ep}–{pay_ep}{est}"
+    return ""
+
+
 def _fmt_rate(rate) -> str:
     """Format rate with up to 10 decimal places, no scientific notation.
     e.g. 6.482e-7 -> '0.0000006482'
@@ -80,9 +134,10 @@ def export_cointracking(db: Session, year: int | None = None) -> str:
     writer = csv.writer(buf, delimiter=",", quoting=csv.QUOTE_ALL)
     writer.writerow(COINTRACKING_HEADER)
 
-    for e in events:
+    for e, amount, role, meta in _expand_qearn(db, events):
         kind = _classify(e, owned)
-        amount = e.amount_qubic or 0
+        if role in (QEARN_LOCK, QEARN_PRINCIPAL):
+            continue  # own coins in/out of the contract — neither disposal nor income
         value_eur = _eur_value(amount, e.qubic_eur_rate)
         exchange = labels.get(e.wallet_id, e.wallet_id or "")
 
@@ -97,7 +152,10 @@ def export_cointracking(db: Session, year: int | None = None) -> str:
         else:
             comment = ""
 
-        if kind == "QUBIC_IN":
+        if role == QEARN_INTEREST:
+            comment = " | ".join(filter(None, [_qearn_note(role, meta), comment]))
+            row = ["Staking", amount, "QUBIC", "", "", "", "", exchange, "", comment, _fmt_date(e.timestamp), e.id, value_eur, ""]
+        elif kind == "QUBIC_IN":
             row = ["Deposit", amount, "QUBIC", "", "", "", "", exchange, "", comment, _fmt_date(e.timestamp), e.id, value_eur, ""]
         elif kind == "QUBIC_OUT":
             row = ["Withdrawal", "", "", amount, "QUBIC", "", "", exchange, "", comment, _fmt_date(e.timestamp), e.id, "", value_eur]
@@ -162,15 +220,14 @@ def export_koinly(db: Session, year: int | None = None) -> str:
     writer = csv.writer(buf, delimiter=",", quoting=csv.QUOTE_ALL)
     writer.writerow(KOINLY_HEADER)
 
-    for e in events:
+    for e, amount, role, meta in _expand_qearn(db, events):
         kind = _classify(e, owned)
-        if kind not in ("QUBIC_IN", "QUBIC_OUT"):
+        if kind not in ("QUBIC_IN", "QUBIC_OUT") or role in (QEARN_LOCK, QEARN_PRINCIPAL):
             continue
-        amount = e.amount_qubic or 0
         date = _fmt_date_utc(e.timestamp, "%Y-%m-%d %H:%M UTC")
         net_worth = _eur_value(amount, e.qubic_eur_rate)
         label = "reward" if (kind == "QUBIC_IN" and e.source_type == "EVENT") else ""
-        desc = _addr_comment(db, e)
+        desc = " | ".join(filter(None, [_qearn_note(role, meta), _addr_comment(db, e)]))
 
         if kind == "QUBIC_IN":
             row = [date, "", "", amount, "QUBIC", "", "", net_worth, "EUR", label, desc, e.id]
@@ -189,13 +246,12 @@ def export_blockpit(db: Session, year: int | None = None) -> str:
     writer = csv.writer(buf, delimiter=",", quoting=csv.QUOTE_ALL)
     writer.writerow(BLOCKPIT_HEADER)
 
-    for e in events:
+    for e, amount, role, meta in _expand_qearn(db, events):
         kind = _classify(e, owned)
-        if kind not in ("QUBIC_IN", "QUBIC_OUT"):
+        if kind not in ("QUBIC_IN", "QUBIC_OUT") or role in (QEARN_LOCK, QEARN_PRINCIPAL):
             continue
-        amount = e.amount_qubic or 0
         date = _fmt_date_utc(e.timestamp, "%Y-%m-%d %H:%M:%S")
-        desc = _addr_comment(db, e)
+        desc = " | ".join(filter(None, [_qearn_note(role, meta), _addr_comment(db, e)]))
 
         if kind == "QUBIC_IN":
             label = "Staking" if e.source_type == "EVENT" else "Deposit"
@@ -223,9 +279,14 @@ def export_steuerberater(db: Session, year: int | None = None) -> str:
     writer = csv.writer(buf, delimiter=";", quoting=csv.QUOTE_ALL)
     writer.writerow(STEUERBERATER_HEADER)
 
-    for e in events:
+    for e, amount, role, meta in _expand_qearn(db, events):
         kind = _classify(e, owned)
-        amount = e.amount_qubic or 0
+        if role == QEARN_LOCK:
+            kind = "QEARN_LOCK"
+        elif role == QEARN_PRINCIPAL:
+            kind = "QEARN_EINSATZ"
+        elif role == QEARN_INTEREST:
+            kind = "QEARN_ZINS"
         rate = _fmt_rate(e.qubic_eur_rate)
         value = _eur_value(amount, e.qubic_eur_rate)
         label = labels.get(e.wallet_id, "")
@@ -240,7 +301,7 @@ def export_steuerberater(db: Session, year: int | None = None) -> str:
             addr_note = f"\u2192 {dst_name}"
         else:
             addr_note = ""
-        bemerkung = " | ".join(filter(None, [e.comment or "", addr_note])) if addr_note else e.comment or ""
+        bemerkung = " | ".join(filter(None, [_qearn_note(role, meta, "de"), e.comment or "", addr_note]))
 
         writer.writerow([
             _fmt_date(e.timestamp), kind, amount, rate, value,

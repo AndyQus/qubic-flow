@@ -327,6 +327,15 @@ async def sync_all_wallets():
             except Exception as e:
                 db.rollback()
                 logger.error(f"Dedup failed for wallet {wallet.id}: {e}", exc_info=True)
+
+            # New Qearn locks/payouts → classify and split principal/interest.
+            try:
+                from .qearn_service import wallet_needs_processing, auto_process_wallet
+                if wallet_needs_processing(db, wallet.id):
+                    await auto_process_wallet(db, wallet.id)
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Qearn processing failed for wallet {wallet.id}: {e}", exc_info=True)
     finally:
         db.close()
 

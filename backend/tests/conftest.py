@@ -56,6 +56,7 @@ def test_engine():
     import app.models.donor_cache     # noqa: F401
     import app.models.address_label   # noqa: F401
     import app.models.opening_position  # noqa: F401
+    import app.models.qearn           # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     yield engine

@@ -116,6 +116,17 @@ export const api = {
     rebuildExports: () => req('/balance-history/export/rebuild', { method: 'POST' }),
     resetSeries: (kind) => req(`/balance-history/series/${kind}`, { method: 'DELETE' }),
   },
+  qearn: {
+    positions: () => req('/qearn/positions'),
+    check: (walletIds = null) => req('/qearn/check', { method: 'POST', body: JSON.stringify({ wallet_ids: walletIds }) }),
+    apply: (reconstruct = [], walletIds = null) => req('/qearn/apply', {
+      method: 'POST', body: JSON.stringify({ wallet_ids: walletIds, reconstruct }),
+    }),
+    job: () => req('/qearn/job'),
+    setInterest: (eventId, walletId, interest) => req(`/qearn/splits/${encodeURIComponent(eventId)}/interest`, {
+      method: 'PUT', body: JSON.stringify({ wallet_id: walletId, interest_qubic: interest }),
+    }),
+  },
   tax: {
     getSettings: () => req('/tax/settings'),
     saveSettings: (data) => req('/tax/settings', { method: 'PUT', body: JSON.stringify(data) }),

@@ -19,6 +19,12 @@ const selectedWallets = ref([])
 const report = ref(null)
 const loadingReport = ref(false)
 
+// Qearn interest rows carry the lock epoch; everything else keeps the old label
+function incomeType(i) {
+  if (i.kind === 'qearn_interest') return t('qearn.tax_interest', { epoch: i.lock_epoch ?? '—' })
+  return i.source_type === 'EVENT' ? t('tax.income_reward') : i.source_type
+}
+
 const modeWallets = computed(() =>
   store.wallets.filter(w => w.wallet_type === mode.value.toUpperCase())
 )
@@ -188,7 +194,7 @@ function exportCSV() {
         i.date ? new Date(i.date).toISOString().slice(0, 10) : '—',
         i.amount_qubic,
         fmtNum(i.value),
-        i.source_type,
+        incomeType(i),
       ].join(sep))
     }
     lines.push('')
@@ -305,7 +311,7 @@ function exportPDF() {
         i.date ? new Date(i.date).toISOString().slice(0, 10) : '—',
         fmtQu(i.amount_qubic),
         `${fmtNum(i.value)} ${currency}`,
-        i.source_type === 'EVENT' ? t('tax.income_reward') : i.source_type,
+        incomeType(i),
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [0, 178, 181], textColor: 255 },
@@ -503,6 +509,13 @@ function exportPDF() {
         </div>
       </div>
 
+      <!-- Qearn payouts that were not split yet are still counted fully as income -->
+      <div v-if="report.qearn_unsplit > 0"
+           class="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-400 leading-relaxed">
+        ⚠ {{ t('qearn.tax_unsplit', { count: report.qearn_unsplit }) }}
+        <router-link to="/settings?tab=qearn" class="underline hover:text-amber-300 ml-1">{{ t('qearn.open_check') }}</router-link>
+      </div>
+
       <!-- No data -->
       <div v-if="!report.disposals?.length && !report.income?.length" class="card text-sm text-gray-400 text-center py-6">
         {{ t('tax.no_data') }}
@@ -568,7 +581,7 @@ function exportPDF() {
                 <td class="py-2 pr-3 text-gray-300 whitespace-nowrap">{{ fmtDate(item.date) }}</td>
                 <td class="py-2 pr-3 text-right font-mono whitespace-nowrap cursor-copy select-none" @dblclick.prevent="copyValue(item.amount_qubic)">{{ fmtQu(item.amount_qubic) }}</td>
                 <td class="py-2 pr-3 text-right font-mono whitespace-nowrap text-qubic-teal cursor-copy select-none" @dblclick.prevent="copyValue(item.value)">{{ fmtNum(item.value) }} {{ ccy }}</td>
-                <td class="py-2 text-gray-400">{{ item.source_type === 'EVENT' ? t('tax.income_reward') : item.source_type }}</td>
+                <td class="py-2 text-gray-400">{{ incomeType(item) }}</td>
               </tr>
             </tbody>
           </table>
