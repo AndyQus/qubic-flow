@@ -46,7 +46,7 @@ Supports unlimited wallets (PRIVATE / BUSINESS), automatic EUR/USD rates, live e
 - **Address name resolution** — automatic resolution of Qubic addresses to tokens/labels (assets page + CSV)
 - **Assets page** — overview of all smart contracts and tokens with ticker, category, decimal places, website
 - **Wallet balances** — current balance per wallet is updated automatically
-- **EUR/USD rates** — fetched daily from CoinGecko, cached in the database
+- **EUR/USD rates** — daily rate from CoinGecko (cached in the database); it is the rate used for tax report, statistics and exports. In addition the rate is captured every full hour (table `price_hourly`) and stored on each transaction/event as a second rate (`qubic_eur_rate_hourly` / `qubic_usd_rate_hourly`). If an hourly fetch fails, the last captured hour is used (max. 24 h back); events outside the captured range have no hourly rate. The header shows the latest hourly rate in EUR and USD; clicking a value copies it to the clipboard
 - **Statistics panels** — Hour / Day / Epoch / Month / Year, each with current and previous period
 - **Epoch view** — all epochs navigable as a wallet panel grid (label, owner, incoming Qubics incl. TX/event split, outgoing Qubics incl. EUR value); dividends from smart contract payouts and token distributions (e.g. QX shares, Qearn, QMine) are automatically detected per epoch as EVENTs; filter "All" / "With income only" plus "Show all" toggle (`?ext=1`) to show/hide empty sub-rows
 - **Events table** — separate columns for TxId and Tick, each with copy button and Explorer link (`/network/tx/{id}` and `/network/tick/{tick}`); short display (5 chars) with tooltip, full value on copy/open. Only real 60-character Qubic TxIDs are shown — SC-internal events without user TX show a dash in the TxID column
@@ -451,6 +451,7 @@ All endpoints under `/api/v1/`. Interactive docs: `http://localhost:8000/docs`
 | DELETE | `/tax/opening-positions/{id}`         | Delete opening position                               |
 | GET    | `/tax/report`                         | Calculate tax report                                  |
 | GET    | `/tax/price`                          | EUR/USD rate for a date (`?date=`)                    |
+| GET    | `/tax/price/current`                  | Latest hourly EUR/USD rate with capture time          |
 | GET    | `/balance-history/settings`           | Balance history settings (series toggles, retention, auto export) |
 | PUT    | `/balance-history/settings`           | Save balance history settings                         |
 | GET    | `/balance-history/overview`           | Capture rows of a series (`?kind=hourly\|daily\|weekly`) |

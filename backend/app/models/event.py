@@ -21,6 +21,10 @@ class Event(Base):
     amount_qubic = Column(Integer)
     qubic_eur_rate = Column(Float)
     qubic_usd_rate = Column(Float)
+    # Rate of the event's UTC hour (price_hourly); the daily rate above stays
+    # the default for tax and stats. NULL when no hourly rate was captured.
+    qubic_eur_rate_hourly = Column(Float)
+    qubic_usd_rate_hourly = Column(Float)
     buy_value_eur = Column(Float)
     buy_value_usd = Column(Float)
     sell_value_eur = Column(Float)

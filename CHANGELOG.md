@@ -4,6 +4,15 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.18] — 2026-10-07
+
+### Added
+- **Hourly EUR/USD rate in addition to the daily rate** — the QUBIC rate is now also captured every full hour (and once at startup) into the new table `price_hourly`. Every new transaction/event stores this hourly rate next to its daily rate (`qubic_eur_rate_hourly` / `qubic_usd_rate_hourly`). The daily rate stays the rate for tax report, statistics and exports — nothing changes there. If an hourly fetch fails nothing is stored and the last captured hour is used (max. 24 h back). Events synced before their hour was captured get the hourly rate added afterwards; older events have none. Basis for a later rate-type selection in reports
+- **Current rate in the header** — the latest hourly rate in EUR and USD (tooltip with capture time); clicking a value copies it to the clipboard. New endpoint `GET /tax/price/current`
+- Migration `017`: table `price_hourly`, columns `events.qubic_eur_rate_hourly` / `events.qubic_usd_rate_hourly`; backup/restore includes the hourly rates
+
+---
+
 ## [0.2.17] — 2026-09-26
 
 ### Added

@@ -3,6 +3,7 @@ from .event import Event
 from .node import Node
 from .sync_state import SyncState
 from .price_cache import PriceCache
+from .price_hourly import PriceHourly
 from .sync_gap import SyncGap
 from .snapshot import WeeklySnapshot
 from .settings import AppSetting

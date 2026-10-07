@@ -1,14 +1,44 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import { useDonationState } from '../composables/useDonationState'
+import { useQubicUtils } from '../composables/useQubicUtils'
+import { api } from '../api'
 import logoDark from '../assets/logo-full.svg'
 import logoLight from '../assets/logo-full-light.svg'
 
 const store = useAppStore()
 const { t } = useTranslation()
 const { isSuppressed, suppressedUntil, donorRank } = useDonationState()
+const { copyValue, fmtRateLocale } = useQubicUtils()
+
+// Current QUBIC rate — the backend captures it hourly; polling every 5 min
+// picks up a new capture soon after the full hour.
+const price = ref(null)
+let _priceTimer = null
+
+async function loadPrice() {
+  try {
+    price.value = await api.tax.getCurrentPrice()
+  } catch {
+    // keep the last shown rate
+  }
+}
+
+const priceTitle = computed(() => {
+  const at = price.value?.fetched_at
+  if (!at) return t('header.price_copy')
+  const time = new Date(at).toLocaleString(store.locale, { dateStyle: 'short', timeStyle: 'short' })
+  return `${t('header.price_copy')}
+${t('header.price_as_of', { time })}`
+})
+
+onMounted(() => {
+  loadPrice()
+  _priceTimer = setInterval(loadPrice, 5 * 60_000)
+})
+onUnmounted(() => clearInterval(_priceTimer))
 
 const logoUrl = computed(() => store.theme === 'light' ? logoLight : logoDark)
 const isLight = computed(() => store.theme === 'light')
@@ -46,6 +76,17 @@ const activeNodeName = computed(() => {
               <span class="font-medium">{{ activeNodeName }}</span>
               <span class="opacity-70">{{ store.activeNode.node_type }}</span>
             </span>
+          </span>
+          <!-- Aktueller Kurs: Klick kopiert den jeweiligen Wert -->
+          <span v-if="price && (price.eur != null || price.usd != null)"
+                class="pill cursor-default font-mono"
+                :class="isLight ? 'text-[#6a9e00] border-[#9acd32]/60' : ''"
+                :title="priceTitle">
+            <span v-if="price.eur != null" class="cursor-copy select-none hover:text-qubic-teal transition-colors"
+                  @click="copyValue(price.eur)">{{ fmtRateLocale(price.eur) }}€</span>
+            <span v-if="price.usd != null" class="ml-1.5 pl-1.5 cursor-copy select-none hover:text-qubic-teal transition-colors"
+                  :class="isLight ? 'border-l border-[#9acd32]/50' : 'border-l border-gray-600'"
+                  @click="copyValue(price.usd)">{{ fmtRateLocale(price.usd) }}$</span>
           </span>
           <!-- Adressen verbergen / anzeigen -->
           <button @click="store.toggleHideAddresses()"

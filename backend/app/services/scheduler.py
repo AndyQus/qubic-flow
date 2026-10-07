@@ -7,7 +7,8 @@ from .health_monitor import check_nodes
 from .sync_engine import sync_all_wallets, backfill_tx_epochs, retry_sync_gaps, backfill_missing_timestamps
 from .snapshot_service import create_snapshot
 from .label_service import sync_labels
-from .coingecko import get_price_for_date
+from .coingecko import get_price_for_date, get_hourly_price, capture_hourly_price
+from ..models.price_hourly import PriceHourly
 from .balance_service import check_all_balances
 from .donation_cache_service import refresh_donation_cache
 from .dedup_service import auto_dedup_job
@@ -84,6 +85,62 @@ async def backfill_missing_rates():
         logger.error(f"backfill_missing_rates failed: {e}")
     finally:
         db.close()
+
+
+async def backfill_hourly_rates():
+    """Add the hourly rate to events that got none at sync time (e.g. synced
+    before the first capture of their hour). Only events inside the captured
+    range are candidates — older events simply have no hourly rate."""
+    db = SessionLocal()
+    try:
+        first = db.query(PriceHourly.hour).order_by(PriceHourly.hour).first()
+        if not first:
+            return
+        events = db.query(Event).filter(
+            Event.qubic_eur_rate_hourly == None,  # noqa: E711
+            Event.timestamp >= first[0],
+        ).all()
+        updated = 0
+        for ev in events:
+            prices = await get_hourly_price(db, ev.timestamp)
+            if prices.get("eur") is not None:
+                ev.qubic_eur_rate_hourly = prices["eur"]
+                ev.qubic_usd_rate_hourly = prices["usd"]
+                updated += 1
+        if updated:
+            db.commit()
+            logger.info(f"Backfilled hourly rates for {updated} events")
+    except Exception as e:
+        logger.error(f"backfill_hourly_rates failed: {e}")
+    finally:
+        db.close()
+
+
+async def hourly_price_capture():
+    """Store the QUBIC rate once per hour as an additional rate next to the
+    daily one. A failed fetch writes nothing — lookups keep using the last
+    captured hour."""
+    db = SessionLocal()
+    try:
+        if not await capture_hourly_price(db):
+            logger.warning("Hourly price capture: no rate from CoinGecko, keeping last known")
+        else:
+            await backfill_hourly_rates()
+    except Exception as e:
+        logger.error(f"hourly_price_capture failed: {e}")
+    finally:
+        db.close()
+
+
+# Runs at every full hour and once at startup so the current hour has a rate.
+scheduler.add_job(
+    hourly_price_capture,
+    CronTrigger(minute=0, timezone="UTC"),
+    id="price_hourly",
+    max_instances=1,
+    coalesce=True,
+    next_run_time=datetime.now(timezone.utc),
+)
 
 
 scheduler.add_job(

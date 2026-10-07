@@ -50,6 +50,7 @@ def test_engine():
     import app.models.sync_state      # noqa: F401
     import app.models.sync_gap        # noqa: F401
     import app.models.price_cache     # noqa: F401
+    import app.models.price_hourly    # noqa: F401
     import app.models.node            # noqa: F401
     import app.models.settings        # noqa: F401
     import app.models.snapshot        # noqa: F401

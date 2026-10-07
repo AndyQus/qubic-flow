@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import httpx
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from ..config import settings
 from ..models.price_cache import PriceCache
+from ..models.price_hourly import PriceHourly
 from ..utils.time import now_utc_iso
 
 logger = logging.getLogger(__name__)
@@ -107,3 +108,67 @@ async def get_price_for_date(db: Session, date_str: str) -> dict:
         db.commit()
 
     return {"eur": eur, "usd": usd}
+
+
+# An hourly rate older than this is considered too stale for an event (e.g.
+# after the app was offline for days); the event then gets no hourly rate.
+_HOURLY_MAX_AGE = timedelta(hours=24)
+
+
+def _hour_key(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H")
+
+
+async def capture_hourly_price(db: Session) -> bool:
+    """Store the current live price under the current UTC hour.
+
+    Returns False when CoinGecko delivered no complete pair — then no row is
+    written and lookups keep using the last captured hour.
+    """
+    live = await get_live_price()
+    eur, usd = live.get("eur"), live.get("usd")
+    if eur is None or usd is None:
+        return False
+    db.merge(PriceHourly(
+        hour=_hour_key(datetime.now(timezone.utc)),
+        qubic_eur=eur,
+        qubic_usd=usd,
+        source="coingecko",
+        fetched_at=now_utc_iso(),
+    ))
+    db.commit()
+    return True
+
+
+async def get_hourly_price(db: Session, ts_iso: str | None) -> dict:
+    """Captured rate of the event's UTC hour, else the last captured hour
+    before it (max. 24 h back). {'eur': None, 'usd': None} when there is none —
+    the daily rate stays the event's primary rate either way."""
+    try:
+        ts = datetime.fromisoformat(ts_iso.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return {"eur": None, "usd": None}
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    row = (
+        db.query(PriceHourly)
+        .filter(
+            PriceHourly.hour <= _hour_key(ts),
+            PriceHourly.hour >= _hour_key(ts - _HOURLY_MAX_AGE),
+        )
+        .order_by(PriceHourly.hour.desc())
+        .first()
+    )
+    if row:
+        return {"eur": row.qubic_eur, "usd": row.qubic_usd}
+    return {"eur": None, "usd": None}
+
+
+async def get_current_hourly_price(db: Session) -> dict:
+    """Latest captured hourly rate for the header display. Falls back to the
+    live price when nothing has been captured yet (fresh install)."""
+    row = db.query(PriceHourly).order_by(PriceHourly.hour.desc()).first()
+    if row:
+        return {"eur": row.qubic_eur, "usd": row.qubic_usd, "fetched_at": row.fetched_at}
+    live = await get_live_price()
+    return {"eur": live.get("eur"), "usd": live.get("usd"), "fetched_at": None}

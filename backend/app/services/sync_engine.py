@@ -11,7 +11,7 @@ from ..models.sync_state import SyncState
 from ..models.sync_gap import SyncGap
 from ..utils.time import now_utc_iso, unix_ms_to_iso, iso_to_date
 from .qubic_client import RPCClient, BOBClient
-from .coingecko import get_price_for_date
+from .coingecko import get_price_for_date, get_hourly_price
 from ..websocket.manager import manager
 from ..models.node import Node
 from ..utils.log_buffer import log_buffer
@@ -498,6 +498,7 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
     inserted = 0
     new_events = []
     price_cache: dict = {}
+    hourly_cache: dict = {}
     seen_ids: set = set()
 
     for log in logs:
@@ -553,6 +554,10 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
         if date_str not in price_cache:
             price_cache[date_str] = await get_price_for_date(db, date_str)
         price = price_cache[date_str]
+        hour_key = ts_iso[:13]
+        if hour_key not in hourly_cache:
+            hourly_cache[hour_key] = await get_hourly_price(db, ts_iso)
+        hourly = hourly_cache[hour_key]
 
         is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
@@ -580,6 +585,8 @@ async def _persist_logs(db: Session, wallet_id: str, logs: list, owned_addresses
             amount_qubic=amount,
             qubic_eur_rate=price.get("eur"),
             qubic_usd_rate=price.get("usd"),
+            qubic_eur_rate_hourly=hourly.get("eur"),
+            qubic_usd_rate_hourly=hourly.get("usd"),
             source_type=src_type,
             verified=0,
             created_at=now_utc_iso(),
@@ -727,6 +734,7 @@ async def backfill_missing_timestamps(limit: int = 500) -> int:
         base_url = _get_rpc_client(db).base_url
         tick_cache: dict = {}
         price_cache: dict = {}
+        hourly_cache: dict = {}
         updated = 0
         async with httpx.AsyncClient() as http_client:
             for ev in rows:
@@ -740,9 +748,16 @@ async def backfill_missing_timestamps(limit: int = 500) -> int:
                 if date_str not in price_cache:
                     price_cache[date_str] = await get_price_for_date(db, date_str)
                 price = price_cache[date_str]
+                hour_key = ts_iso[:13]
+                if hour_key not in hourly_cache:
+                    hourly_cache[hour_key] = await get_hourly_price(db, ts_iso)
+                hourly = hourly_cache[hour_key]
                 if price.get("eur") is not None:
                     ev.qubic_eur_rate = price.get("eur")
                     ev.qubic_usd_rate = price.get("usd")
+                if hourly.get("eur") is not None:
+                    ev.qubic_eur_rate_hourly = hourly.get("eur")
+                    ev.qubic_usd_rate_hourly = hourly.get("usd")
                 updated += 1
         if updated:
             db.commit()
@@ -808,6 +823,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
     total_inserted = 0
     epoch_cache: dict = {}
     price_cache: dict = {}
+    hourly_cache: dict = {}
     # Stubs already upgraded during this run. Without this, N identical
     # transfers in one tick would all reconcile against the same stub and the
     # remaining N-1 stubs would survive as duplicates of the reconciled row.
@@ -878,6 +894,10 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                     if date_str not in price_cache:
                         price_cache[date_str] = await get_price_for_date(db, date_str)
                     price = price_cache[date_str]
+                    hour_key = ts_iso[:13]
+                    if hour_key not in hourly_cache:
+                        hourly_cache[hour_key] = await get_hourly_price(db, ts_iso)
+                    hourly = hourly_cache[hour_key]
                     is_internal = 1 if (source in owned_addresses and dest in owned_addresses) else 0
 
                     # Reconcile with an event-log stub for the same transaction.
@@ -925,6 +945,8 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                         amount_qubic=amount,
                         qubic_eur_rate=price.get("eur"),
                         qubic_usd_rate=price.get("usd"),
+                        qubic_eur_rate_hourly=hourly.get("eur"),
+                        qubic_usd_rate_hourly=hourly.get("usd"),
                         source_type="TX",
                         verified=0,
                         created_at=now_utc_iso(),

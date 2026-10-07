@@ -139,6 +139,7 @@ export const api = {
       return req(`/tax/report${q ? '?' + q : ''}`)
     },
     getPriceForDate: (date) => req(`/tax/price?date=${date}`),
+    getCurrentPrice: () => req('/tax/price/current'),
   },
 }
 

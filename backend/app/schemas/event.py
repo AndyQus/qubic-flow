@@ -14,6 +14,8 @@ class EventOut(BaseModel):
     amount_qubic: Optional[int]
     qubic_eur_rate: Optional[float]
     qubic_usd_rate: Optional[float]
+    qubic_eur_rate_hourly: Optional[float] = None
+    qubic_usd_rate_hourly: Optional[float] = None
     source_type: Optional[str]
     log_type: Optional[int] = None
     is_internal: int = 0

@@ -45,7 +45,7 @@ Unterstützt unbegrenzte Wallets (PRIVAT / GESCHÄFTLICH), automatische EUR/USD-
 - **Adress-Namensauflösung** — automatische Auflösung von Qubic-Adressen zu Tokens/Labels (Assets-Seite + CSV)
 - **Assets-Seite** — Übersicht aller Smart Contracts und Tokens mit Ticker, Kategorie, Dezimalstellen, Website
 - **Wallet-Kontostände** — aktueller Kontostand je Wallet wird automatisch nachgeführt
-- **EUR/USD-Kurse** — täglich von CoinGecko abgerufen, in der Datenbank zwischengespeichert
+- **EUR/USD-Kurse** — Tageskurs von CoinGecko (in der Datenbank zwischengespeichert); er ist der Kurs für Steuerreport, Statistiken und Exporte. Zusätzlich wird der Kurs zu jeder vollen Stunde erfasst (Tabelle `price_hourly`) und an jeder Transaktion bzw. jedem Event als zweiter Kurs gespeichert (`qubic_eur_rate_hourly` / `qubic_usd_rate_hourly`). Schlägt ein Stundenabruf fehl, gilt der zuletzt erfasste Stundenkurs (max. 24 h zurück); Events außerhalb des Erfassungszeitraums haben keinen Stundenkurs. Der Header zeigt den aktuellen Stundenkurs in EUR und USD; ein Klick auf einen Wert kopiert ihn in die Zwischenablage
 - **Statistik-Panels** — Stunden / Tag / Epoche / Monat / Jahr, je mit aktueller und vorheriger Periode
 - **Epochen-Ansicht** — alle Epochen navigierbar als Wallet-Panel-Raster (Label, Besitzer, eingehende Qubics inkl. TX-/Event-Aufteilung, ausgehende Qubics inkl. EUR-Wert); Dividenden aus Smart-Contract-Ausschüttungen und Token-Payouts (z. B. QX-Shares, Qearn, QMine) werden je Epoche als EVENTs automatisch erkannt und sind vollständig sichtbar; Filter „Alle" / „Nur mit Eingang" plus „Alles anzeigen"-Umschalter (`?ext=1`) zum Ein-/Ausblenden leerer Unterzeilen
 - **Events-Tabelle** — getrennte Spalten für TxId und Tick, je mit Kopier-Schaltfläche und Explorer-Link (`/network/tx/{id}` bzw. `/network/tick/{tick}`); Kurzanzeige 5 Zeichen mit Tooltip, voller Wert beim Kopieren/Öffnen. Nur echte 60-Zeichen-Qubic-TxIDs werden angezeigt — SC-interne Events ohne Nutzer-TX zeigen in der TxID-Spalte einen Bindestrich.
@@ -449,6 +449,7 @@ Alle Endpunkte unter `/api/v1/`. Interaktive Dokumentation: `http://localhost:80
 | DELETE  | `/tax/opening-positions/{id}`         | Eröffnungsposition löschen                            |
 | GET     | `/tax/report`                         | Steuerbericht berechnen                               |
 | GET     | `/tax/price`                          | EUR/USD-Kurs für ein Datum (`?date=`)                 |
+| GET     | `/tax/price/current`                  | Aktueller Stundenkurs EUR/USD mit Erfassungszeit      |
 | GET     | `/balance-history/settings`           | Bestandsverlauf-Einstellungen (Serien-Schalter, Aufbewahrung, Auto-Export) |
 | PUT     | `/balance-history/settings`           | Bestandsverlauf-Einstellungen speichern               |
 | GET     | `/balance-history/overview`           | Erfassungszeilen einer Serie (`?kind=hourly\|daily\|weekly`) |

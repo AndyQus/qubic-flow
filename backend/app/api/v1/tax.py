@@ -180,6 +180,13 @@ def get_countries():
     return tax_engine.TAX_RULES
 
 
+@router.get("/tax/price/current")
+async def get_current_price(db: Session = Depends(get_db)):
+    """Latest hourly QUBIC rate (EUR + USD) with its capture time."""
+    from ...services.coingecko import get_current_hourly_price
+    return await get_current_hourly_price(db)
+
+
 @router.get("/tax/price")
 async def get_price_for_date(date: str = Query(...), db: Session = Depends(get_db)):
     from ...services.coingecko import get_price_for_date as _get_price

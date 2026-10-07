@@ -170,14 +170,14 @@ def restore_backup(
                 INSERT OR IGNORE INTO events
                 (id, wallet_id, epoch, tick_number, timestamp_raw, timestamp, log_type,
                  log_digest, categories, source_address, destination_addr, is_internal,
-                 amount_qubic, qubic_eur_rate, qubic_usd_rate, buy_value_eur, buy_value_usd,
+                 amount_qubic, qubic_eur_rate, qubic_usd_rate, qubic_eur_rate_hourly, qubic_usd_rate_hourly, buy_value_eur, buy_value_usd,
                  sell_value_eur, sell_value_usd, source_type, buy_currency, sell_currency,
                  item_id, item_name, comment, trade_group, verified, created_at,
                  note, sc_kind, reconstructed)
                 VALUES
                 (:id, :wallet_id, :epoch, :tick_number, :timestamp_raw, :timestamp, :log_type,
                  :log_digest, :categories, :source_address, :destination_addr, :is_internal,
-                 :amount_qubic, :qubic_eur_rate, :qubic_usd_rate, :buy_value_eur, :buy_value_usd,
+                 :amount_qubic, :qubic_eur_rate, :qubic_usd_rate, :qubic_eur_rate_hourly, :qubic_usd_rate_hourly, :buy_value_eur, :buy_value_usd,
                  :sell_value_eur, :sell_value_usd, :source_type, :buy_currency, :sell_currency,
                  :item_id, :item_name, :comment, :trade_group, :verified, :created_at,
                  :note, :sc_kind, :reconstructed)
@@ -193,7 +193,9 @@ def restore_backup(
                     "categories": e.get("categories"), "source_address": e.get("source_address"),
                     "destination_addr": e.get("destination_addr"), "is_internal": e.get("is_internal", 0),
                     "amount_qubic": e.get("amount_qubic"), "qubic_eur_rate": e.get("qubic_eur_rate"),
-                    "qubic_usd_rate": e.get("qubic_usd_rate"), "buy_value_eur": e.get("buy_value_eur"),
+                    "qubic_usd_rate": e.get("qubic_usd_rate"),
+                    "qubic_eur_rate_hourly": e.get("qubic_eur_rate_hourly"),
+                    "qubic_usd_rate_hourly": e.get("qubic_usd_rate_hourly"), "buy_value_eur": e.get("buy_value_eur"),
                     "buy_value_usd": e.get("buy_value_usd"), "sell_value_eur": e.get("sell_value_eur"),
                     "sell_value_usd": e.get("sell_value_usd"), "source_type": e.get("source_type"),
                     "buy_currency": e.get("buy_currency"), "sell_currency": e.get("sell_currency"),
