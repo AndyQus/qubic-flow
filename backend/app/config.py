@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     coingecko_api_key: str = ""
     cors_origins: str = "http://localhost:8080,http://localhost:5173"
     log_level: str = "INFO"
+    # Budget for public Qubic APIs (rpc.qubic.org, public BOB nodes). Cloudflare
+    # limits per public IP (~100-120/min) and that budget is shared with every
+    # device in the network (Home Node, browser wallet, explorer). Own nodes in
+    # the LAN are not throttled.
+    public_rpc_rate_limit_per_min: int = 25
+    public_rpc_burst: int = 5
     app_password: str = ""  # Injected by Umbrel as APP_PASSWORD; if set, protects backup endpoints
 
     @property

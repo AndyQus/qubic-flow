@@ -298,6 +298,13 @@ DATABASE_URL=sqlite:///./data/qubicflow.db
 # Qubic RPC
 QUBIC_RPC_URL=https://rpc.qubic.org
 
+# Budget for public Qubic APIs (rpc.qubic.org, public BOB nodes, QX API).
+# Cloudflare limits per public IP (~100-120 req/min) and every device in your
+# network shares it (Home Node, browser wallet, explorer). A 429 pauses all
+# requests to that host. Own nodes in the LAN are not throttled.
+PUBLIC_RPC_RATE_LIMIT_PER_MIN=25
+PUBLIC_RPC_BURST=5
+
 # CoinGecko (optional: API key for higher rate limits)
 COINGECKO_API_URL=https://api.coingecko.com/api/v3
 COINGECKO_API_KEY=

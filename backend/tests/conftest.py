@@ -136,3 +136,14 @@ def client(db, app_client):
     holder is populated before any request hits the override.
     """
     yield app_client
+
+
+@pytest.fixture(autouse=True)
+def _unthrottled_public_api(monkeypatch):
+    """Tests mock the network — the public-API throttle would only slow them down."""
+    from app.services import rate_limit
+    rate_limit.reset_for_tests()
+    monkeypatch.setattr(rate_limit.settings, "public_rpc_rate_limit_per_min", 1_000_000)
+    monkeypatch.setattr(rate_limit.settings, "public_rpc_burst", 1_000_000)
+    yield
+    rate_limit.reset_for_tests()

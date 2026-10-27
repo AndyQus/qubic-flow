@@ -638,26 +638,22 @@ def _epoch_for_tick(db: Session, tick_number: int | None) -> int | None:
     return row[0] if row else None
 
 
-async def _epoch_from_api(tick_number: int, cache: dict, http_client=None) -> int | None:
-    """Fetch epoch for a tick from the Qubic API, with in-memory cache."""
-    from .qubic_client import _rpc_rate_limit
+async def _epoch_from_api(tick_number: int, cache: dict, http_client=None, base_url: str | None = None) -> int | None:
+    """Fetch epoch for a tick from the RPC interface (Home Node first), with in-memory cache."""
+    from . import rate_limit
 
     if tick_number in cache:
         return cache[tick_number]
+    url = f"{(base_url or settings.qubic_rpc_url).rstrip('/')}/v1/ticks/{tick_number}/tick-data"
     try:
-        # direct rpc.qubic.org call — must share the global 100/min budget
-        await _rpc_rate_limit()
+        # shares the per-host budget; free when base_url is the user's own node
+        await rate_limit.acquire(url)
         if http_client is not None:
-            r = await http_client.get(
-                f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
-                timeout=10,
-            )
+            r = await http_client.get(url, timeout=10)
         else:
             async with httpx.AsyncClient() as c:
-                r = await c.get(
-                    f"https://rpc.qubic.org/v1/ticks/{tick_number}/tick-data",
-                    timeout=10,
-                )
+                r = await c.get(url, timeout=10)
+        rate_limit.report_response(url, r)
         if r.status_code == 200:
             epoch = r.json().get("tickData", {}).get("epoch")
             cache[tick_number] = epoch
@@ -677,11 +673,12 @@ async def backfill_tx_epochs(db: Session) -> int:
     ).all()
     updated = 0
     api_cache: dict = {}
+    base_url = _get_rpc_client(db).base_url
     async with httpx.AsyncClient() as http_client:
         for ev in rows:
             epoch = _epoch_for_tick(db, ev.tick_number)
             if epoch is None:
-                epoch = await _epoch_from_api(ev.tick_number, api_cache, http_client)
+                epoch = await _epoch_from_api(ev.tick_number, api_cache, http_client, base_url)
             if epoch is not None:
                 ev.epoch = epoch
                 updated += 1
@@ -693,15 +690,16 @@ async def backfill_tx_epochs(db: Session) -> int:
 
 async def _tick_timestamp_from_api(tick_number: int, cache: dict, http_client, base_url: str) -> str | None:
     """Fetch the Unix-ms timestamp for a tick from the archiver, with cache."""
-    from .qubic_client import _rpc_rate_limit
+    from . import rate_limit
 
     if tick_number in cache:
         return cache[tick_number]
     ts = None
+    url = f"{base_url}/v1/ticks/{tick_number}/tick-data"
     try:
-        # direct RPC-node call — must share the global 100/min budget
-        await _rpc_rate_limit()
-        r = await http_client.get(f"{base_url}/v1/ticks/{tick_number}/tick-data", timeout=10)
+        await rate_limit.acquire(url)
+        r = await http_client.get(url, timeout=10)
+        rate_limit.report_response(url, r)
         if r.status_code == 200:
             raw = r.json().get("tickData", {}).get("timestamp")
             if raw and int(raw) > 0:
@@ -832,6 +830,9 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
     # are already committed, so a second page returning the same TxID could
     # otherwise insert it twice.
     seen_tx_ids: set = set()
+    # Tick→epoch lookups go to the TX source itself when it speaks the RPC
+    # interface (Home Node / RPC), otherwise to the best RPC-type node.
+    tick_data_url = client.base_url if isinstance(client, RPCClient) else _get_rpc_client(db).base_url
 
     async with httpx.AsyncClient() as http_client:
         while True:
@@ -844,7 +845,7 @@ async def _sync_transactions(db: Session, wallet_id: str, from_tick: int, to_tic
                 tick_number = tick_group.get("tickNumber")
                 epoch = _epoch_for_tick(db, tick_number)
                 if epoch is None:
-                    epoch = await _epoch_from_api(tick_number, epoch_cache, http_client)
+                    epoch = await _epoch_from_api(tick_number, epoch_cache, http_client, tick_data_url)
                 for tx_data in tick_group.get("transactions", []):
                     if not tx_data.get("moneyFlew", False):
                         continue

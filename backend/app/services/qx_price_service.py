@@ -4,6 +4,7 @@ import time
 import httpx
 
 from ..config import settings
+from . import rate_limit
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,10 @@ async def get_last_trade_price(issuer: str, asset_name: str) -> float | None:
     price = None
     try:
         url = f"{settings.qx_api_url}/v1/qx/issuer/{issuer}/asset/{asset_name}/trades"
+        await rate_limit.acquire(url)
         async with httpx.AsyncClient() as client:
             r = await client.get(url, timeout=10)
+            rate_limit.report_response(url, r)
             if r.status_code == 200:
                 price = _extract_last_price(r.json())
     except Exception as e:

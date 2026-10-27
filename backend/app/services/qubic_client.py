@@ -4,12 +4,9 @@ import logging
 from datetime import datetime, timezone
 import httpx
 from ..config import settings
+from . import rate_limit
 
 logger = logging.getLogger(__name__)
-
-_RPC_RATE_LIMIT = 100
-_rpc_lock = asyncio.Lock()
-_rpc_request_times: list[float] = []
 
 # Capability cache: url → (supported, checked_at)
 # False entries are retried once per day; True entries are permanent until a 404 is received.
@@ -17,16 +14,9 @@ _BOB_CAPABILITY_RETRY_HOURS = 24
 _bob_capability_cache: dict[str, tuple[bool, datetime]] = {}
 
 
-async def _rpc_rate_limit():
-    async with _rpc_lock:
-        now = datetime.now(timezone.utc).timestamp()
-        global _rpc_request_times
-        _rpc_request_times = [t for t in _rpc_request_times if now - t < 60]
-        if len(_rpc_request_times) >= _RPC_RATE_LIMIT:
-            wait = 60 - (now - _rpc_request_times[0])
-            logger.info(f"RPC rate limit reached, waiting {wait:.1f}s")
-            await asyncio.sleep(wait)
-        _rpc_request_times.append(datetime.now(timezone.utc).timestamp())
+async def _rpc_rate_limit(url: str | None = None):
+    """Wait for the shared per-host budget (public hosts only, see rate_limit)."""
+    await rate_limit.acquire(url or settings.qubic_rpc_url)
 
 
 @runtime_checkable
@@ -40,12 +30,15 @@ class RPCClient:
         self.base_url = (url or settings.qubic_rpc_url).rstrip('/')
 
     async def _request(self, method: str, path: str, **kwargs) -> dict:
-        await _rpc_rate_limit()
+        url = f"{self.base_url}{path}"
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
+                # every attempt counts against the budget; a 429 pauses the host
+                await rate_limit.acquire(url)
                 async with httpx.AsyncClient() as client:
-                    r = await client.request(method, f"{self.base_url}{path}", timeout=30, **kwargs)
+                    r = await client.request(method, url, timeout=30, **kwargs)
+                    rate_limit.report_response(url, r)
                     r.raise_for_status()
                     return r.json()
             except (httpx.HTTPError, httpx.TimeoutException) as e:
@@ -289,8 +282,10 @@ class BOBClient:
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
+                await rate_limit.acquire(self.base_url)
                 async with httpx.AsyncClient(verify=False) as client:
                     r = await client.post(f"{self.base_url}/qubic", json=payload, timeout=30)
+                    rate_limit.report_response(self.base_url, r)
                     r.raise_for_status()
                     data = r.json()
                     if data.get("error"):
@@ -310,8 +305,10 @@ class BOBClient:
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
+                await rate_limit.acquire(self.base_url)
                 async with httpx.AsyncClient(verify=False) as client:
                     r = await client.get(f"{self.base_url}{path}", timeout=15)
+                    rate_limit.report_response(self.base_url, r)
                     r.raise_for_status()
                     return r.json()
             except (httpx.HTTPError, httpx.TimeoutException) as e:

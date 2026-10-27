@@ -92,7 +92,8 @@ async def _run_tx_resync(wallet_id: str):
     from ...database import SessionLocal
     db = SessionLocal()
     try:
-        client = RPCClient()
+        from ...services.sync_engine import _get_rpc_client
+        client = _get_rpc_client(db)  # Home Node first, public RPC only as fallback
         current_tick = await client.get_current_tick()
         await sync_wallet_tx(db, wallet_id, current_tick, client)
     except Exception as e:

@@ -1,3 +1,4 @@
+from ...services import rate_limit
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -26,4 +27,6 @@ def metrics(db: Session = Depends(get_db)):
         "failed_syncs": failed_syncs,
         "nodes_online": nodes_online,
         "nodes_total": nodes_total,
+        # outbound budget for public Qubic APIs (requests/min, active 429 pauses)
+        "public_api": rate_limit.status(),
     }

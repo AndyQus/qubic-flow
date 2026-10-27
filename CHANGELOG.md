@@ -4,6 +4,19 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.20] — 2026-10-27
+
+### Fixed
+- **Home IP blocked by rpc.qubic.org** — Cloudflare limits public Qubic APIs per public IP (~100–120 requests/min), shared by every device in the network. When the budget is used up, qubic.org web apps (wallet, explorer) in the same network fail with CORS errors (the 429 response has no CORS header). QubicFlow alone could use 100/min, and some paths ignored the configured Home Node:
+  - New outbound throttle per public host: token bucket with small burst, default **25 requests/min** (`PUBLIC_RPC_RATE_LIMIT_PER_MIN`, `PUBLIC_RPC_BURST`). Every retry counts against the budget. Own nodes in the LAN (private IPs, `*.local`, Docker service names) are not throttled
+  - A 429 (or 503 with `Retry-After`) now pauses **all** requests to that host for the `Retry-After` time (default 60 s, max. 300 s) instead of each request retrying on its own
+  - Tick→epoch lookups during the TX sync and the epoch backfill went to `rpc.qubic.org` hard-coded, once per new transaction tick — they now use the Home Node / configured RPC node. The manual TX resync uses the Home Node too
+  - While a Home Node is online, public nodes (`rpc.qubic.org`, `bobnet.qubic.li`) are health-checked every 5 min instead of every 30 s, and not marked offline while their host pauses us
+  - QX price lookups (`qxinfo.qubic.org`) use the same throttle
+  - `GET /metrics` shows the budget, requests in the last minute and active pauses per host (`public_api`)
+
+---
+
 ## [0.2.19] — 2026-10-27
 
 ### Added
