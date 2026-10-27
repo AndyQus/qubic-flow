@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from ...database import get_db
 from ...models.wallet import Wallet
 from ...models.sync_state import SyncState
+from ...models.qearn import QearnPosition
 from ...schemas.wallet import WalletCreate, WalletUpdate, WalletOut
 from ...utils.time import now_utc_iso
 from ...services.balance_service import initialize_wallet_balance
+from ...services.internal_transfer_service import recompute_internal_flags
 from ...services.sync_engine import sync_wallet_tx
 from ...services.qubic_client import RPCClient
 
@@ -16,11 +18,17 @@ router = APIRouter()
 def list_wallets(db: Session = Depends(get_db)):
     wallets = db.query(Wallet).filter(Wallet.deleted_at.is_(None)).all()
     states = {s.wallet_id: s for s in db.query(SyncState).all()}
+    # QUBIC still locked in Qearn counts as holdings — an archived wallet with
+    # an open lock must not be hidden in the portfolio.
+    locked: dict[str, int] = {}
+    for p in db.query(QearnPosition).filter(QearnPosition.status == "LOCKED").all():
+        locked[p.wallet_id] = locked.get(p.wallet_id, 0) + max(0, (p.principal_qu or 0) - (p.early_unlocked_qu or 0))
     result = []
     for w in wallets:
         state = states.get(w.id)
         out = WalletOut.model_validate(w)
         out.total_events = state.total_events if state else None
+        out.qearn_locked = locked.get(w.id, 0)
         result.append(out)
     return result
 
@@ -43,6 +51,8 @@ async def create_wallet(payload: WalletCreate, background_tasks: BackgroundTasks
     )
     db.add(wallet)
     db.commit()
+    # Transfers already stored between the new wallet and existing ones become internal
+    recompute_internal_flags(db)
     db.refresh(wallet)
     background_tasks.add_task(initialize_wallet_balance, wallet.id)
     return wallet
@@ -54,9 +64,24 @@ async def update_wallet(wallet_id: str, payload: WalletUpdate, background_tasks:
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
     data = payload.model_dump(exclude_unset=True)
+    for key in ("archived_reason", "archived_successor"):
+        if key in data:
+            data[key] = (data[key] or "").strip() or None
+    was_archived = bool(wallet.archived)
+    if "archived" in data:
+        data["archived"] = 1 if data["archived"] else 0
+    archived = data.get("archived", wallet.archived)
+    reason = data["archived_reason"] if "archived_reason" in data else wallet.archived_reason
+    if archived and not reason:
+        raise HTTPException(status_code=422, detail="archived_reason is required when archived")
     for k, v in data.items():
         setattr(wallet, k, v)
-    wallet.updated_at = now_utc_iso()
+    now = now_utc_iso()
+    if archived and not was_archived:
+        wallet.archived_at = now
+    elif not archived:
+        wallet.archived_at = None
+    wallet.updated_at = now
     db.commit()
     db.refresh(wallet)
     background_tasks.add_task(initialize_wallet_balance, wallet.id)
@@ -181,3 +206,4 @@ def delete_wallet(wallet_id: str, db: Session = Depends(get_db)):
     wallet.deleted_at = now_utc_iso()
     wallet.active = 0
     db.commit()
+    recompute_internal_flags(db)

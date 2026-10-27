@@ -393,6 +393,18 @@ function simulate() {
                   @click="setLang('en')">English</button>
         </div>
       </div>
+
+      <div class="flex items-start gap-4">
+        <span class="text-sm text-gray-400 w-28 shrink-0">{{ t('archive.setting_label') }}</span>
+        <div class="space-y-1">
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" class="accent-qubic-teal" :checked="store.hideArchived"
+                   @change="store.setHideArchived($event.target.checked)" />
+            {{ t('archive.setting_toggle') }}
+          </label>
+          <p class="text-xs text-gray-500 leading-snug">{{ t('archive.setting_hint') }}</p>
+        </div>
+      </div>
     </div>
 
     <!-- Eingangsanimation -->

@@ -116,3 +116,61 @@ class TestDenmark:
         s = report["summary"]
         assert s["taxable_gains_eur"] == 0.0  # +100 and −100 netted
         assert s["deductible_losses_eur"] is None
+
+
+# ---------------------------------------------------------------- internal moves
+
+OLD = "WALLET_OLD"
+NEW = "WALLET_NEW"
+
+
+def _row(db, id_, wallet_id, ts, source, dest, amount, rate_eur, is_internal=0):
+    db.add(Event(
+        id=id_, wallet_id=wallet_id, tick_number=1, timestamp=ts,
+        source_address=source, destination_addr=dest, is_internal=is_internal,
+        amount_qubic=amount, qubic_eur_rate=rate_eur, qubic_usd_rate=rate_eur * 1.1,
+        source_type="TX", verified=0, created_at=ts,
+    ))
+    db.commit()
+
+
+class TestInternalTransferMovesLots:
+    """Moving funds to a new own address (e.g. after a hack) is no disposal —
+    the lots travel with the coins and keep their acquisition date."""
+
+    def _setup(self, db):
+        # bought 1000 QU at 0.1 on the old address in 2025
+        _row(db, "buy", OLD, "2025-01-10T00:00:00Z", "EXT_ADDR", OLD, 1000, 0.1)
+        # moved to the new address in 2026 — stored once per wallet
+        _row(db, "mv", OLD, "2026-03-01T00:00:00Z", OLD, NEW, 1000, 0.3, is_internal=1)
+        _row(db, "mv", NEW, "2026-03-01T00:00:00Z", OLD, NEW, 1000, 0.3, is_internal=1)
+
+    def test_move_is_no_disposal_and_holdings_move(self, db):
+        self._setup(db)
+        report = calculate_tax_report(db, [OLD, NEW], 2026, "private", "DE", "FIFO")
+        assert report["disposals"] == []
+        holdings = {h["wallet_id"]: h for h in report["year_end_holdings"]}
+        assert OLD not in holdings
+        assert holdings[NEW]["amount_qubic"] == 1000
+        assert holdings[NEW]["cost_basis_eur"] == 100.0
+
+    def test_sale_from_new_address_keeps_cost_basis_and_holding_period(self, db):
+        self._setup(db)
+        _row(db, "sell", NEW, "2026-06-01T00:00:00Z", NEW, "EXT_ADDR", 1000, 0.5)
+        report = calculate_tax_report(db, [OLD, NEW], 2026, "private", "DE", "FIFO")
+        assert len(report["disposals"]) == 1
+        d = report["disposals"][0]
+        assert d["cost_basis"] == 100.0
+        lot = d["lots"][0]
+        assert lot["acquired_date"].startswith("2025-01-10")
+        assert lot["tax_free"] is True  # held > 1 year since the original purchase
+        assert report["summary"]["taxable_gains_eur"] == 0.0
+
+    def test_partial_move_with_lifo_moves_newest_lot(self, db):
+        _row(db, "b1", OLD, "2025-01-10T00:00:00Z", "EXT_ADDR", OLD, 1000, 0.1)
+        _row(db, "b2", OLD, "2026-02-01T00:00:00Z", "EXT_ADDR", OLD, 1000, 0.3)
+        _row(db, "mv", OLD, "2026-03-01T00:00:00Z", OLD, NEW, 1000, 0.3, is_internal=1)
+        report = calculate_tax_report(db, [OLD, NEW], 2026, "private", "DE", "LIFO")
+        holdings = {h["wallet_id"]: h for h in report["year_end_holdings"]}
+        assert holdings[NEW]["cost_basis_eur"] == 300.0
+        assert holdings[OLD]["cost_basis_eur"] == 100.0

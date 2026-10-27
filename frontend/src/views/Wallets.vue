@@ -8,6 +8,7 @@ import PageLoader from '../components/PageLoader.vue'
 import PageHeader from '../components/PageHeader.vue'
 import OwnerIcon from '../components/OwnerIcon.vue'
 import BackButton from '../components/BackButton.vue'
+import ArchiveBadge from '../components/ArchiveBadge.vue'
 import { useQubicUtils } from '../composables/useQubicUtils'
 
 function groupIconType(group) {
@@ -34,7 +35,8 @@ const selectedOwner   = ref(null)
 const configSortKey   = ref('label')
 const configSortDir   = ref('asc')
 const form            = ref({ id: '', label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
-const editForm        = ref({ label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE' })
+const editForm        = ref({ label: '', owner: '', function: '', note: '', wallet_type: 'PRIVATE', archived: false, archived_reason: '', archived_successor: '' })
+const archiveFilter   = ref('all')   // config tab: all | active | archived
 
 function toggleConfigSort(key) {
   if (configSortKey.value === key) {
@@ -55,7 +57,9 @@ const uniqueFunctions = computed(() =>
 
 const displayedWallets = computed(() => {
   const base = Array.isArray(store.filteredWallets) ? store.filteredWallets : []
-  const filtered = !selectedOwner.value ? base : base.filter(w => w && w.owner === selectedOwner.value)
+  const byOwner = !selectedOwner.value ? base : base.filter(w => w && w.owner === selectedOwner.value)
+  const filtered = archiveFilter.value === 'all' ? byOwner
+    : byOwner.filter(w => archiveFilter.value === 'archived' ? !!w.archived : !w.archived)
   return [...filtered].sort((a, b) => {
     let av, bv
     switch (configSortKey.value) {
@@ -95,11 +99,18 @@ async function submit() {
 
 function startEdit(w) {
   editingId.value = w.id
-  editForm.value = { label: w.label, owner: w.owner || '', function: w.function || '', note: w.note || '', wallet_type: w.wallet_type }
+  editForm.value = {
+    label: w.label, owner: w.owner || '', function: w.function || '', note: w.note || '', wallet_type: w.wallet_type,
+    archived: !!w.archived, archived_reason: w.archived_reason || '', archived_successor: w.archived_successor || '',
+  }
 }
 
 async function saveEdit(id) {
   editError.value = ''
+  if (editForm.value.archived && !editForm.value.archived_reason.trim()) {
+    editError.value = t('archive.reason_required')
+    return
+  }
   try {
     await api.wallets.update(id, editForm.value)
     editingId.value = null
@@ -254,8 +265,15 @@ function fmtPct(n) {
   return `${sign}${n.toFixed(1)}%`
 }
 
+// Portfolio hides archived wallets without holdings (setting, default on);
+// archived wallets that received QUBIC again stay visible with a warning badge.
+const portfolioWallets = computed(() => {
+  const base = Array.isArray(store.filteredWallets) ? store.filteredWallets : []
+  return base.filter(w => !store.isArchivedHidden(w))
+})
+
 const ownerGroups = computed(() => {
-  const wallets = Array.isArray(store.filteredWallets) ? store.filteredWallets : []
+  const wallets = portfolioWallets.value
   const map = new Map()
   const px = unitPrice.value
   const cbMap = costBasisMap.value
@@ -265,9 +283,11 @@ const ownerGroups = computed(() => {
       owner: key, wallets: [], totalBalance: 0, hasNullBalance: false,
       totalEvents: 0, types: new Set(),
       totalValue: 0, totalCost: 0, hasValue: false, hasCost: false,
+      archivedWithFunds: 0,
     })
     const g = map.get(key)
     g.wallets.push(w)
+    if (store.isArchivedWithFunds(w)) g.archivedWithFunds++
     if (w.balance != null) {
       g.totalBalance += w.balance
       if (px != null) { g.totalValue += w.balance * px; g.hasValue = true }
@@ -591,9 +611,14 @@ onMounted(async () => {
                 {{ store.hideAddresses ? '••••••' : group.owner }}
               </span>
             </div>
-            <span class="text-xs px-2 py-0.5 rounded-md bg-qubic-teal/10 text-qubic-teal border border-qubic-teal/20 font-mono shrink-0">
-              {{ group.wallets.length }}w
-            </span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span v-if="group.archivedWithFunds" class="text-amber-300 cursor-help" :title="t('archive.warn_badge')">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+              </span>
+              <span class="text-xs px-2 py-0.5 rounded-md bg-qubic-teal/10 text-qubic-teal border border-qubic-teal/20 font-mono">
+                {{ group.wallets.length }}w
+              </span>
+            </div>
           </div>
 
           <!-- Balance (hero value) -->
@@ -678,6 +703,7 @@ onMounted(async () => {
                 <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors flex items-center gap-1.5">
                   <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
                   {{ maskLabel(w.label, w.id) }}
+                  <ArchiveBadge :wallet="w" />
                 </div>
                 <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
                 <div class="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -720,6 +746,7 @@ onMounted(async () => {
                       {{ maskLabel(w.label, w.id) }}
                       <span v-if="w.function" class="text-xs text-gray-500 font-normal ml-1">· {{ w.function }}</span>
                     </span>
+                    <ArchiveBadge :wallet="w" />
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                   </div>
                 </td>
@@ -843,9 +870,14 @@ onMounted(async () => {
                     {{ store.hideAddresses ? '••••••' : group.owner }}
                   </span>
                 </div>
-                <span class="text-xs px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono shrink-0">
-                  {{ group.wallets.length }}w
-                </span>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <span v-if="group.archivedWithFunds" class="text-amber-300 cursor-help" :title="t('archive.warn_badge')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                  </span>
+                  <span class="text-xs px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-300 border border-violet-500/20 font-mono">
+                    {{ group.wallets.length }}w
+                  </span>
+                </div>
               </div>
 
               <!-- Total value (hero) — the one number that matters: tokens + QUBIC -->
@@ -904,6 +936,7 @@ onMounted(async () => {
                 <router-link :to="`/wallets/${w.id}`" class="flex items-center gap-1.5 min-w-0 group">
                   <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
                   <span class="font-medium text-sm group-hover:text-qubic-teal transition-colors">{{ maskLabel(w.label, w.id) }}</span>
+                  <ArchiveBadge :wallet="w" />
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </router-link>
                 <div class="flex items-center gap-4 text-right flex-wrap">
@@ -976,6 +1009,16 @@ onMounted(async () => {
 
     <!-- Add button + owner filter pills -->
     <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+      <div class="flex flex-wrap items-center gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('archive.filter_label') }}:</span>
+        <div class="filter-row">
+          <button v-for="[val, lbl] in [['all', t('filter.all')], ['active', t('archive.filter_active')], ['archived', t('archive.filter_archived')]]"
+                  :key="val"
+                  :class="['filter-pill', archiveFilter === val && 'filter-pill-active']"
+                  @click="archiveFilter = val">{{ lbl }}</button>
+        </div>
+      </div>
       <div v-if="uniqueOwners.length" class="flex flex-wrap items-center gap-2">
         <span class="text-xs text-gray-500 uppercase tracking-wide">{{ t('filter.owner') }}:</span>
         <button v-for="owner in uniqueOwners" :key="owner"
@@ -987,7 +1030,7 @@ onMounted(async () => {
           {{ store.hideAddresses ? '••••••' : owner }}
         </button>
       </div>
-      <div v-else></div>
+      </div>
       <button class="btn text-sm" @click="showForm = !showForm">+ {{ t('wallet.add') }}</button>
     </div>
 
@@ -1041,6 +1084,15 @@ onMounted(async () => {
         <datalist id="function-list-mobile-edit">
           <option v-for="f in uniqueFunctions" :key="f" :value="f" />
         </datalist>
+        <label class="flex items-center gap-2 text-xs cursor-pointer">
+          <input v-model="editForm.archived" type="checkbox" class="accent-qubic-teal" />
+          {{ t('archive.flag') }}
+        </label>
+        <template v-if="editForm.archived">
+          <input v-model="editForm.archived_reason" :placeholder="t('archive.reason_placeholder')"
+                 :class="['input w-full text-xs', !editForm.archived_reason.trim() && 'border-red-500/60']" />
+          <input v-model="editForm.archived_successor" :placeholder="t('archive.successor_placeholder')" class="input w-full text-xs" />
+        </template>
         <p v-if="editError" class="text-red-400 text-xs">{{ editError }}</p>
         <div class="flex gap-2">
           <button class="btn text-sm" @click="saveEdit(w.id)">{{ t('common.save') }}</button>
@@ -1053,7 +1105,9 @@ onMounted(async () => {
             <div class="text-sm font-medium group-hover:text-qubic-teal transition-colors flex items-center gap-1.5">
               <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
               {{ maskLabel(w.label, w.id) }}
+              <ArchiveBadge :wallet="w" />
             </div>
+            <div v-if="w.archived && w.archived_reason" class="text-xs text-gray-500 truncate">{{ t('archive.reason') }}: {{ w.archived_reason }}</div>
             <div class="text-xs font-mono text-gray-500 truncate">{{ store.hideAddresses ? '••••••••••••' : w.id }}</div>
             <div class="flex items-center gap-1 mt-0.5">
               <span class="text-xs font-mono" :class="w.balance == null ? 'text-gray-600 italic' : 'text-gray-400'">{{ fmtBalance(w) }}</span>
@@ -1161,7 +1215,6 @@ onMounted(async () => {
             </td>
             <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 hidden lg:table-cell"></td>
-            <td class="p-2 hidden lg:table-cell"></td>
             <td class="p-2 text-right">
               <p v-if="editError" class="text-red-400 text-xs text-right mb-1">{{ editError }}</p>
               <div class="flex justify-end gap-2">
@@ -1170,12 +1223,29 @@ onMounted(async () => {
               </div>
             </td>
           </tr>
+          <tr v-if="editingId === w.id" class="tr-edit">
+            <td colspan="9" class="p-2 pt-0">
+              <div class="flex items-center gap-3 flex-wrap">
+                <label class="flex items-center gap-2 text-xs cursor-pointer whitespace-nowrap">
+                  <input v-model="editForm.archived" type="checkbox" class="accent-qubic-teal" />
+                  {{ t('archive.flag') }}
+                </label>
+                <template v-if="editForm.archived">
+                  <input v-model="editForm.archived_reason" :placeholder="t('archive.reason_placeholder')"
+                         :class="['input text-xs flex-1 min-w-[16rem]', !editForm.archived_reason.trim() && 'border-red-500/60']" />
+                  <input v-model="editForm.archived_successor" :placeholder="t('archive.successor_placeholder')"
+                         class="input text-xs flex-1 min-w-[12rem]" />
+                </template>
+              </div>
+            </td>
+          </tr>
           <!-- Normal-Row -->
-          <tr v-else class="tr-row cursor-pointer hover:bg-white/[0.03] transition-colors group" @click="goToWallet(w.id)">
+          <tr v-else :class="['tr-row cursor-pointer hover:bg-white/[0.03] transition-colors group', w.archived && !store.isArchivedWithFunds(w) && 'opacity-60']" @click="goToWallet(w.id)">
             <td class="td">
               <div class="flex items-center gap-1.5 font-medium group-hover:text-qubic-teal transition-colors">
                 <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
                 {{ maskLabel(w.label, w.id) }}
+                <ArchiveBadge :wallet="w" />
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-500 group-hover:text-qubic-teal transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <polyline points="9 18 15 12 9 6"/>
                 </svg>
@@ -1215,7 +1285,10 @@ onMounted(async () => {
               </span>
             </td>
             <td class="td text-gray-400 hidden md:table-cell">{{ w.function || '—' }}</td>
-            <td class="td text-gray-400 hidden md:table-cell">{{ w.note || '—' }}</td>
+            <td class="td text-gray-400 hidden md:table-cell">
+              <div>{{ w.note || '—' }}</div>
+              <div v-if="w.archived && w.archived_reason" class="text-xs text-gray-500">{{ t('archive.reason') }}: {{ w.archived_reason }}</div>
+            </td>
             <td class="td hidden lg:table-cell text-right">
               <div class="flex items-center justify-end gap-1.5">
                 <span class="font-mono whitespace-nowrap" :class="w.balance == null ? 'text-gray-500 italic' : 'text-gray-300'">

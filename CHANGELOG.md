@@ -4,6 +4,22 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.19] — 2026-10-27
+
+### Added
+- **Archived wallets** — after the Qubic hack every address has to be replaced by a new one. A wallet can now be flagged *Archived* in Wallets → Configuration (edit row) with a mandatory reason and an optional successor (new address or label, free text). The configuration list shows an *Archived* badge, the reason, and a status filter *All / Active / Archived*
+- **Portfolio hides empty archived wallets** — archived wallets holding 0 QUBIC (live balance, falling back to the tracked balance, plus QUBIC still locked in Qearn) are hidden in the portfolio and in the wallet filters of Dashboard, Statistics and Tax. As soon as QUBIC arrives on an archived address it reappears with an amber *Archived – incoming!* badge — independent of the setting; the tooltip shows the amount, reason, successor and archive date. Owner cards show a warning icon when they contain such a wallet. The wallet filter offers *Show archived (n)* to select hidden wallets anyway
+- **Setting** — Settings → Display → *Hide archived wallets without balance* (default: on) to switch the hiding off during the migration
+- Archived wallets keep syncing and stay part of totals, balance history, tax report and exports — archiving only affects the display
+- `GET /wallets` returns `archived`, `archived_reason`, `archived_successor`, `archived_at` and `qearn_locked`; `PUT /wallets/{id}` accepts the archive fields and rejects `archived = true` without a reason (422)
+- Migration `018`: columns `wallets.archived`, `archived_reason`, `archived_successor`, `archived_at`; backup/restore includes them
+
+### Fixed
+- **Transfers to an address added later counted as a sale** — `events.is_internal` was fixed at sync time against the wallets known back then. Funds moved to a new address before that address was added stayed *external* on the sender's rows, and the tax report treated them as disposals. The flag is now recomputed against the currently owned wallets whenever a wallet is added, deleted or restored, and once at startup (heals existing data). Exports were already correct (they recompute on the fly)
+- **Tax report: lots did not follow internal transfers** — internal transfers were skipped, so the lots stayed on the sending wallet. A later sale from the receiving wallet had no lots: zero cost basis and no holding period (the 1-year exemption was lost). Lots now move to the receiving wallet with their original acquisition date and cost basis
+
+---
+
 ## [0.2.18] — 2026-10-07
 
 ### Added

@@ -19,6 +19,9 @@ class WalletUpdate(BaseModel):
     function: Optional[str] = Field(None, max_length=200)
     wallet_type: Optional[Literal["PRIVATE", "BUSINESS"]] = None
     active: Optional[int] = None
+    archived: Optional[bool] = None
+    archived_reason: Optional[str] = Field(None, max_length=1000)
+    archived_successor: Optional[str] = Field(None, max_length=200)
 
 
 class WalletOut(BaseModel):
@@ -35,6 +38,11 @@ class WalletOut(BaseModel):
     balance_live: Optional[int] = None
     balance_live_at: Optional[str] = None
     total_events: Optional[int] = None
+    archived: bool = False
+    archived_reason: Optional[str] = None
+    archived_successor: Optional[str] = None
+    archived_at: Optional[str] = None
+    qearn_locked: int = 0
 
     class Config:
         from_attributes = True

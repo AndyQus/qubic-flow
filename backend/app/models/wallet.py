@@ -21,6 +21,10 @@ class Wallet(Base):
     balance_since_tick = Column(Integer, nullable=True)
     owner = Column(Text, nullable=True)
     function = Column(Text, nullable=True)
+    archived = Column(Integer, nullable=False, default=0, server_default="0")
+    archived_reason = Column(Text, nullable=True)
+    archived_successor = Column(Text, nullable=True)
+    archived_at = Column(Text, nullable=True)
 
     sync_state = relationship(
         "SyncState",

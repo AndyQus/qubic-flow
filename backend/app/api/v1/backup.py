@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ...config import settings
 from ...database import get_db
 from ...services.balance_service import check_all_balances
+from ...services.internal_transfer_service import recompute_internal_flags
 from ...models.event import Event
 from ...models.qearn import EventSplit, QearnPosition
 from ...models.node import Node
@@ -96,6 +97,10 @@ def restore_backup(
                 updated_at=w.get("updated_at"),
                 owner=w.get("owner"),
                 function=w.get("function"),
+                archived=1 if w.get("archived") else 0,
+                archived_reason=w.get("archived_reason"),
+                archived_successor=w.get("archived_successor"),
+                archived_at=w.get("archived_at"),
             ))
             db.flush()
             existing_wallet_ids.add(w["id"])
@@ -271,5 +276,7 @@ def restore_backup(
         db.commit()
         stats["tax_settings"] = "restored"
 
+    # Restored events carry the flag of the source instance — align with the wallets owned here
+    stats["internal_flags"] = recompute_internal_flags(db)
     background_tasks.add_task(check_all_balances)
     return stats

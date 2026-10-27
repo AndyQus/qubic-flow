@@ -3,6 +3,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
 import OwnerIcon from './OwnerIcon.vue'
+import ArchiveBadge from './ArchiveBadge.vue'
 
 const props = defineProps({
   modelValue:   { type: Array,   default: () => [] },
@@ -47,14 +48,23 @@ watch(() => (props.wallets ?? store.wallets).length, (n, prev) => {
 
 const allWallets = computed(() => props.wallets ?? store.wallets)
 
+// Archived wallets without holdings are hidden (setting) unless the user
+// expands them here; already selected wallets always stay visible.
+const showArchived = ref(false)
+const hiddenArchivedCount = computed(() => allWallets.value.filter(w => store.isArchivedHidden(w)).length)
+const selectableWallets = computed(() =>
+  showArchived.value ? allWallets.value
+    : allWallets.value.filter(w => !store.isArchivedHidden(w) || props.modelValue.includes(w.id))
+)
+
 const uniqueOwners = computed(() =>
   [...new Set(allWallets.value.map(w => w.owner).filter(Boolean))].sort()
 )
 
 const visibleWallets = computed(() => {
   const base = selectedOwners.value.length
-    ? allWallets.value.filter(w => selectedOwners.value.includes(w.owner))
-    : allWallets.value
+    ? selectableWallets.value.filter(w => selectedOwners.value.includes(w.owner))
+    : selectableWallets.value
   return [...base].sort((a, b) =>
     (a.label || a.id || '').toLowerCase().localeCompare((b.label || b.id || '').toLowerCase())
   )
@@ -77,7 +87,7 @@ function toggleOwner(owner) {
   if (selectedOwners.value.length === 0) {
     emit('update:modelValue', [])
   } else {
-    const ids = allWallets.value
+    const ids = selectableWallets.value
       .filter(w => selectedOwners.value.includes(w.owner))
       .map(w => w.id)
     emit('update:modelValue', ids)
@@ -180,6 +190,14 @@ function ownerType(owner) {
         >
           <OwnerIcon :type="w.wallet_type" size="w-3.5 h-3.5" />
           <span class="truncate">{{ walletLabel(w) }}</span>
+          <ArchiveBadge :wallet="w" compact />
+        </button>
+      </div>
+
+      <!-- Archived wallets hidden by the setting -->
+      <div v-if="hiddenArchivedCount" class="pt-1">
+        <button class="btn-ghost text-xs py-1 px-3 text-gray-400 hover:text-gray-200" @click="showArchived = !showArchived">
+          {{ showArchived ? t('archive.hide_hidden') : t('archive.show_hidden', { count: hiddenArchivedCount }) }}
         </button>
       </div>
     </div>

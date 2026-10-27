@@ -170,17 +170,29 @@ def _match_lots(
     return sub_disposals, total_cost
 
 
-def _take_lots(q: deque, amount: int) -> list[dict]:
-    """Remove `amount` QU from the front of a lot queue, keeping dates and prices."""
+def _take_lots(q: deque, amount: int, method: str = "FIFO", currency: str = "EUR") -> list[dict]:
+    """Remove `amount` QU from a lot queue, keeping dates and prices.
+
+    Lots are picked in the order of the cost-basis method (LIFO newest,
+    HIFO most expensive, otherwise oldest first), so a partial internal
+    transfer leaves the sender with the lots the method would sell last.
+    """
+    m = method.upper()
     taken, remaining = [], amount
     while remaining > 0 and q:
-        lot = q[0]
+        if m == "LIFO":
+            idx = len(q) - 1
+        elif m == "HIFO":
+            idx = max(range(len(q)), key=lambda i: _price(q[i], currency))
+        else:
+            idx = 0
+        lot = q[idx]
         take = min(remaining, lot["amount"])
         taken.append({**lot, "amount": take})
         lot["amount"] -= take
         remaining -= take
         if lot["amount"] <= 0:
-            q.popleft()
+            del q[idx]
     return taken
 
 
@@ -284,8 +296,6 @@ def calculate_tax_report(
     income: list[dict] = []
 
     for evt in events:
-        if evt.is_internal:
-            continue
         amount = int(evt.amount_qubic or 0)
         if amount <= 0:
             continue
@@ -295,6 +305,18 @@ def calculate_tax_report(
         # year_end_holdings would reflect disposals from subsequent years.
         if ts > year_end:
             break
+
+        # Internal transfer between two selected wallets: no disposal — the
+        # lots (acquisition dates + cost basis) move to the receiving wallet,
+        # so a later sale from there keeps the original holding period.
+        # The transfer is stored once per wallet; act on the sender's row only.
+        if evt.source_address in wallet_set and evt.destination_addr in wallet_set:
+            if evt.wallet_id == evt.source_address:
+                moved = _take_lots(lots[evt.source_address], amount, method, currency)
+                _restore_lots(lots[evt.destination_addr], moved)
+            continue
+        if evt.is_internal:
+            continue
         price_eur = float(evt.qubic_eur_rate) if evt.qubic_eur_rate is not None else 0.0
         price_usd = float(evt.qubic_usd_rate) if evt.qubic_usd_rate is not None else 0.0
 

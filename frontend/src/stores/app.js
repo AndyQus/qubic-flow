@@ -14,6 +14,9 @@ export const useAppStore = defineStore('app', () => {
   const hideAddresses = ref(localStorage.getItem('hideAddresses') === 'true')
   const currency = ref(localStorage.getItem('currency') || 'USD')
   const walletFilter = ref('all')
+  // Archived wallets (e.g. replaced after a hack) without holdings are hidden
+  // in the portfolio and wallet filters. Default on.
+  const hideArchived = ref(localStorage.getItem('hideArchived') !== 'false')
   const wallets = ref([])
   const events = ref([])
   const nodes = ref([])
@@ -24,6 +27,21 @@ export const useAppStore = defineStore('app', () => {
   function setNodeLogError(val) { nodeLogError.value = val }
 
   const locale = computed(() => lang.value === 'de' ? 'de-DE' : 'en-US')
+
+  // Current holdings incl. Qearn locks; null while the balance is still unknown.
+  function walletHoldings(w) {
+    const bal = w.balance_live ?? w.balance
+    if (bal == null) return null
+    return bal + (w.qearn_locked || 0)
+  }
+  // Archived but still holding QUBIC → must stay visible with a warning.
+  function isArchivedWithFunds(w) {
+    return !!w.archived && (walletHoldings(w) ?? 0) > 0
+  }
+  // Archived, empty and the hide setting is on → hidden from portfolio/filters.
+  function isArchivedHidden(w) {
+    return hideArchived.value && !!w.archived && walletHoldings(w) === 0
+  }
 
   const filteredWallets = computed(() => {
     if (walletFilter.value === 'all') return wallets.value
@@ -46,6 +64,7 @@ export const useAppStore = defineStore('app', () => {
     hideAddresses.value = !hideAddresses.value
     localStorage.setItem('hideAddresses', hideAddresses.value)
   }
+  function setHideArchived(v) { hideArchived.value = v; localStorage.setItem('hideArchived', String(v)) }
   function setCurrency(c) { currency.value = c; localStorage.setItem('currency', c) }
   function setFontSize(s) {
     fontSize.value = s
@@ -93,11 +112,11 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     animation, moneyAnim, moneySound, soundStyle,
-    theme, lang, fontSize, hideAddresses, currency, walletFilter,
+    theme, lang, fontSize, hideAddresses, currency, walletFilter, hideArchived,
     wallets, events, nodes, wsConnected, newEventIds, nodeLogError,
     locale, filteredWallets, activeNode,
     setAnimation, setMoneyAnim, setMoneySound, setSoundStyle,
     setTheme, setLang, setFontSize, toggleHideAddresses, setCurrency, prependEvent, simulateEvent,
-    setNodeLogError,
+    setNodeLogError, setHideArchived, walletHoldings, isArchivedWithFunds, isArchivedHidden,
   }
 })

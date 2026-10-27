@@ -185,3 +185,90 @@ class TestUpdateWallet:
         client.delete(f"/api/v1/wallets/{WALLET_ID}")
         resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"label": "Ghost"})
         assert resp.status_code == 404
+
+
+# ------------------------------------------------------------------ archive --
+
+class TestArchiveWallet:
+    def test_new_wallet_is_not_archived(self, client):
+        resp = client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        assert resp.json()["archived"] is False
+
+    def test_archive_without_reason_returns_422(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": True})
+        assert resp.status_code == 422
+
+    def test_archive_with_blank_reason_returns_422(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": True, "archived_reason": "   "})
+        assert resp.status_code == 422
+
+    def test_archive_with_reason_persisted(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={
+            "archived": True, "archived_reason": " Hack ", "archived_successor": "NEWID"})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["archived"] is True
+        assert body["archived_reason"] == "Hack"
+        assert body["archived_successor"] == "NEWID"
+        assert body["archived_at"]
+
+    def test_successor_is_optional(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": True, "archived_reason": "Hack"})
+        assert resp.status_code == 200
+        assert resp.json()["archived_successor"] is None
+
+    def test_unarchive_clears_archived_at(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": True, "archived_reason": "Hack"})
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": False})
+        assert resp.json()["archived"] is False
+        assert resp.json()["archived_at"] is None
+
+    def test_clearing_reason_of_archived_wallet_returns_422(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived": True, "archived_reason": "Hack"})
+        resp = client.put(f"/api/v1/wallets/{WALLET_ID}", json={"archived_reason": ""})
+        assert resp.status_code == 422
+
+    def test_list_reports_qearn_locked_default_zero(self, client):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        wallet = next(w for w in client.get("/api/v1/wallets").json() if w["id"] == WALLET_ID)
+        assert wallet["qearn_locked"] == 0
+
+
+# ------------------------------------------------------------------ internal flags --
+
+class TestInternalFlagRecompute:
+    def _event(self, db, wallet_id, source, dest, is_internal=0):
+        from app.models.event import Event
+        db.add(Event(
+            id="mv1", wallet_id=wallet_id, tick_number=1, timestamp="2026-10-20T00:00:00Z",
+            source_address=source, destination_addr=dest, is_internal=is_internal,
+            amount_qubic=1000, source_type="TX", verified=0, created_at="2026-10-20T00:00:00Z",
+        ))
+        db.commit()
+
+    def _flag(self, db):
+        from app.models.event import Event
+        db.expire_all()
+        return db.query(Event).filter(Event.id == "mv1").one().is_internal
+
+    def test_adding_counterpart_wallet_marks_transfer_internal(self, client, db):
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        new_id = _addr("successor")
+        self._event(db, WALLET_ID, WALLET_ID, new_id)
+        assert self._flag(db) == 0
+        client.post("/api/v1/wallets", json={**WALLET_PAYLOAD, "id": new_id, "label": "New"})
+        assert self._flag(db) == 1
+
+    def test_deleting_counterpart_wallet_marks_transfer_external(self, client, db):
+        new_id = _addr("successor")
+        client.post("/api/v1/wallets", json=WALLET_PAYLOAD)
+        client.post("/api/v1/wallets", json={**WALLET_PAYLOAD, "id": new_id, "label": "New"})
+        self._event(db, WALLET_ID, WALLET_ID, new_id, is_internal=1)
+        client.delete(f"/api/v1/wallets/{new_id}")
+        assert self._flag(db) == 0

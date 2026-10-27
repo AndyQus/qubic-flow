@@ -79,6 +79,24 @@ def _seed_defaults():
 _seed_defaults()
 
 
+def _fix_internal_flags():
+    # One pass at startup heals transfers stored before their counterpart
+    # wallet was added (e.g. funds moved to a new address added later).
+    import logging
+    from .database import SessionLocal
+    from .services.internal_transfer_service import recompute_internal_flags
+    db = SessionLocal()
+    try:
+        recompute_internal_flags(db)
+    except Exception as e:
+        logging.warning(f"Recomputing internal-transfer flags failed: {e}")
+    finally:
+        db.close()
+
+
+_fix_internal_flags()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     install_buffer_handler()
