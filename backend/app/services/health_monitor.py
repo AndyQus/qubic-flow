@@ -59,16 +59,16 @@ async def _check_node(db, node: Node):
     else:
         url = f"{base}/v1/tick-info"
     start = time.perf_counter()
-    # SSL-Verify nur für öffentliche RPCs; BOB & HOME_NODE laufen oft im LAN
-    # mit http oder selbstsignierten Zertifikaten.
-    verify = node.node_type == "RPC"
+    # SSL-Verify für RPCs und alle öffentlichen Hosts; BOB & HOME_NODE im LAN
+    # laufen oft mit http oder selbstsignierten Zertifikaten.
+    verify = node.node_type == "RPC" or rate_limit.verify_tls(base)
     try:
         await rate_limit.acquire(base)
         if node.node_type == "BOB_NODE":
             # Try JSON-RPC first (qubic_getTickNumber), fall back to REST /status
             tick = 0
             try:
-                async with httpx.AsyncClient(verify=False) as client:
+                async with httpx.AsyncClient(verify=verify) as client:
                     rpc_r = await client.post(
                         f"{base}/qubic",
                         json={"jsonrpc": "2.0", "id": 1, "method": "qubic_getTickNumber"},
@@ -81,7 +81,7 @@ async def _check_node(db, node: Node):
             except Exception:
                 pass
             if tick == 0:
-                async with httpx.AsyncClient(verify=False) as client:
+                async with httpx.AsyncClient(verify=verify) as client:
                     r = await client.get(url, timeout=10)
                     r.raise_for_status()
                     data = r.json()

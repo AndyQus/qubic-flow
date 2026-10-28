@@ -60,6 +60,11 @@ def is_public_host(host: str) -> bool:
         return True
 
 
+def verify_tls(url: str) -> bool:
+    """Check TLS certificates for public hosts; LAN nodes often use self-signed certs."""
+    return is_public_host(_host(url))
+
+
 def _bucket(host: str) -> _HostBucket:
     b = _buckets.get(host)
     if b is None:

@@ -4,6 +4,14 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.21] — 2026-10-28
+
+### Security
+- **TLS certificates of public nodes are now verified** — requests to BOB nodes and Home Nodes always skipped certificate verification, also for public HTTPS hosts like `bob.qubic.li`, so a man-in-the-middle could have fed QubicFlow fake data. Certificates are now verified for every public host; own nodes in the LAN (private IPs, `*.local`, Docker service names) keep working with http or self-signed certificates
+- **Updated CA certificates** — the images are rebuilt on current base images without the distrusted roots *emSign ECC Root CA - G3* and *AAA Certificate Services* (CA advisory of 2026-10-20)
+
+---
+
 ## [0.2.20] — 2026-10-27
 
 ### Fixed

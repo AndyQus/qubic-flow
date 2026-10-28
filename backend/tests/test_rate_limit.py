@@ -59,3 +59,10 @@ def test_status_reports_hosts():
     asyncio.run(rate_limit.acquire("https://rpc.qubic.org/v1/tick-info"))
     st = rate_limit.status()
     assert st["hosts"]["rpc.qubic.org"]["requests_last_min"] == 1
+
+
+def test_tls_verified_for_public_hosts_only():
+    assert rate_limit.verify_tls("https://bob.qubic.li/qubic")
+    assert rate_limit.verify_tls("https://rpc.qubic.org/v1/tick-info")
+    for url in ("https://192.168.1.10:8443", "https://umbrel.local/qubic", "http://qubic-home-node_core:9090"):
+        assert not rate_limit.verify_tls(url), url

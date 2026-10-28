@@ -283,7 +283,7 @@ class BOBClient:
         for attempt in range(3):
             try:
                 await rate_limit.acquire(self.base_url)
-                async with httpx.AsyncClient(verify=False) as client:
+                async with httpx.AsyncClient(verify=rate_limit.verify_tls(self.base_url)) as client:
                     r = await client.post(f"{self.base_url}/qubic", json=payload, timeout=30)
                     rate_limit.report_response(self.base_url, r)
                     r.raise_for_status()
@@ -301,12 +301,12 @@ class BOBClient:
         raise last_exc if last_exc else RuntimeError(f"BOB RPC {rpc_method} failed")
 
     async def _http_get(self, path: str) -> dict:
-        """HTTP GET with retry, SSL disabled."""
+        """HTTP GET with retry, TLS verified for public hosts only."""
         last_exc: Exception | None = None
         for attempt in range(3):
             try:
                 await rate_limit.acquire(self.base_url)
-                async with httpx.AsyncClient(verify=False) as client:
+                async with httpx.AsyncClient(verify=rate_limit.verify_tls(self.base_url)) as client:
                     r = await client.get(f"{self.base_url}{path}", timeout=15)
                     rate_limit.report_response(self.base_url, r)
                     r.raise_for_status()
