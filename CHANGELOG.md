@@ -4,6 +4,15 @@ All notable changes to QubicFlow are documented here.
 
 ---
 
+## [0.2.22] — 2026-11-11
+
+### Removed
+- **Donation feature** — the donation address is no longer considered safe after the Qubic seed hack in October 2026, so every donation request is gone: the support banner and the thank-you notice, the support link in the navigation, the QR code, the donation address, supporter ranks, the top-supporters list and the personal donation history on `/support`. The page itself stays reachable by URL and only shows the about section
+- Backend: the endpoints `/events/donation-check`, `/events/donation-suppression`, `/events/donation-top` and `/events/donation-history` and the hourly job `refresh_donation_cache`. The `donor_cache` table stays in the database untouched
+- Frontend dependency `qrcode`
+
+---
+
 ## [0.2.21] — 2026-10-28
 
 ### Security

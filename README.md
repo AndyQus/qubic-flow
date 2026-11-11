@@ -330,7 +330,7 @@ qubic-flow/
 │   ├── app/
 │   │   ├── api/v1/          # REST endpoints
 │   │   │   ├── wallets.py   # Wallet CRUD, resync, asset holdings
-│   │   │   ├── events.py    # Event list, filters, notes, donation endpoints
+│   │   │   ├── events.py    # Event list, filters, notes
 │   │   │   ├── nodes.py     # Node CRUD, logs, diagnose, sync-now
 │   │   │   ├── stats.py     # Statistics panels, epochs, portfolio history
 │   │   │   ├── export.py    # CSV downloads (CoinTracking, Koinly, Blockpit, tax advisor)
@@ -350,7 +350,6 @@ qubic-flow/
 │   │   │   ├── address_label.py
 │   │   │   ├── snapshot.py
 │   │   │   ├── settings.py
-│   │   │   ├── donor_cache.py       # Donation/supporter cache
 │   │   │   └── opening_position.py  # Opening positions for tax
 │   │   ├── services/        # Business logic
 │   │   │   ├── sync_engine.py      # Tick sync with window technique (event + TX); dynamic node selection; timestamp/epoch/rate backfill
@@ -362,7 +361,6 @@ qubic-flow/
 │   │   │   ├── health_monitor.py   # Node status checking
 │   │   │   ├── snapshot_service.py # Weekly snapshots
 │   │   │   ├── balance_service.py  # Wallet balance updates
-│   │   │   ├── donation_cache_service.py # Supporter/donation detection
 │   │   │   ├── tax_engine.py       # Tax calculation (FIFO/LIFO/HIFO/AVCO, country-specific incl. DK)
 │   │   │   └── scheduler.py        # APScheduler jobs
 │   │   ├── websocket/
@@ -578,7 +576,6 @@ The report can be downloaded directly in the UI as **CSV** or **PDF**.
 | `retry_sync_gaps`         | every 15 minutes     | Retry unresolved sync gaps (EVENT + TX) via RPC                           |
 | `check_balances`          | every hour           | Compare live RPC balance vs. computed balance; trigger targeted resync on drift |
 | `backfill_tx_epochs`      | every hour           | Fill missing epoch numbers on TX records                                  |
-| `refresh_donation_cache`  | every hour           | Update supporter/donation cache                                           |
 | `auto_dedup`              | every hour + startup | Remove duplicate events and correct the affected wallet balance           |
 | `backfill_rates`          | every 6 hours        | Fetch EUR/USD rates for events without a rate                             |
 | `backfill_timestamps`     | every 6 hours        | Resolve events without a usable timestamp (old BOB imports) via tick data |
@@ -627,7 +624,6 @@ python -m pytest tests/ -v
 | `tests/test_bob_client.py`        | 25    | BOB JSON-RPC client, response mapping, timestamp resolution          |
 | `tests/test_wallets_api.py`       | 23    | Wallet CRUD + resync endpoints                                       |
 | `tests/test_time_utils.py`        | 15    | UTC helpers                                                          |
-| `tests/test_donation_utils.py`    | 13    | Supporter rank / donation logic                                      |
 | `tests/test_balance_snapshots.py` | 10    | Balance history: buckets, edit audit trail, Excel workbook, transfer period, UTC timestamps |
 | `tests/test_bob_selection.py`     | 8     | Tick-based BOB node election + lag fallback                          |
 | `tests/test_home_node_selection.py` | 7   | HOME_NODE preference in the sync source selection chain (HOME → BOB → RPC) |

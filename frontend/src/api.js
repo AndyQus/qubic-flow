@@ -46,10 +46,6 @@ export const api = {
       }
       return req(`/events/filter-options${walletId ? `?wallet_id=${walletId}` : ''}`)
     },
-    donationCheck: () => req('/events/donation-check'),
-    donationSuppression: () => req('/events/donation-suppression'),
-    donationTop: () => req('/events/donation-top'),
-    donationHistory: (mineOnly = false) => req(`/events/donation-history${mineOnly ? '?mine_only=true' : ''}`),
     updateNote: (eventId, walletId, note) => req(`/events/${eventId}/note`, {
       method: 'PATCH',
       body: JSON.stringify({ wallet_id: walletId, note: note || null }),

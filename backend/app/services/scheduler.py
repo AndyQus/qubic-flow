@@ -10,7 +10,6 @@ from .label_service import sync_labels
 from .coingecko import get_price_for_date, get_hourly_price, capture_hourly_price
 from ..models.price_hourly import PriceHourly
 from .balance_service import check_all_balances
-from .donation_cache_service import refresh_donation_cache
 from .dedup_service import auto_dedup_job
 from ..database import SessionLocal
 from ..models.event import Event
@@ -200,17 +199,6 @@ scheduler.add_job(
     "interval",
     minutes=15,
     id="retry_sync_gaps",
-    max_instances=1,
-    coalesce=True,
-    next_run_time=datetime.now(timezone.utc),
-)
-
-
-scheduler.add_job(
-    refresh_donation_cache,
-    "interval",
-    hours=1,
-    id="refresh_donation_cache",
     max_instances=1,
     coalesce=True,
     next_run_time=datetime.now(timezone.utc),

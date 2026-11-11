@@ -329,7 +329,7 @@ qubic-flow/
 │   ├── app/
 │   │   ├── api/v1/          # REST-Endpunkte
 │   │   │   ├── wallets.py   # Wallet CRUD, Resync, Asset-Bestände
-│   │   │   ├── events.py    # Event-Liste, Filter, Notizen, Spenden-Endpunkte
+│   │   │   ├── events.py    # Event-Liste, Filter, Notizen
 │   │   │   ├── nodes.py     # Node CRUD, Logs, Diagnose, Sync-Now
 │   │   │   ├── stats.py     # Statistik-Panels, Epochen, Portfolio-Verlauf
 │   │   │   ├── export.py    # CSV-Downloads (CoinTracking, Koinly, Blockpit, Steuerberater)
@@ -349,7 +349,6 @@ qubic-flow/
 │   │   │   ├── address_label.py
 │   │   │   ├── snapshot.py
 │   │   │   ├── settings.py
-│   │   │   ├── donor_cache.py       # Spenden-/Supporter-Cache
 │   │   │   └── opening_position.py  # Eröffnungspositionen für Steuer
 │   │   ├── services/        # Geschäftslogik
 │   │   │   ├── sync_engine.py      # Tick-Sync mit Fenstertechnik (Event + TX); dynamische Node-Auswahl; Timestamp-/Epoch-/Kurs-Backfill
@@ -361,7 +360,6 @@ qubic-flow/
 │   │   │   ├── health_monitor.py   # Node-Statusprüfung
 │   │   │   ├── snapshot_service.py # Wöchentliche Schnappschüsse
 │   │   │   ├── balance_service.py  # Wallet-Kontostand-Nachführung
-│   │   │   ├── donation_cache_service.py # Supporter-/Spendenerkennung
 │   │   │   ├── tax_engine.py       # Steuerberechnung (FIFO/LIFO/HIFO/AVCO, länderspezifisch inkl. DK)
 │   │   │   └── scheduler.py        # APScheduler-Jobs
 │   │   ├── websocket/
@@ -576,7 +574,6 @@ Der Bericht kann direkt in der Oberfläche als **CSV** oder **PDF** heruntergela
 | `retry_sync_gaps`         | alle 15 Minuten      | Ungelöste Sync-Lücken (EVENT + TX) per RPC erneut versuchen               |
 | `check_balances`          | stündlich            | Live-RPC-Kontostand mit berechnetem Bestand vergleichen; bei Abweichung gezielten Resync auslösen |
 | `backfill_tx_epochs`      | stündlich            | Fehlende Epochen-Nummern an TX-Datensätzen ergänzen                       |
-| `refresh_donation_cache`  | stündlich            | Supporter-/Spenden-Cache aktualisieren                                    |
 | `auto_dedup`              | stündlich + Start    | Doppelt erfasste Events entfernen und den Kontostand entsprechend korrigieren |
 | `backfill_rates`          | alle 6 Stunden       | EUR/USD-Kurse für Events ohne Kurs nachladen                              |
 | `backfill_timestamps`     | alle 6 Stunden       | Events ohne verwertbaren Zeitstempel (alte BOB-Importe) über Tick-Daten reparieren |
@@ -629,7 +626,6 @@ python -m pytest tests/ -v
 | `tests/test_bob_client.py`        | 25    | BOB-JSON-RPC-Client, Antwort-Mapping, Timestamp-Auflösung            |
 | `tests/test_wallets_api.py`       | 23    | Wallet-CRUD + Resync-Endpunkte                                       |
 | `tests/test_time_utils.py`        | 15    | UTC-Hilfsfunktionen                                                  |
-| `tests/test_donation_utils.py`    | 13    | Supporter-Rang- / Spendenlogik                                       |
 | `tests/test_balance_snapshots.py` | 10    | Bestandsverlauf: Buckets, Edit-Audit-Trail, Excel-Workbook, Transfer-Zeitraum, UTC-Timestamps |
 | `tests/test_bob_selection.py`     | 8     | Tick-basierte BOB-Node-Wahl + Lag-Fallback                           |
 | `tests/test_home_node_selection.py` | 7   | HOME_NODE-Bevorzugung in der Sync-Quellen-Auswahl (HOME → BOB → RPC) |

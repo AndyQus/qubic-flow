@@ -2,7 +2,6 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useTranslation } from 'i18next-vue'
-import { useDonationState } from '../composables/useDonationState'
 import { useQubicUtils } from '../composables/useQubicUtils'
 import { api } from '../api'
 import logoDark from '../assets/logo-full.svg'
@@ -10,7 +9,6 @@ import logoLight from '../assets/logo-full-light.svg'
 
 const store = useAppStore()
 const { t } = useTranslation()
-const { isSuppressed, suppressedUntil, donorRank } = useDonationState()
 const { copyValue, fmtRateLocale } = useQubicUtils()
 
 // Current QUBIC rate — the backend captures it hourly; polling every 5 min
@@ -101,24 +99,6 @@ const activeNodeName = computed(() => {
             </svg>
           </button>
         </div>
-
-        <!-- Dankeschön-Text (nur Desktop) -->
-        <router-link v-if="isSuppressed" to="/support"
-          class="hidden sm:flex items-center gap-1.5 text-xs font-semibold transition-colors"
-          :class="isLight ? 'text-emerald-600 hover:text-emerald-800' : 'text-[#9acd32] hover:text-[#b8e05a]'">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
-          </svg>
-          <span>
-            {{ donorRank
-              ? (suppressedUntil === '2099-12-31'
-                  ? t('donation.banner_suppressed_rank_forever', { rank: donorRank.name })
-                  : t('donation.banner_suppressed_rank', { rank: donorRank.name, date: suppressedUntil }))
-              : (suppressedUntil === '2099-12-31'
-                  ? t('donation.banner_suppressed_forever')
-                  : t('donation.banner_suppressed') + ' ' + suppressedUntil) }}
-          </span>
-        </router-link>
 
       </div>
     </div>

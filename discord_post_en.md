@@ -36,24 +36,9 @@ docker compose up --build
 
 ---
 
-**Support / Donations**
-QubicFlow is free to use. If you'd like to support the project, you can send QU to:
-`CCCJKFMDTUFFWDCRBFNHMQRYOBABEKBDUZWEJMARUETQPTFZWBCJLYUGREXI`
-
-QubicFlow detects donations from your own wallets automatically — directly on-chain. No subscription, no cloud, no account — just an on-chain payment straight from your own wallet.
-
-**Donation tiers:**
-- **1,000,000 QU** = 1 month thank-you notice in the app
-- **12,000,000 QU** = 1 year
-- **100,000,000+ QU** = forever
-
-The **Top 20 supporters** by QU sent are displayed directly in the app — data pulled live from the Qubic Explorer.
-
----
-
 **About AndyQus**
 AndyQus has been an active community developer in the Qubic ecosystem for several years. He served as Project Manager for the official [Qubic Explorer](https://explorer.qubic.org), as Admin for Quottery and as Developer for the [Qubic Web Wallet](https://wallet.qubic.org) — for which he was compensated by the Qubic core team at the time.
 
 All other tools, such as [MyLedger](https://myledger.qubic.tools), [Dividends](https://dividends.qubic.tools), [Auctions](https://auctions.qubic.tools), [Doge-Mining-Stats](https://doge.qubic.tools), [Explorer](https://live.qubic.org/explorer), [Live](https://live.qubic.org), [QPI Language Support](https://marketplace.visualstudio.com/items?itemName=AndyQus.qubic-org-qpi), have been built since January 2025 entirely in his free time — free of charge, without any compensation, purely for the community.
 
-QubicFlow is open source (MIT license) — the source code is freely available on GitHub. If you'd like to support the project, feel free to ⭐ star it or send a donation.
+QubicFlow is open source (MIT license) — the source code is freely available on GitHub. If you'd like to support the project, feel free to ⭐ star it.
